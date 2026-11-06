@@ -1,4 +1,4 @@
-# Valico (nome provvisorio)
+# Galleria
 
 Client desktop open source per OpenVPN e WireGuard: una rubrica di connessioni in stile VirtualBox,
 una connessione attiva alla volta, Linux e Windows (macOS in seguito).

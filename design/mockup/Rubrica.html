@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Valico — mockup rubrica (v0.1)</title>
+<title>Galleria — mockup rubrica (v0.1)</title>
 <style>
 :root{
   --bg:#141518; --panel:#1b1c20; --panel-2:#222328; --line:#2c2e34; --ink:#ecebe7; --muted:#9a9a96; --faint:#6c6d6b;
@@ -133,9 +133,9 @@ section.detail{display:flex;flex-direction:column;min-height:0;min-width:0}
 <body>
 <div class="demo">Mockup v0.1 — dati di esempio, nessuna connessione reale</div>
 
-<div class="win" role="application" aria-label="Valico">
+<div class="win" role="application" aria-label="Galleria">
   <div class="title">
-    <span class="brand">Valico<small>nome provvisorio</small></span>
+    <span class="brand">Galleria</span>
     <div class="tb-actions">
       <button class="tb" id="bImport" title="Importa profilo (Ctrl+O)">Importa…</button>
       <button class="tb" id="bTray" title="Anteprima menu tray">Tray</button>
@@ -157,7 +157,7 @@ section.detail{display:flex;flex-direction:column;min-height:0;min-width:0}
     <section class="detail" id="detail"></section>
   </div>
 
-  <div class="bar"><span id="barState">Nessuna connessione attiva</span><span class="sp">Demone valicod · connesso</span><span>v0.1.0-mock</span></div>
+  <div class="bar"><span id="barState">Nessuna connessione attiva</span><span class="sp">Demone galleriad · connesso</span><span>v0.1.0-mock</span></div>
 </div>
 
 <!-- import -->
@@ -197,9 +197,9 @@ section.detail{display:flex;flex-direction:column;min-height:0;min-width:0}
 </div>
 
 <div class="tray" id="tray" aria-label="Anteprima menu tray">
-  <header><span>Valico</span><span id="trayState" style="color:var(--muted);font-weight:400"></span></header>
+  <header><span>Galleria</span><span id="trayState" style="color:var(--muted);font-weight:400"></span></header>
   <div id="trayList" style="padding:6px 0"></div>
-  <div class="row" style="border-top:1px solid var(--line);color:var(--muted)"><span class="nm">Apri Valico</span></div>
+  <div class="row" style="border-top:1px solid var(--line);color:var(--muted)"><span class="nm">Apri Galleria</span></div>
 </div>
 
 <div class="toast" id="toast" role="status"></div>
@@ -323,7 +323,7 @@ ${p.auth!=="cert"?"auth-user-pass\n":""}verb 3
     const me=p.id===active&&state==="on";
     return `<div class="rawbar"><span>Ultima sessione</span><span style="margin-left:auto"></span><button class="btn">Copia</button><button class="btn">Apri cartella log</button></div>
     <div class="log">${me?(p.proto==="wg"?
-`<span class="t">10:42:01</span> <span class="i">Creazione interfaccia valico0</span>
+`<span class="t">10:42:01</span> <span class="i">Creazione interfaccia galleria0</span>
 <span class="t">10:42:01</span> <span class="i">Configurazione peer ${esc(p.server)}</span>
 <span class="t">10:42:02</span> <span class="i">DNS impostato: ${esc(p.dns)}</span>
 <span class="t">10:42:02</span> <span class="g">Handshake completato</span>`:

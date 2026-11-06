@@ -1,7 +1,7 @@
 # 01 — Analisi tecnico-funzionale
 
-Versione 0.1 — 2026-11-06 — stato: bozza da discutere con Nello (CTO)
-Nome di lavoro: **Valico** (provvisorio, vedi D7).
+Versione 0.2 — 2026-11-06 — stato: bozza da discutere con Nello (CTO)
+Nome: **Galleria** (D7).
 
 Legenda: **[V]** verificato su fonte letta (link in fondo) · **[S]** supposto, da verificare.
 
@@ -24,7 +24,7 @@ monetizzazione.
 | D4 | Protocolli: OpenVPN e WireGuard | Peppe |
 | D5 | **Una sola connessione attiva** alla volta, imposta dal demone | Peppe |
 | D6 | UX stile VirtualBox: lista/rubrica a sinistra, dettaglio a schede a destra | Peppe |
-| D7 | Nome definitivo da scegliere. Scartati: Connectio (tool OSS omonimo, ott. 2026), Connect.io (VPN aziendale), Varco (varco.io, prodotto di onboarding dispositivi), Tunnelbox (prodotto omonimo) | ricerca 2026-11-06 |
+| D7 | Nome: **Galleria** (scelto da Peppe il 2026-11-06). Scartati in precedenza: Connectio (tool OSS omonimo, ott. 2026), Connect.io (VPN aziendale), Varco (varco.io, prodotto di onboarding dispositivi), Tunnelbox (prodotto omonimo) | ricerca 2026-11-06 |
 
 ## 3. Differenziazione (perché esiste)
 
@@ -56,7 +56,7 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 - Kill switch e protezione DNS leak (per profilo).
 - Split tunneling per rotte/subnet (per app è molto più complesso, fuori).
 - Avvio con il sistema, connessione automatica su reti non fidate.
-- CLI `valico` che parla con lo stesso demone (utile su SSH/server).
+- CLI `galleria` che parla con lo stesso demone (utile su SSH/server).
 - Backup/ripristino della rubrica.
 
 ### Fase 3 (solo con trazione)
@@ -68,7 +68,7 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 
 ```
 ┌────────────────────────┐   IPC locale autenticato   ┌──────────────────────────────┐
-│ GUI (Tauri 2)          │ ─────────────────────────▶ │ Demone valicod (Rust)        │
+│ GUI (Tauri 2)          │ ─────────────────────────▶ │ Demone galleriad (Rust)        │
 │ React + TS, utente     │ ◀───────── eventi ──────── │ root / LocalSystem           │
 │ normale, niente privil.│                            │ - stato e vincolo "1 attiva" │
 └────────────────────────┘                            │ - backend WireGuard          │
@@ -79,9 +79,9 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 ```
 
 - **GUI**: Tauri 2 + React + TypeScript (stack di Peppe). Gira come utente normale.
-- **Demone `valicod`** in Rust, unico componente privilegiato:
+- **Demone `galleriad`** in Rust, unico componente privilegiato:
   - Linux: unit **systemd**; IPC su socket Unix con controllo delle credenziali del chiamante
-    (gruppo `valico`).
+    (gruppo `galleria`).
   - Windows: **servizio Windows**; IPC su named pipe con ACL per gli utenti autorizzati.
   - Protocollo IPC: JSON-RPC o gRPC (tonic) — **da decidere con Nello**.
 - **Backend WireGuard**:
@@ -171,7 +171,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 
 | ID | Domanda | Chi decide | Stato |
 |---|---|---|---|
-| A1 | Nome definitivo (candidati: Valico, Portolan, Galleria; verifica marchi/dominio) | Peppe | DA DECIDERE |
+| A1 | Nome definitivo | Peppe | RISOLTA: Galleria (D7). Verifica marchio/dominio/nome repo ancora da fare |
 | A2 | Licenza: GPL-3.0-or-later o Apache-2.0/MIT | Peppe | DA DECIDERE |
 | A3 | IPC: JSON-RPC su socket/pipe o gRPC (tonic) | Nello | DA DECIDERE |
 | A4 | Windows: includere OpenVPN o richiederlo come prerequisito | Nello | DA DECIDERE |

@@ -15,7 +15,7 @@ VirtualBox (lista a sinistra, dettaglio a destra), una connessione attiva alla v
 
 | Prodotto | Licenza | OS | Protocolli | Note |
 |---|---|---|---|---|
-| **Pritunl Client** | open source ("Other" su GitHub) | Linux, Win, macOS, Flatpak | OpenVPN + WireGuard | Il più vicino. Si presenta come "Free and open source alternative to Viscosity". Import di profili OpenVPN standard; WireGuard dichiarato "directly from Pritunl servers" → **da verificare** se importa un `.conf` WireGuard generico. GUI Electron + servizio Go + CLI/TUI (v1.4, set 2026). Giudizio di Peppe: "l'interfaccia mi fa un po' cagare". |
+| **Pritunl Client** | open source ("Other" su GitHub) | Linux, Win, macOS, Flatpak | OpenVPN + WireGuard | Il più vicino. Si presenta come "Free and open source alternative to Viscosity". Import di profili OpenVPN standard; WireGuard **solo con server Pritunl** [verificato: forum Pritunl, "does not support any other WireGuard servers"; chiavi generate per sessione dal server]: un `.conf` WireGuard generico non si importa. GUI Electron + servizio Go + CLI/TUI (v1.4, set 2026). Giudizio di Peppe: "l'interfaccia mi fa un po' cagare". |
 | **Eddie** (AirVPN) | GPLv3 | Linux, Win, macOS | OpenVPN + WireGuard | Molto configurabile (direttive OpenVPN, rotte, network lock), ma costruito attorno al servizio AirVPN. **Da verificare** quanto bene gestisce profili di terzi. |
 | **Defguard client** | "Other" su GitHub | Linux, Win, macOS | solo WireGuard | Stesso stack che proponiamo (Rust + Tauri + React). Qualsiasi server WireGuard; punto forte MFA con server Defguard. |
 | **Viscosity** | proprietario, $14 una tantum | Win, macOS | solo OpenVPN | Il riferimento UX "rubrica di connessioni". |
@@ -42,9 +42,13 @@ Per ciascuno annotare:
 
 Quella lista diventa il backlog di differenziazione del MVP.
 
+## Esito validazione (2026-11-06)
+
+Peppe ha visto Pritunl senza installarlo: il problema principale è l'**interfaccia spartana**; il limite WireGuard (solo server Pritunl) è confermato dalla documentazione del forum. Prova pratica con i profili veri non fatta.
+
 ## Fonti
 
-- Pritunl Client: https://client.pritunl.com/ , https://github.com/pritunl/pritunl-client
+- Pritunl Client: https://client.pritunl.com/ , https://github.com/pritunl/pritunl-client , https://forum.pritunl.com/t/edit-the-wg0-conf-file/192 , https://docs.pritunl.com/kb/vpn/client/wireguard
 - Eddie: https://eddie.website/ , https://github.com/AirVPN/Eddie
 - Defguard client: https://github.com/DefGuard/client , https://docs.defguard.net/using-defguard-for-end-users/desktop-client
 - Viscosity: https://viscosityapp.com/viscosity/ , https://www.sparklabs.com/support/kb/article/purchasing-viscosity/

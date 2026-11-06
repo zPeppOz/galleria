@@ -34,7 +34,7 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
    tray con connessione rapida.
 3. **Configurabilità per profilo** esposta in GUI (DNS, rotte, kill switch, riconnessione) invece che
    solo nel file di testo, con editor raw sempre disponibile.
-4. Da completare con la lista dei difetti di Pritunl raccolta da Peppe (validazione, doc 00).
+4. Pritunl, il concorrente più vicino: UI spartana (giudizio di Peppe) e WireGuard utilizzabile solo con server Pritunl (verificato). Le funzioni 1 e 2 sono quindi il cuore del prodotto: se la UX non è nettamente migliore, il progetto non ha motivo di esistere.
 
 ## 4. Funzionalità
 
@@ -177,7 +177,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | A4 | Windows: includere OpenVPN o richiederlo come prerequisito | Nello | DA DECIDERE |
 | A5 | Storage profili: TOML (leggibile, versionabile) o SQLite | Nello | DA DECIDERE |
 | A6 | Soglie del criterio di stop dopo il lancio | Peppe | DA DECIDERE |
-| A7 | Lista dei difetti di Pritunl/Eddie (validazione) | Peppe | IN SOSPESO |
+| A7 | Lista dei difetti di Pritunl/Eddie (validazione) | Peppe | PARZIALE: Pritunl = UI spartana + WireGuard solo con server Pritunl (verificato su forum); Eddie e prova pratica non fatti |
 | A8 | Design system: riuso di xr1 design-system (verificarne la licenza per un progetto OSS) | Peppe | DA DECIDERE |
 
 ## Fonti

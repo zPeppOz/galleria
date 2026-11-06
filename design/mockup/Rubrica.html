@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Valico — mockup rubrica (v0.1)</title>
+<style>
+:root{
+  --bg:#141518; --panel:#1b1c20; --panel-2:#222328; --line:#2c2e34; --ink:#ecebe7; --muted:#9a9a96; --faint:#6c6d6b;
+  --accent:oklch(0.76 0.14 62); --accent-ink:#1a1206;
+  --ok:oklch(0.76 0.15 150); --warn:oklch(0.8 0.14 85); --err:oklch(0.68 0.19 25);
+  --wg:oklch(0.74 0.11 200); --ovpn:oklch(0.75 0.12 40);
+  --r:8px; --font:"Segoe UI Variable Text","Segoe UI",Cantarell,"Ubuntu","Noto Sans",ui-sans-serif,sans-serif;
+  --mono:ui-monospace,"Cascadia Code","JetBrains Mono","DejaVu Sans Mono",monospace;
+}
+:root[data-theme=light]{
+  --bg:#eeede9; --panel:#f7f6f3; --panel-2:#ffffff; --line:#dddbd5; --ink:#1c1c1a; --muted:#66655f; --faint:#9a9890;
+  --accent:oklch(0.62 0.15 55); --accent-ink:#fff;
+}
+*{box-sizing:border-box} html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--font);display:grid;place-items:center;padding:24px}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.win{width:min(1180px,100%);height:min(740px,calc(100vh - 48px));display:grid;grid-template-rows:38px 1fr 26px;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 30px 80px -30px #0009}
+/* titlebar */
+.title{display:flex;align-items:center;gap:12px;padding:0 6px 0 14px;border-bottom:1px solid var(--line);-webkit-user-select:none;user-select:none}
+.brand{font-weight:650;letter-spacing:.2px}
+.brand small{color:var(--faint);font-weight:400;margin-left:6px}
+.tb-actions{margin-left:auto;display:flex;gap:2px}
+.tb{background:none;border:0;padding:6px 10px;border-radius:6px;color:var(--muted)}
+.tb:hover{background:var(--panel-2);color:var(--ink)}
+.winbtn{width:40px;height:30px;border:0;background:none;color:var(--faint)}
+/* body */
+.main{display:grid;grid-template-columns:300px 1fr;min-height:0}
+aside{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.search{margin:12px;display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);padding:0 10px}
+.search input{flex:1;background:none;border:0;color:var(--ink);padding:9px 0;font:inherit;outline:none}
+kbd{white-space:nowrap;font:11px var(--mono);color:var(--faint);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.list{overflow:auto;padding:0 8px 12px;flex:1}
+.group{margin-top:10px}
+.group h4{margin:0;padding:6px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600;display:flex;justify-content:space-between}
+.item{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;
+  padding:9px 10px;border-radius:7px;min-height:44px}
+.item:hover{background:var(--panel)}
+.item[aria-selected=true]{background:var(--panel-2);box-shadow:inset 0 0 0 1px var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint);opacity:.5}
+.dot.on{background:var(--ok);opacity:1;box-shadow:0 0 0 3px color-mix(in oklch,var(--ok) 25%,transparent)}
+.dot.busy{background:var(--warn);opacity:1;animation:pulse 1s infinite}
+.dot.err{background:var(--err);opacity:1}
+@keyframes pulse{50%{opacity:.35}}
+.item .n{font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .s{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proto{font:600 10px var(--mono);padding:2px 6px;border-radius:4px;letter-spacing:.04em}
+.proto.wg{color:var(--wg);background:color-mix(in oklch,var(--wg) 14%,transparent)}
+.proto.ovpn{color:var(--ovpn);background:color-mix(in oklch,var(--ovpn) 14%,transparent)}
+.star{color:var(--accent);margin-left:4px}
+.side-foot{border-top:1px solid var(--line);padding:10px 12px;display:flex;gap:8px}
+.btn{border:1px solid var(--line);background:var(--panel-2);padding:7px 12px;border-radius:7px}
+.btn:hover{border-color:var(--faint)}
+.btn.primary{background:var(--accent);border-color:transparent;color:var(--accent-ink);font-weight:600}
+.btn.danger{color:var(--err)}
+/* detail */
+section.detail{display:flex;flex-direction:column;min-height:0;min-width:0}
+.head{padding:22px 28px 0;display:grid;grid-template-columns:1fr auto;gap:6px 20px;align-items:start}
+.head h1{margin:0;font-size:22px;font-weight:650;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.head .meta{color:var(--muted);font-size:13px;grid-column:1}
+.head .meta span+span::before{content:"·";margin:0 8px;color:var(--faint)}
+.cta{grid-row:1/3;grid-column:2;display:flex;gap:8px;align-items:center}
+.connect{min-width:150px;height:42px;border-radius:8px;border:0;font-weight:650;background:var(--accent);color:var(--accent-ink)}
+.connect.on{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.connect.on:hover{box-shadow:inset 0 0 0 1px var(--err);color:var(--err)}
+.connect.busy{background:var(--panel-2);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
+.status{margin:18px 28px 0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r);background:var(--bg)}
+.status>div{padding:12px 14px}
+.status>div+div{border-left:1px solid var(--line)}
+.status label{display:block;font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+.status b{font:500 14px var(--mono);display:block;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status .state b{font-family:var(--font);font-weight:650}
+.state.on b{color:var(--ok)} .state.busy b{color:var(--warn)} .state.err b{color:var(--err)}
+.tabs{display:flex;gap:2px;margin:22px 28px 0;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;padding:9px 12px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-selected=true]{color:var(--ink);border-color:var(--accent)}
+.pane{flex:1;overflow:auto;padding:20px 28px 28px}
+.form{display:grid;grid-template-columns:180px minmax(0,460px);gap:14px 18px;align-items:center}
+.form>label{color:var(--muted)}
+.form .hint{grid-column:2;margin-top:-8px;font-size:12px;color:var(--faint)}
+.field{background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:8px 10px;color:var(--ink);font:inherit;width:100%}
+.field.mono{font-family:var(--mono);font-size:13px}
+.seg{justify-self:start;display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:none;padding:7px 12px;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--panel-2);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.switch{justify-self:start;width:38px;height:22px;border-radius:11px;border:0;background:var(--line);position:relative}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--ink);transition:transform .15s}
+.switch[aria-checked=true]{background:var(--accent)} .switch[aria-checked=true]::after{transform:translateX(16px);background:var(--accent-ink)}
+.sect{grid-column:1/-1;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-top:10px;padding-top:12px;border-top:1px solid var(--line)}
+.sect:first-child{margin-top:0;padding-top:0;border-top:0}
+.cert{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--line);border-radius:7px;padding:8px 10px}
+.cert .k{font:12px var(--mono);color:var(--muted);margin-left:auto}
+.raw{width:100%;min-height:330px;resize:vertical;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:14px;font:13px/1.6 var(--mono);tab-size:2}
+.rawbar{display:flex;align-items:center;gap:10px;margin-bottom:10px;color:var(--muted);font-size:13px}
+.rawbar .ok{color:var(--ok)}
+.log{font:12.5px/1.7 var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;min-height:320px;white-space:pre-wrap;color:var(--muted)}
+.log .t{color:var(--faint)} .log .i{color:var(--ink)} .log .w{color:var(--warn)} .log .g{color:var(--ok)}
+/* statusbar */
+.bar{display:flex;align-items:center;gap:14px;padding:0 14px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);background:var(--bg)}
+.bar .sp{margin-left:auto}
+/* overlays */
+.scrim{position:fixed;inset:0;background:#0008;display:none;place-items:center;z-index:10}
+.scrim.show{display:grid}
+.modal{width:min(560px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 30px 80px -20px #000a}
+.modal header{padding:18px 20px 6px;font-weight:650;font-size:16px}
+.modal .body{padding:6px 20px 16px;color:var(--muted)}
+.modal footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid var(--line)}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:26px;text-align:center;margin:10px 0}
+.drop b{color:var(--ink)}
+.check{display:grid;grid-template-columns:18px 1fr;gap:8px;margin:8px 0;color:var(--ink);font-size:13px}
+.check .w{color:var(--warn)} .check .g{color:var(--ok)}
+.toast{position:fixed;left:50%;bottom:48px;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--panel-2);border:1px solid var(--line);
+  padding:9px 14px;border-radius:8px;transition:.2s;z-index:20;font-size:13px}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.tray{position:fixed;right:24px;bottom:24px;width:280px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 20px 60px -20px #000a;display:none;z-index:9}
+.tray.show{display:block}
+.tray header{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;font-weight:600}
+.tray .row{display:flex;align-items:center;gap:10px;padding:9px 14px}
+.tray .row:hover{background:var(--panel-2)}
+.tray .row .nm{flex:1}
+.demo{position:fixed;left:12px;top:10px;font-size:11px;color:var(--faint)}
+@media (max-width:860px){.main{grid-template-columns:1fr}aside{display:none}.status{grid-template-columns:1fr 1fr}.status>div:nth-child(3){border-left:0;border-top:1px solid var(--line)}.status>div:nth-child(4){border-top:1px solid var(--line)}.form{grid-template-columns:1fr}.form .hint{grid-column:1}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="demo">Mockup v0.1 — dati di esempio, nessuna connessione reale</div>
+
+<div class="win" role="application" aria-label="Valico">
+  <div class="title">
+    <span class="brand">Valico<small>nome provvisorio</small></span>
+    <div class="tb-actions">
+      <button class="tb" id="bImport" title="Importa profilo (Ctrl+O)">Importa…</button>
+      <button class="tb" id="bTray" title="Anteprima menu tray">Tray</button>
+      <button class="tb" id="bTheme" title="Tema chiaro/scuro">Tema</button>
+      <button class="winbtn" aria-label="Riduci">—</button><button class="winbtn" aria-label="Massimizza">▢</button><button class="winbtn" aria-label="Chiudi">✕</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <aside>
+      <label class="search"><span style="color:var(--faint)">⌕</span><input id="q" placeholder="Cerca connessioni" aria-label="Cerca connessioni"><kbd>Ctrl K</kbd></label>
+      <div class="list" id="list" role="listbox" aria-label="Connessioni"></div>
+      <div class="side-foot">
+        <button class="btn primary" id="bImport2">+ Importa</button>
+        <button class="btn">Nuovo gruppo</button>
+      </div>
+    </aside>
+
+    <section class="detail" id="detail"></section>
+  </div>
+
+  <div class="bar"><span id="barState">Nessuna connessione attiva</span><span class="sp">Demone valicod · connesso</span><span>v0.1.0-mock</span></div>
+</div>
+
+<!-- import -->
+<div class="scrim" id="mImport" role="dialog" aria-modal="true" aria-labelledby="impT">
+  <div class="modal">
+    <header id="impT">Importa profilo</header>
+    <div class="body">
+      <div class="drop"><b>Trascina qui un file .ovpn o .conf</b><br>oppure scegli un file · incolla il testo · scansiona un QR WireGuard</div>
+      <div style="color:var(--ink);font-weight:600;margin-top:14px">Anteprima: <span style="font-family:var(--mono)">cliente-bianchi.ovpn</span> <span class="proto ovpn">OVPN</span></div>
+      <div class="check"><span class="g">✓</span><span>CA, certificato e chiave inline trovati — la chiave andrà nel portachiavi di sistema</span></div>
+      <div class="check"><span class="g">✓</span><span>tls-crypt trovato</span></div>
+      <div class="check"><span class="w">!</span><span>Direttiva <code>up /etc/openvpn/update-dns</code> bloccata: gli script non vengono eseguiti senza conferma esplicita</span></div>
+      <div class="check"><span class="w">!</span><span><code>auth-user-pass</code>: le credenziali saranno chieste alla prima connessione</span></div>
+      <div class="form" style="grid-template-columns:110px 1fr;margin-top:14px">
+        <label>Nome</label><input class="field" value="Cliente Bianchi">
+        <label>Gruppo</label><select class="field"><option>Clienti</option><option>Lavoro</option><option>Personale</option></select>
+      </div>
+    </div>
+    <footer><button class="btn" data-close>Annulla</button><button class="btn primary" id="doImport">Importa</button></footer>
+  </div>
+</div>
+
+<!-- credenziali -->
+<div class="scrim" id="mCred" role="dialog" aria-modal="true" aria-labelledby="credT">
+  <div class="modal" style="width:min(420px,92vw)">
+    <header id="credT">Accesso a <span id="credName"></span></header>
+    <div class="body">
+      <div class="form" style="grid-template-columns:100px 1fr">
+        <label>Utente</label><input class="field" value="g.setaro" id="cu">
+        <label>Password</label><input class="field" type="password" value="••••••••">
+        <label>OTP</label><input class="field mono" placeholder="123456" inputmode="numeric">
+      </div>
+      <label class="check" style="margin-top:12px"><input type="checkbox" checked> Ricorda utente e password nel portachiavi</label>
+    </div>
+    <footer><button class="btn" data-close>Annulla</button><button class="btn primary" id="doCred">Connetti</button></footer>
+  </div>
+</div>
+
+<div class="tray" id="tray" aria-label="Anteprima menu tray">
+  <header><span>Valico</span><span id="trayState" style="color:var(--muted);font-weight:400"></span></header>
+  <div id="trayList" style="padding:6px 0"></div>
+  <div class="row" style="border-top:1px solid var(--line);color:var(--muted)"><span class="nm">Apri Valico</span></div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const profiles=[
+ {id:"ufficio",name:"Ufficio Napoli",proto:"ovpn",group:"Lavoro",fav:true,server:"vpn.esempio-ufficio.it:1194",transport:"UDP",auth:"cert+user",dns:"10.8.0.1",routes:"10.10.0.0/16, 10.20.0.0/16",full:false,used:"ieri"},
+ {id:"dc",name:"Datacenter Milano",proto:"ovpn",group:"Lavoro",server:"gw.dc-mi.esempio.net:443",transport:"TCP",auth:"cert",dns:"Sistema",routes:"172.16.0.0/12",full:false,used:"3 giorni fa"},
+ {id:"homelab",name:"Homelab",proto:"wg",group:"Personale",fav:true,server:"casa.esempio.org:51820",dns:"192.168.1.2",routes:"192.168.1.0/24",full:false,used:"oggi"},
+ {id:"vps",name:"VPS Hetzner",proto:"wg",group:"Personale",server:"203.0.113.24:51820",dns:"1.1.1.1",routes:"0.0.0.0/0, ::/0",full:true,used:"la settimana scorsa"},
+ {id:"rossi",name:"Cliente Rossi",proto:"ovpn",group:"Clienti",server:"vpn.rossi-srl.example:1194",transport:"UDP",auth:"user+otp",dns:"Sistema",routes:"192.168.50.0/24",full:false,used:"mai"},
+];
+let sel="ufficio", active=null, state="off", tab="gen", t0=0, rx=0, tx=0, timer=null, killsw={vps:true}, recon={};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const P=id=>profiles.find(p=>p.id===id);
+const tag=p=>`<span class="proto ${p.proto}">${p.proto==="wg"?"WG":"OVPN"}</span>`;
+const dotCls=p=>p.id===active?(state==="on"?"on":state==="busy"?"busy":state==="err"?"err":""):"";
+function fmtB(b){return b<1024?b+" B":b<1048576?(b/1024).toFixed(1)+" KB":(b/1048576).toFixed(1)+" MB"}
+function fmtT(s){const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+":":"")+String(m).padStart(2,"0")+":"+String(x).padStart(2,"0")}
+
+function renderList(){
+  const q=$("#q").value.toLowerCase();
+  const groups=[...new Set(profiles.map(p=>p.group))];
+  $("#list").innerHTML=groups.map(g=>{
+    const items=profiles.filter(p=>p.group===g&&(p.name+p.server).toLowerCase().includes(q));
+    if(!items.length)return"";
+    return `<div class="group"><h4><span>${g}</span><span>${items.length}</span></h4>`+items.map(p=>`
+      <button class="item" role="option" aria-selected="${p.id===sel}" data-id="${p.id}">
+        <span class="dot ${dotCls(p)}"></span>
+        <span style="min-width:0"><div class="n">${esc(p.name)}${p.fav?'<span class="star" title="Preferito">★</span>':""}</div>
+        <div class="s">${p.id===active&&state==="on"?"Connesso · "+fmtT(Math.floor((Date.now()-t0)/1000)):esc(p.server)}</div></span>
+        ${tag(p)}
+      </button>`).join("")+`</div>`}).join("")||`<div style="padding:30px 12px;color:var(--muted);text-align:center">Nessun risultato per “${esc(q)}”</div>`;
+}
+
+function stat(){
+  const p=P(sel), me=p.id===active;
+  const st=me?state:"off";
+  const label={off:"Disconnesso",busy:"Connessione…",on:"Connesso",err:"Errore"}[st];
+  const up=me&&state==="on"?fmtT(Math.floor((Date.now()-t0)/1000)):"—";
+  const ip=me&&state==="on"?(p.proto==="wg"?"10.66.0.4":"10.8.0.18"):"—";
+  const traffic=me&&state==="on"?`↓ ${fmtB(rx)}  ↑ ${fmtB(tx)}`:"—";
+  const extra=p.proto==="wg"?["Ultimo handshake",me&&state==="on"?Math.floor((Date.now()-t0)/1000%120)+" s fa":"—"]:["Durata",up];
+  return `<div class="state ${st}"><label>Stato</label><b>${label}</b></div>
+    <div><label>IP assegnato</label><b>${ip}</b></div>
+    <div><label>Traffico</label><b>${traffic}</b></div>
+    <div><label>${extra[0]}</label><b>${extra[1]}</b></div>`;
+}
+
+function paneHTML(p){
+  if(tab==="gen") return `<div class="form">
+    <div class="sect">Connessione</div>
+    <label>Nome</label><input class="field" value="${esc(p.name)}">
+    <label>Gruppo</label><select class="field">${["Lavoro","Personale","Clienti"].map(g=>`<option ${g===p.group?"selected":""}>${g}</option>`).join("")}</select>
+    <label>Server</label><input class="field mono" value="${esc(p.server)}">
+    ${p.proto==="ovpn"?`<label>Trasporto</label><div class="seg">${["UDP","TCP"].map(x=>`<button aria-pressed="${p.transport===x}">${x}</button>`).join("")}</div>`:""}
+    <div class="sect">Comportamento</div>
+    <label>Riconnessione automatica</label><button class="switch" role="switch" aria-checked="${recon[p.id]!==false}" data-sw="recon"></button>
+    <label>Kill switch</label><button class="switch" role="switch" aria-checked="${!!killsw[p.id]}" data-sw="kill"></button>
+    <div class="hint">Blocca il traffico fuori dal tunnel se la VPN cade. (Fase 2)</div>
+    <label>Connetti all'avvio</label><button class="switch" role="switch" aria-checked="false"></button>
+  </div>`;
+  if(tab==="auth") return p.proto==="wg"?`<div class="form">
+    <div class="sect">Chiavi WireGuard</div>
+    <label>Chiave privata</label><div class="cert">Nel portachiavi di sistema<span class="k">••••••••••••••••Q2s=</span></div>
+    <label>Chiave pubblica</label><input class="field mono" value="hY3x…7nPq/ZkA=" readonly>
+    <label>Peer</label><input class="field mono" value="Vt9c…mE1w4Rk=" readonly>
+    <label>Preshared key</label><div class="cert">Presente<span class="k">nel portachiavi</span></div>
+  </div>`:`<div class="form">
+    <div class="sect">Certificati</div>
+    <label>CA</label><div class="cert">ca.crt<span class="k">scade 03/2029</span></div>
+    <label>Certificato client</label><div class="cert">g.setaro.crt<span class="k">scade 11/2027</span></div>
+    <label>Chiave privata</label><div class="cert">Nel portachiavi di sistema<span class="k">RSA 4096</span></div>
+    <label>tls-crypt</label><div class="cert">Presente<span class="k">inline</span></div>
+    <div class="sect">Credenziali</div>
+    <label>Metodo</label><div class="seg">${["Certificato","Utente","Utente + OTP"].map((x,i)=>`<button aria-pressed="${["cert","cert+user","user+otp"][i]===p.auth}">${x}</button>`).join("")}</div>
+    <label>Utente</label><input class="field" value="${p.auth==="cert"?"":"g.setaro"}" placeholder="—">
+    <label>Password</label><div class="cert">${p.auth==="cert"?"Non richiesta":"Salvata nel portachiavi"}<button class="btn" style="margin-left:auto;padding:3px 10px">Dimentica</button></div>
+  </div>`;
+  if(tab==="net") return `<div class="form">
+    <div class="sect">Instradamento</div>
+    <label>Tutto il traffico nel tunnel</label><button class="switch" role="switch" aria-checked="${p.full}"></button>
+    <label>Reti instradate</label><input class="field mono" value="${esc(p.routes)}">
+    <div class="hint">Separate da virgola. Ignorate se tutto il traffico passa nel tunnel.</div>
+    <div class="sect">DNS</div>
+    <label>Server DNS</label><input class="field mono" value="${esc(p.dns)}">
+    <label>Domini di ricerca</label><input class="field mono" placeholder="es. corp.local">
+    <label>Protezione DNS leak</label><button class="switch" role="switch" aria-checked="${p.full}"></button>
+    <div class="sect">Interfaccia</div>
+    <label>MTU</label><input class="field mono" value="${p.proto==="wg"?"1420":"Automatico"}" style="max-width:140px">
+  </div>`;
+  if(tab==="raw") return `<div class="rawbar"><span class="ok">✓ Configurazione valida</span><span style="margin-left:auto">Le chiavi sono nel portachiavi e non compaiono qui</span><button class="btn">Ripristina</button><button class="btn primary">Salva</button></div>
+    <textarea class="raw" spellcheck="false">${esc(p.proto==="wg"?
+`[Interface]
+PrivateKey = <portachiavi:${p.id}/private>
+Address = 10.66.0.4/32
+DNS = ${p.dns}
+
+[Peer]
+PublicKey = Vt9c...mE1w4Rk=
+PresharedKey = <portachiavi:${p.id}/psk>
+Endpoint = ${p.server}
+AllowedIPs = ${p.routes}
+PersistentKeepalive = 25`:
+`client
+dev tun
+proto ${(p.transport||"udp").toLowerCase()}
+remote ${p.server.replace(":"," ")}
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+cipher AES-256-GCM
+${p.auth!=="cert"?"auth-user-pass\n":""}verb 3
+<ca>  ca.crt  </ca>
+<cert>  ${"g.setaro.crt"}  </cert>
+<key>  <portachiavi:${p.id}/key>  </key>`)}</textarea>`;
+  if(tab==="log"){
+    const me=p.id===active&&state==="on";
+    return `<div class="rawbar"><span>Ultima sessione</span><span style="margin-left:auto"></span><button class="btn">Copia</button><button class="btn">Apri cartella log</button></div>
+    <div class="log">${me?(p.proto==="wg"?
+`<span class="t">10:42:01</span> <span class="i">Creazione interfaccia valico0</span>
+<span class="t">10:42:01</span> <span class="i">Configurazione peer ${esc(p.server)}</span>
+<span class="t">10:42:02</span> <span class="i">DNS impostato: ${esc(p.dns)}</span>
+<span class="t">10:42:02</span> <span class="g">Handshake completato</span>`:
+`<span class="t">10:42:01</span> <span class="i">OpenVPN 2.6 avviato (management 127.0.0.1)</span>
+<span class="t">10:42:01</span> <span class="i">TCP/UDP: connessione a ${esc(p.server)}</span>
+<span class="t">10:42:02</span> <span class="i">Verifica certificato server: OK</span>
+<span class="t">10:42:02</span> <span class="w">WARNING: direttiva 'up' ignorata (script disabilitati)</span>
+<span class="t">10:42:03</span> <span class="i">PUSH: route ${esc(p.routes)}</span>
+<span class="t">10:42:03</span> <span class="g">Initialization Sequence Completed</span>`):`<span class="t">Nessun log per la sessione corrente. Connetti per vedere l'output in tempo reale.</span>`}</div>`;
+  }
+}
+
+function renderDetail(){
+  const p=P(sel), me=p.id===active;
+  const btn=!me||state==="off"||state==="err"?`<button class="connect" id="bConn">Connetti</button>`:state==="busy"?`<button class="connect busy" id="bConn">Annulla</button>`:`<button class="connect on" id="bConn">Disconnetti</button>`;
+  const tabs=[["gen","Generale"],["auth","Autenticazione"],["net","Rete"],["raw","Configurazione"],["log","Log"]];
+  $("#detail").innerHTML=`
+   <div class="head">
+     <h1>${esc(p.name)} ${tag(p)}</h1>
+     <div class="meta"><span>${p.proto==="wg"?"WireGuard":"OpenVPN"}</span><span>${esc(p.group)}</span><span>Ultimo uso: ${p.used}</span></div>
+     <div class="cta"><button class="btn" title="Altre azioni">⋯</button>${btn}</div>
+   </div>
+   <div class="status" id="status">${stat()}</div>
+   <div class="tabs" role="tablist">${tabs.map(([k,l])=>`<button class="tab" role="tab" aria-selected="${tab===k}" data-tab="${k}">${l}</button>`).join("")}</div>
+   <div class="pane" role="tabpanel">${paneHTML(p)}</div>`;
+  $("#bConn").onclick=()=>toggle(p.id);
+}
+
+function render(){renderList();renderDetail();renderBar();renderTray()}
+function renderBar(){const p=active&&P(active);$("#barState").textContent=!p?"Nessuna connessione attiva":state==="busy"?`Connessione a ${p.name}…`:state==="on"?`Connesso a ${p.name}`:"Nessuna connessione attiva"}
+function renderTray(){
+  const p=active&&P(active);
+  $("#trayState").textContent=p&&state==="on"?"Connesso":"Disconnesso";
+  $("#trayList").innerHTML=profiles.filter(x=>x.fav||x.id===active).concat(profiles.filter(x=>!x.fav&&x.id!==active)).slice(0,5).map(x=>`
+    <div class="row" data-tray="${x.id}"><i class="dot ${dotCls(x)}"></i><span class="nm">${esc(x.name)}</span>${tag(x)}</div>`).join("");
+  document.querySelectorAll("[data-tray]").forEach(r=>r.onclick=()=>{sel=r.dataset.tray;toggle(sel)});
+}
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2600)}
+
+function toggle(id){
+  if(id===active&&state!=="off"){stop();toast("Disconnesso da "+P(id).name);render();return}
+  const p=P(id);
+  if(p.proto==="ovpn"&&p.auth!=="cert"&&!p._cred){ $("#credName").textContent=p.name; open("#mCred"); $("#doCred").onclick=()=>{p._cred=1;close();toggle(id)}; return }
+  if(active&&state!=="off"){const old=P(active).name;stop();toast(`Disconnesso da ${old} — una connessione alla volta`)}
+  active=id;state="busy";render();
+  setTimeout(()=>{if(active!==id||state!=="busy")return;state="on";t0=Date.now();rx=0;tx=0;
+    timer=setInterval(()=>{rx+=Math.floor(Math.random()*90000);tx+=Math.floor(Math.random()*20000);$("#status")&&sel===active&&($("#status").innerHTML=stat());renderList()},1000);
+    render();toast("Connesso a "+P(id).name)},1400);
+}
+function stop(){clearInterval(timer);state="off";active=null}
+function open(s){$(s).classList.add("show");$(s).querySelector("input,button.primary")?.focus()}
+function close(){document.querySelectorAll(".scrim.show").forEach(x=>x.classList.remove("show"))}
+
+document.addEventListener("click",e=>{
+  const it=e.target.closest(".item"); if(it){sel=it.dataset.id;render();return}
+  const tb=e.target.closest("[data-tab]"); if(tb){tab=tb.dataset.tab;renderDetail();return}
+  const sw=e.target.closest(".switch"); if(sw){const v=sw.getAttribute("aria-checked")!=="true";sw.setAttribute("aria-checked",v);if(sw.dataset.sw==="kill")killsw[sel]=v;if(sw.dataset.sw==="recon")recon[sel]=v;return}
+  const sg=e.target.closest(".seg button"); if(sg){sg.parentElement.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b===sg));return}
+  if(e.target.matches("[data-close]")||e.target.classList.contains("scrim"))close();
+});
+$("#q").oninput=renderList;
+$("#bImport").onclick=$("#bImport2").onclick=()=>open("#mImport");
+$("#doImport").onclick=()=>{if(!P("bianchi"))profiles.push({id:"bianchi",name:"Cliente Bianchi",proto:"ovpn",group:"Clienti",server:"vpn.bianchi.example:1194",transport:"UDP",auth:"cert+user",dns:"Sistema",routes:"10.50.0.0/24",full:false,used:"mai"});sel="bianchi";tab="gen";close();render();toast("Importato: Cliente Bianchi — 1 direttiva bloccata")};
+$("#bTray").onclick=()=>$("#tray").classList.toggle("show");
+$("#bTheme").onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==="light"?"":"light"};
+document.addEventListener("keydown",e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){e.preventDefault();$("#q").focus()}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="o"){e.preventDefault();open("#mImport")}
+  if(e.key==="Escape")close();
+  if(e.target.tagName!=="INPUT"&&e.target.tagName!=="TEXTAREA"){
+    const ids=profiles.map(p=>p.id),i=ids.indexOf(sel);
+    if(e.key==="ArrowDown"){sel=ids[Math.min(i+1,ids.length-1)];render()}
+    if(e.key==="ArrowUp"){sel=ids[Math.max(i-1,0)];render()}
+    if(e.key==="Enter"&&!document.querySelector(".scrim.show")&&e.target.tagName!=="BUTTON")toggle(sel);
+  }
+});
+render();
+// Stati demo per screenshot: #on, #log, #import, #tray, #light
+(()=>{const h=location.hash.slice(1).split(",");if(h.includes("light"))document.documentElement.dataset.theme="light";
+ if(h.includes("on")||h.includes("log")){active=sel;state="on";t0=Date.now()-754000;rx=48213000;tx=6120000;if(h.includes("log"))tab="log";render()}
+ if(h.includes("import"))open("#mImport");if(h.includes("tray"))$("#tray").classList.add("show")})();
+</script>
+</body>
+</html>

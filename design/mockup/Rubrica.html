@@ -186,7 +186,7 @@ section.detail{display:flex;flex-direction:column;min-height:0;min-width:0}
     <header id="credT">Accesso a <span id="credName"></span></header>
     <div class="body">
       <div class="form" style="grid-template-columns:100px 1fr">
-        <label>Utente</label><input class="field" value="g.setaro" id="cu">
+        <label>Utente</label><input class="field" value="m.rossi" id="cu">
         <label>Password</label><input class="field" type="password" value="••••••••">
         <label>OTP</label><input class="field mono" placeholder="123456" inputmode="numeric">
       </div>
@@ -272,12 +272,12 @@ function paneHTML(p){
   </div>`:`<div class="form">
     <div class="sect">Certificati</div>
     <label>CA</label><div class="cert">ca.crt<span class="k">scade 03/2029</span></div>
-    <label>Certificato client</label><div class="cert">g.setaro.crt<span class="k">scade 11/2027</span></div>
+    <label>Certificato client</label><div class="cert">m.rossi.crt<span class="k">scade 11/2027</span></div>
     <label>Chiave privata</label><div class="cert">Nel portachiavi di sistema<span class="k">RSA 4096</span></div>
     <label>tls-crypt</label><div class="cert">Presente<span class="k">inline</span></div>
     <div class="sect">Credenziali</div>
     <label>Metodo</label><div class="seg">${["Certificato","Utente","Utente + OTP"].map((x,i)=>`<button aria-pressed="${["cert","cert+user","user+otp"][i]===p.auth}">${x}</button>`).join("")}</div>
-    <label>Utente</label><input class="field" value="${p.auth==="cert"?"":"g.setaro"}" placeholder="—">
+    <label>Utente</label><input class="field" value="${p.auth==="cert"?"":"m.rossi"}" placeholder="—">
     <label>Password</label><div class="cert">${p.auth==="cert"?"Non richiesta":"Salvata nel portachiavi"}<button class="btn" style="margin-left:auto;padding:3px 10px">Dimentica</button></div>
   </div>`;
   if(tab==="net") return `<div class="form">
@@ -317,7 +317,7 @@ remote-cert-tls server
 cipher AES-256-GCM
 ${p.auth!=="cert"?"auth-user-pass\n":""}verb 3
 <ca>  ca.crt  </ca>
-<cert>  ${"g.setaro.crt"}  </cert>
+<cert>  ${"m.rossi.crt"}  </cert>
 <key>  <portachiavi:${p.id}/key>  </key>`)}</textarea>`;
   if(tab==="log"){
     const me=p.id===active&&state==="on";

@@ -25,6 +25,7 @@ monetizzazione.
 | D5 | **Una sola connessione attiva** alla volta, imposta dal demone | Peppe |
 | D6 | UX stile VirtualBox: lista/rubrica a sinistra, dettaglio a schede a destra | Peppe |
 | D7 | Nome: **Galleria** (scelto da Peppe il 2026-11-06). Scartati in precedenza: Connectio (tool OSS omonimo, ott. 2026), Connect.io (VPN aziendale), Varco (varco.io, prodotto di onboarding dispositivi), Tunnelbox (prodotto omonimo) | ricerca 2026-11-06 |
+| D8 | Licenza **GPL-3.0-or-later**; repo pubblico `github.com/zPeppOz/galleria` | Peppe, 2026-11-06 |
 
 ## 3. Differenziazione (perché esiste)
 
@@ -136,8 +137,7 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
   **processo separato**, non linkato, quindi non impone la sua licenza **[S: lettura comune
   dell'aggregazione GPL, non un parere legale]**. Correzione rispetto alla chat: GPLv3 non è *obbligata*
   da OpenVPN.
-- Proposta: **GPL-3.0-or-later** (come Eddie, impedisce fork chiusi) oppure **Apache-2.0/MIT**
-  (più contributi aziendali). Da decidere (A2).
+- Scelta: **GPL-3.0-or-later** (D8), come Eddie: impedisce fork chiusi.
 
 ## 10. Piano a fasi e tempi
 
@@ -172,7 +172,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | ID | Domanda | Chi decide | Stato |
 |---|---|---|---|
 | A1 | Nome definitivo | Peppe | RISOLTA: Galleria (D7). Verifica marchio/dominio/nome repo ancora da fare |
-| A2 | Licenza: GPL-3.0-or-later o Apache-2.0/MIT | Peppe | DA DECIDERE |
+| A2 | Licenza | Peppe | RISOLTA: GPL-3.0-or-later (D8) |
 | A3 | IPC: JSON-RPC su socket/pipe o gRPC (tonic) | Nello | DA DECIDERE |
 | A4 | Windows: includere OpenVPN o richiederlo come prerequisito | Nello | DA DECIDERE |
 | A5 | Storage profili: TOML (leggibile, versionabile) o SQLite | Nello | DA DECIDERE |

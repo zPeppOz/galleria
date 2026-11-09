@@ -175,16 +175,22 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 - **Telemetria** (A11): proposta **nessuna**. Niente analytics né crash report automatici; per le segnalazioni
   l'utente esporta il log dalla GUI (con i segreti già filtrati). Va scritto nel README: per un client VPN è un argomento.
 - **Modello delle minacce**: vedi [`02-modello-minacce.md`](02-modello-minacce.md).
-- **Matrice di test** (A12), proposta (sotto). Backend DNS da coprire su Linux: systemd-resolved, NetworkManager, resolvconf (R1).
+- **Matrice di test** (A12): proposta di Nello sotto, da decidere con Peppe. "Obbligatoria" vuol dire: test end-to-end
+  a ogni release, e una release non esce se fallisce. "Best effort": si correggono i bug segnalati, nessun test fisso.
+  Il punto che cambia di più tra le distro è la versione di OpenVPN (2.6 o 2.7), perché la management interface è il
+  nostro percorso critico: per questo entrambe le Ubuntu LTS sono obbligatorie (Aitano ne indicava una).
+  Backend DNS (R1): systemd-resolved con NetworkManager obbligatorio (è il caso di Ubuntu e Fedora desktop **[S]**);
+  resolvconf best effort, su Debian.
 
-| Piattaforma | Versioni | Note |
-|---|---|---|
-| Ubuntu | LTS corrente e precedente | GNOME mostra la tray solo con l'estensione AppIndicator, inclusa in `ubuntu-desktop-minimal` (24.04) **[V]** |
-| Fedora | corrente | GNOME, systemd-resolved; estensione AppIndicator non preinstallata **[S]** → la tray è un accessorio, l'app deve essere completa senza |
-| Debian | stabile corrente | |
-| Arch | rolling | solo community (AUR in fase 3), nessuna garanzia |
-| KDE Plasma | su una delle distro sopra | tray nativa |
-| Windows | 11 | Windows 10 fuori supporto Microsoft dal 2025-10-14 **[V]**: best effort |
+| Piattaforma | Versioni | Livello | OpenVPN nei repository | Note |
+|---|---|---|---|---|
+| Ubuntu | 26.04 LTS e 24.04 LTS | obbligatoria | 2.7.0 (26.04), 2.6.19 (24.04) **[V]** | GNOME mostra la tray solo con l'estensione AppIndicator, inclusa in `ubuntu-desktop-minimal` (24.04) **[V]** |
+| Fedora | corrente | obbligatoria | 2.7.9 (F44) **[V]** | GNOME, systemd-resolved; estensione AppIndicator non preinstallata **[S]** → la tray è un accessorio, l'app deve essere completa senza |
+| Windows | 11 x64 | obbligatoria | installer ufficiale, ultima 2.7 (D14) | anche l'ultima 2.6 ma best effort |
+| Debian | 13 (stabile) | best effort | 2.6.14 **[V]** | utile per resolvconf |
+| KDE Plasma | su una delle distro sopra | best effort | — | tray nativa |
+| Arch | rolling | best effort | — | solo community (AUR in fase 3), nessuna garanzia |
+| Windows 10, ARM64 | — | best effort | — | Windows 10 fuori supporto Microsoft dal 2025-10-14 **[V]** |
 
 ## 9. Licenza
 
@@ -239,7 +245,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | A9 | Interfaccia comune dei backend nel demone già dalla v0.1, e OpenConnect come libreria (`libopenconnect`) o come processo figlio | Nello | PROPOSTA NELLO: interfaccia comune subito (D10), OpenConnect processo figlio (D11), da ratificare da Peppe |
 | A10 | Blocco IPv6 per i profili "tutto nel tunnel" già in v0.1 (§8) | Nello | PROPOSTA NELLO: sì (D15), da ratificare da Peppe |
 | A11 | Nessuna telemetria (§8) | Peppe | DA DECIDERE |
-| A12 | Matrice di test (§8) | Nello + Peppe | DA DECIDERE |
+| A12 | Matrice di test (§8) | Nello + Peppe | PROPOSTA NELLO (§8): obbligatorie Ubuntu 26.04 e 24.04, Fedora corrente, Windows 11 x64; il resto best effort. Da decidere con Peppe |
 | A13 | Canale e meccanismo degli aggiornamenti (§8) | Nello | PROPOSTA NELLO: updater Tauri + MSI su Windows, solo avviso su Linux (D16), da ratificare da Peppe |
 
 ## Fonti
@@ -263,4 +269,5 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 - MSI ufficiale OpenVPN (driver inclusi, chiave di registro `exe_path`): https://github.com/OpenVPN/openvpn-build/blob/master/windows-msi/msi.wxs , https://github.com/OpenVPN/openvpn-build/blob/release/2.6/windows-msi/msi.wxs , https://github.com/OpenVPN/openvpn-gui/blob/master/README.rst
 - Release OpenVPN (cadenza, versione corrente): https://github.com/OpenVPN/openvpn/releases ; pacchetto winget: https://github.com/microsoft/winget-pkgs/tree/master/manifests/o/OpenVPNTechnologies/OpenVPN
 - OpenVPN 2.6 `--block-ipv6` e `--redirect-gateway ipv6`: https://github.com/OpenVPN/openvpn/blob/release/2.6/doc/man-sections/vpn-network-options.rst
+- Versioni di OpenVPN nelle distro: Ubuntu https://launchpad.net/ubuntu/+source/openvpn ; Debian https://sources.debian.org/src/openvpn/ ; Fedora https://mdapi.fedoraproject.org/f44/pkg/openvpn
 - Homebrew 5.0 e cask non firmati (per la fase macOS): https://brew.sh/2025/11/12/homebrew-5.0.0/ , https://workbrew.com/blog/homebrew-5-0-0

@@ -147,6 +147,29 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 - **Distribuzione**: Linux `.deb` e `.rpm` (installano la unit systemd; AppImage non può installare un
   demone di sistema); Windows MSI che installa il servizio. Release automatiche con GitHub Actions.
 - **Firma Windows**: SignPath Foundation (gratuita per OSS) **[V]**, se il progetto rispetta le condizioni (vedi R3).
+- **Aggiornamenti** (A13): la GUI usa il plugin updater di Tauri, che richiede sempre la firma degli
+  aggiornamenti con una chiave nostra **[V]**; se la chiave privata si perde, chi ha l'app installata non riceve
+  più aggiornamenti **[V]** → chiave nei secret di GitHub Actions + copia offline. GUI e demone vanno aggiornati
+  insieme: il protocollo IPC ha un numero di versione e la GUI rifiuta un demone incompatibile con un messaggio chiaro.
+  Proposta: Windows aggiorna MSI completo (GUI + servizio) **[S: verificare che l'updater Tauri gestisca l'MSI con
+  il servizio]**; Linux nessun auto-aggiornamento in v0.1 (avviso "nuova versione" + pacchetti), repository
+  APT/DNF in fase 2.
+- **IPv6** (A10): un profilo che manda tutto il traffico IPv4 nel tunnel ma non ha rotte IPv6 lascerebbe uscire
+  il traffico IPv6 dalla rete locale. Proposta: già in v0.1, per i profili "tutto nel tunnel", bloccare l'IPv6 non
+  instradato nel tunnel (rotta `::/0` verso il tunnel). È più semplice del kill switch completo, che resta in fase 2.
+- **Telemetria** (A11): proposta **nessuna**. Niente analytics né crash report automatici; per le segnalazioni
+  l'utente esporta il log dalla GUI (con i segreti già filtrati). Va scritto nel README: per un client VPN è un argomento.
+- **Modello delle minacce**: vedi [`02-modello-minacce.md`](02-modello-minacce.md).
+- **Matrice di test** (A12), proposta (sotto). Backend DNS da coprire su Linux: systemd-resolved, NetworkManager, resolvconf (R1).
+
+| Piattaforma | Versioni | Note |
+|---|---|---|
+| Ubuntu | LTS corrente e precedente | GNOME: icona tray solo con estensione AppIndicator (preinstallata su Ubuntu, non su GNOME puro) **[S]** |
+| Fedora | corrente | GNOME, systemd-resolved |
+| Debian | stabile corrente | |
+| Arch | rolling | solo community (AUR in fase 3), nessuna garanzia |
+| KDE Plasma | su una delle distro sopra | tray nativa |
+| Windows | 11 | Windows 10 fuori supporto Microsoft dal 2025-10-14 **[S: data da riconfermare]**: best effort |
 
 ## 9. Licenza
 
@@ -199,6 +222,10 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | A7 | Lista dei difetti di Pritunl/Eddie (validazione) | Peppe | PARZIALE: Pritunl = UI spartana + WireGuard solo con server Pritunl (verificato su forum); Eddie e prova pratica non fatti |
 | A8 | Design system: riuso di xr1 design-system (verificarne la licenza per un progetto OSS) | Peppe | DA DECIDERE |
 | A9 | Interfaccia comune dei backend nel demone già dalla v0.1, e OpenConnect come libreria (`libopenconnect`) o come processo figlio | Nello | DA DECIDERE |
+| A10 | Blocco IPv6 per i profili "tutto nel tunnel" già in v0.1 (§8) | Nello | DA DECIDERE |
+| A11 | Nessuna telemetria (§8) | Peppe | DA DECIDERE |
+| A12 | Matrice di test (§8) | Nello + Peppe | DA DECIDERE |
+| A13 | Canale e meccanismo degli aggiornamenti (§8) | Nello | DA DECIDERE |
 
 ## Fonti
 
@@ -207,6 +234,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 - wireguard-go (MIT): https://github.com/WireGuard/wireguard-go
 - OpenVPN COPYING (GPLv2 + eccezioni): https://github.com/OpenVPN/openvpn/blob/HEAD/COPYING
 - SignPath Foundation, condizioni: https://signpath.org/terms.html
+- Tauri updater (firma obbligatoria, perdita della chiave): https://v2.tauri.app/plugin/updater/
 - OpenConnect (protocolli, LGPL-2.1): https://www.infradead.org/openconnect/ ; piattaforme e CSD su Windows: https://www.infradead.org/openconnect/platforms.html ; CSD: https://www.infradead.org/openconnect/csd.html ; HIP: https://www.infradead.org/openconnect/hip.html
 - AmneziaWG (MIT, fork di wireguard-go): https://github.com/amnezia-vpn/amneziawg-go
 - strongSwan: https://docs.strongswan.org/docs/latest/howtos/introduction.html , https://github.com/strongswan/strongswan , licenza: https://github.com/strongswan/strongswan/blob/master/LICENSE

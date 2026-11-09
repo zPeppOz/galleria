@@ -101,8 +101,11 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
   - Windows: **servizio Windows**; IPC su named pipe con ACL per gli utenti autorizzati.
   - Protocollo IPC: JSON-RPC o gRPC (tonic) — **da decidere con Nello**.
 - **Backend WireGuard**:
-  - Linux: modulo del kernel (in mainline) via netlink **[S: valutare il crate `defguard_wireguard_rs`
-    e la sua licenza]**; fallback userspace (`wireguard-go`, MIT **[V]**, o `boringtun` **[S]**).
+  - Linux: modulo del kernel (in mainline) via netlink. Candidato: il crate `defguard_wireguard_rs`,
+    licenza **Apache-2.0 [V]** (file LICENSE e crates.io, versione 0.12.5 del 2026-11-04), compatibile con la
+    nostra GPL-3.0-or-later **[V]** (dichiarazione Apache). Supporta anche WireGuardNT su Windows **[V]**, ma
+    per Windows il README chiede la toolchain `windows-gnu` e MSYS2 **[V]**: da provare nello spike Windows.
+    Fallback userspace (`wireguard-go`, MIT **[V]**, o `boringtun` **[S]**).
   - Windows: **WireGuardNT** (`wireguard.dll`, API in-kernel) **[V]**. La DLL precompilata ha una licenza
     propria che consente la ridistribuzione solo se usata tramite l'API di `wireguard.h` **[V]**
     (vedi rischio R3).
@@ -111,7 +114,10 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
   IPC e vincolo "una attiva".
 - **Backend OpenVPN**: binario `openvpn` 2.6 lanciato come processo figlio e pilotato tramite la
   **management interface** (socket locale con password). Su Linux si dipende dal pacchetto della distro;
-  su Windows va incluso con il suo driver (ovpn-dco-win / wintun) **[S: modalità e licenze dei driver da verificare]**.
+  su Windows va incluso con i suoi driver oppure richiesto come prerequisito (A4). Licenze dei driver **[V]**:
+  ovpn-dco-win (driver predefinito da OpenVPN 2.6) è MIT; tap-windows6 è GPLv2; `wintun.dll` precompilata ha la
+  stessa licenza restrittiva di `wireguard.dll` (ridistribuibile solo se usata tramite l'API di `wintun.h`).
+  L'MSI ufficiale di OpenVPN 2.7 installa solo ovpn-dco e tap-windows6, quello della 2.6 anche wintun **[V]**.
 - **Archivio profili**: metadati e configurazioni non segrete in un file per utente (TOML o SQLite);
   le parti segrete (chiavi private, password, chiavi inline) estratte all'import e salvate nel
   **portachiavi dell'utente**. Al connect la GUI le passa al demone, che non le scrive su disco
@@ -203,8 +209,8 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 |---|---|---|---|
 | R1 | DNS, rotte e kill switch si comportano in modo diverso su ogni OS/distro (systemd-resolved, resolvconf, NetworkManager) | Alto: è dove nascono la maggior parte dei bug | Backend DNS per piattaforma con test su più distro; kill switch solo in fase 2 |
 | R2 | Su Linux il demone può entrare in conflitto con NetworkManager | Medio | Interfacce marcate come non gestite da NM; documentare |
-| R3 | `wireguard.dll` precompilata ha una licenza non OSI; SignPath chiede che nessun componente sia proprietario | Medio: potrebbe bloccare la firma gratuita | Verificare con SignPath; alternativa: compilare WireGuardNT da sorgente o usare `wireguard-go` + wintun |
-| R4 | Ridistribuzione di OpenVPN e driver su Windows (firme, licenze, aggiornamenti di sicurezza) | Medio | Valutare l'uso dell'installer ufficiale OpenVPN come prerequisito |
+| R3 | `wireguard.dll` precompilata ha una licenza non OSI; SignPath chiede che nessun componente sia proprietario | Medio: potrebbe bloccare la firma gratuita | Chiedere per iscritto a SignPath. Attenzione: `wireguard-go` + wintun **non** risolve, perché `wintun.dll` precompilata ha la stessa licenza di `wireguard.dll` **[V]**; compilare i driver da sorgente richiede la firma driver di Microsoft, fuori portata. Se SignPath dice no, decide Peppe (vedi spike in `03-sessione-nello.md`) |
+| R4 | Ridistribuzione di OpenVPN e driver su Windows (firme, licenze, aggiornamenti di sicurezza) | Medio | Licenze verificate **[V]** (§5): ridistribuire si può, il costo vero è seguire ogni release di sicurezza. SignPath firma solo binari costruiti da noi **[V]**. Mitigazione: installer ufficiale OpenVPN come prerequisito |
 | R5 | Il demone privilegiato è una superficie di attacco | Alto | IPC autenticato, input validato, nessuno script da profili non confermati, audit prima della v1 |
 | R6 | Mercato: Pritunl copre già molto, la differenza sta "solo" nella UX | Medio | Validazione fase 0, lancio presto, tetto di tempo |
 | R7 | Tempo sottratto ai progetti che fatturano | Medio | Criterio di stop, lavoro delegato agli agenti |
@@ -244,4 +250,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 - OpenConnect (protocolli, LGPL-2.1): https://www.infradead.org/openconnect/ ; piattaforme e CSD su Windows: https://www.infradead.org/openconnect/platforms.html ; CSD: https://www.infradead.org/openconnect/csd.html ; HIP: https://www.infradead.org/openconnect/hip.html
 - AmneziaWG (MIT, fork di wireguard-go): https://github.com/amnezia-vpn/amneziawg-go
 - strongSwan: https://docs.strongswan.org/docs/latest/howtos/introduction.html , https://github.com/strongswan/strongswan , licenza: https://github.com/strongswan/strongswan/blob/master/LICENSE
+- `defguard_wireguard_rs` (Apache-2.0, requisiti Windows): https://github.com/DefGuard/wireguard-rs/blob/main/LICENSE , https://crates.io/crates/defguard_wireguard_rs , https://github.com/DefGuard/wireguard-rs ; compatibilità Apache-2.0 con GPLv3: https://www.apache.org/licenses/GPL-compatibility.html
+- ovpn-dco-win (MIT): https://github.com/OpenVPN/ovpn-dco-win/blob/multipeer/COPYRIGHT.MIT ; tap-windows6 (GPLv2): https://github.com/OpenVPN/tap-windows6/blob/master/COPYING ; wintun (sorgente GPL-2.0, DLL con licenza propria): https://www.wintun.net/ , https://git.zx2c4.com/wintun/plain/prebuilt-binaries-license.txt
+- MSI ufficiale OpenVPN (driver inclusi, chiave di registro `exe_path`): https://github.com/OpenVPN/openvpn-build/blob/master/windows-msi/msi.wxs , https://github.com/OpenVPN/openvpn-build/blob/release/2.6/windows-msi/msi.wxs
 - Homebrew 5.0 e cask non firmati (per la fase macOS): https://brew.sh/2025/11/12/homebrew-5.0.0/ , https://workbrew.com/blog/homebrew-5-0-0

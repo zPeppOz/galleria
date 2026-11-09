@@ -32,6 +32,7 @@ monetizzazione.
 | D11 | (A9b) **OpenConnect come processo figlio**, non come libreria. Motivi: stesso schema di OpenVPN; niente FFI con `libopenconnect` da mantenere; i segreti passano da stdin (`--passwd-on-stdin`, `--cookie-on-stdin` **[V]**); la rete si configura con `--script` **[V]**, che punterà a un nostro programma fisso (mai uno script del profilo) che consegna rotte e DNS al modulo comune (D10). Su Windows `--script` gira con `cscript.exe` **[V]**: da valutare nello spike della v0.2, insieme al login SSO (`--external-browser` **[V]** o webview) | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
 | D12 | (A3) **IPC con JSON-RPC 2.0**, un messaggio JSON per riga, su socket Unix (Linux) e named pipe (Windows). Gli eventi di stato sono notifiche JSON-RPC sulla stessa connessione. Il primo messaggio è `hello` con la versione del protocollo: se non è compatibile, la GUI mostra un errore chiaro (§8). Tipi delle richieste in un crate Rust condiviso da demone, GUI e CLI; il demone rifiuta campi sconosciuti e messaggi oltre una dimensione massima (M1). La webview non parla mai con il socket: passa dai comandi Tauri, in Rust. gRPC scartato: aggiunge `protoc` e codice generato alla build e non ci serve nulla che JSON-RPC non dia; JSON si ispeziona a mano durante il debug | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
 | D13 | (A5) **Archivio profili in TOML**, un file per profilo (`profiles/<id>.toml`) più un `galleria.toml` per gruppi, ordine e impostazioni, nella cartella di configurazione dell'utente. Ogni file ha `schema_version` per le migrazioni. Scrittura atomica (file temporaneo + rename), così GUI e CLI non si corrompono i file a vicenda; esportare un profilo significa copiare un file. Il demone non legge questi file (M2): riceve la configurazione dalla GUI via IPC. SQLite solo se un giorno servono ricerche su migliaia di profili o il demone deve connettere senza GUI (fase 2, connessione automatica) | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
+| D14 | (A4) **Windows: OpenVPN è un prerequisito in v0.1**, non incluso. L'utente installa l'MSI ufficiale (anche `winget install OpenVPNTechnologies.OpenVPN` **[V]**); il demone trova `openvpn.exe` dal valore `exe_path` in `HKLM\SOFTWARE\OpenVPN` **[V]** (chiave e cartella scrivibili solo dagli amministratori **[S: da controllare nello spike]**), richiede almeno la 2.6 e, se manca, la GUI spiega come installarlo. Motivi: le licenze permetterebbero di includerlo (§5, **[V]**), ma OpenVPN esce con una release circa ogni mese (2.7.5 → 2.7.9 tra luglio e novembre 2026 **[V]**) e ognuna diventerebbe una nostra release; SignPath firma solo binari costruiti da noi **[V]**; i driver li firma già OpenVPN. Costo: un passo in più per l'utente, e l'MSI ufficiale propone anche OpenVPN GUI, che va lasciato fuori **[S: selezione predefinita da controllare nello spike]**. Inclusione: da rivalutare dopo il lancio solo se gli utenti lo chiedono, non come impegno | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
 
 ## 3. Differenziazione (perché esiste)
 
@@ -116,9 +117,9 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 - **Backend intercambiabili** (D10, proposta): ogni protocollo implementa la stessa interfaccia nel demone
   (connetti, disconnetti, stato, statistiche, log), così aggiungere OpenConnect o AmneziaWG non tocca GUI,
   IPC e vincolo "una attiva". OpenConnect sarà un processo figlio come OpenVPN (D11, proposta).
-- **Backend OpenVPN**: binario `openvpn` 2.6 lanciato come processo figlio e pilotato tramite la
+- **Backend OpenVPN**: binario `openvpn` (2.6 o successivo; la versione corrente è la 2.7 **[V]**) lanciato come processo figlio e pilotato tramite la
   **management interface** (socket locale con password). Su Linux si dipende dal pacchetto della distro;
-  su Windows va incluso con i suoi driver oppure richiesto come prerequisito (A4). Licenze dei driver **[V]**:
+  su Windows dall'installer ufficiale, come prerequisito (D14, proposta). Licenze dei driver **[V]**:
   ovpn-dco-win (driver predefinito da OpenVPN 2.6) è MIT; tap-windows6 è GPLv2; `wintun.dll` precompilata ha la
   stessa licenza restrittiva di `wireguard.dll` (ridistribuibile solo se usata tramite l'API di `wintun.h`).
   L'MSI ufficiale di OpenVPN 2.7 installa solo ovpn-dco e tap-windows6, quello della 2.6 anche wintun **[V]**.
@@ -200,7 +201,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | 0 | Validazione con Pritunl/Eddie, nome, licenza, scelta IPC; spike WireGuardNT + management interface OpenVPN | 1 settimana |
 | 1 | Demone Linux + WireGuard + OpenVPN, CLI minima | 1–2 settimane |
 | 2 | GUI rubrica + import + connetti/disconnetti + tray | 2 settimane |
-| 3 | Porting Windows (servizio, named pipe, WireGuardNT, OpenVPN incluso), MSI | 1–2 settimane |
+| 3 | Porting Windows (servizio, named pipe, WireGuardNT, rilevamento di OpenVPN installato come prerequisito, D14), MSI | 1–2 settimane |
 | 4 | Rifinitura, documentazione, release v0.1 pubblica | 1 settimana |
 
 **Criterio di stop**: tetto di ~8 settimane per arrivare alla v0.1. Dopo il lancio pubblico
@@ -228,7 +229,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | A1 | Nome definitivo | Peppe | RISOLTA: Galleria (D7). Verifica marchio/dominio/nome repo ancora da fare |
 | A2 | Licenza | Peppe | RISOLTA: GPL-3.0-or-later (D8) |
 | A3 | IPC: JSON-RPC su socket/pipe o gRPC (tonic) | Nello | PROPOSTA NELLO: JSON-RPC 2.0 (D12), da ratificare da Peppe |
-| A4 | Windows: includere OpenVPN o richiederlo come prerequisito | Nello | DA DECIDERE |
+| A4 | Windows: includere OpenVPN o richiederlo come prerequisito | Nello | PROPOSTA NELLO: prerequisito in v0.1 (D14), da ratificare da Peppe |
 | A5 | Storage profili: TOML (leggibile, versionabile) o SQLite | Nello | PROPOSTA NELLO: TOML, un file per profilo (D13), da ratificare da Peppe |
 | A6 | Soglie del criterio di stop dopo il lancio | Peppe | DA DECIDERE |
 | A7 | Lista dei difetti di Pritunl/Eddie (validazione) | Peppe | PARZIALE: Pritunl = UI spartana + WireGuard solo con server Pritunl (verificato su forum); Eddie e prova pratica non fatti |
@@ -257,5 +258,6 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 - OpenConnect, opzioni da riga di comando (`--passwd-on-stdin`, `--cookie-on-stdin`, `--script`, `--external-browser`): https://www.infradead.org/openconnect/manual.html
 - `defguard_wireguard_rs` (Apache-2.0, requisiti Windows): https://github.com/DefGuard/wireguard-rs/blob/main/LICENSE , https://crates.io/crates/defguard_wireguard_rs , https://github.com/DefGuard/wireguard-rs ; compatibilità Apache-2.0 con GPLv3: https://www.apache.org/licenses/GPL-compatibility.html
 - ovpn-dco-win (MIT): https://github.com/OpenVPN/ovpn-dco-win/blob/multipeer/COPYRIGHT.MIT ; tap-windows6 (GPLv2): https://github.com/OpenVPN/tap-windows6/blob/master/COPYING ; wintun (sorgente GPL-2.0, DLL con licenza propria): https://www.wintun.net/ , https://git.zx2c4.com/wintun/plain/prebuilt-binaries-license.txt
-- MSI ufficiale OpenVPN (driver inclusi, chiave di registro `exe_path`): https://github.com/OpenVPN/openvpn-build/blob/master/windows-msi/msi.wxs , https://github.com/OpenVPN/openvpn-build/blob/release/2.6/windows-msi/msi.wxs
+- MSI ufficiale OpenVPN (driver inclusi, chiave di registro `exe_path`): https://github.com/OpenVPN/openvpn-build/blob/master/windows-msi/msi.wxs , https://github.com/OpenVPN/openvpn-build/blob/release/2.6/windows-msi/msi.wxs , https://github.com/OpenVPN/openvpn-gui/blob/master/README.rst
+- Release OpenVPN (cadenza, versione corrente): https://github.com/OpenVPN/openvpn/releases ; pacchetto winget: https://github.com/microsoft/winget-pkgs/tree/master/manifests/o/OpenVPNTechnologies/OpenVPN
 - Homebrew 5.0 e cask non firmati (per la fase macOS): https://brew.sh/2025/11/12/homebrew-5.0.0/ , https://workbrew.com/blog/homebrew-5-0-0

@@ -1,13 +1,14 @@
 # 01 — Analisi tecnico-funzionale
 
-Versione 0.2 — 2026-11-06 — stato: bozza da discutere con Nello (CTO)
+Versione 0.3 — 2026-11-09 — stato: bozza da discutere con Nello (CTO)
 Nome: **Galleria** (D7).
 
 Legenda: **[V]** verificato su fonte letta (link in fondo) · **[S]** supposto, da verificare.
 
 ## 1. Obiettivo
 
-Client desktop open source per gestire una rubrica di connessioni **OpenVPN** e **WireGuard**:
+Client desktop open source per gestire una rubrica di connessioni VPN, partendo da **OpenVPN** e **WireGuard**
+e arrivando alle principali VPN aziendali (D9, §4.1):
 importare profili e certificati, organizzarli, configurarli e accenderne **una alla volta**,
 con un'interfaccia in stile VirtualBox, veloce e curata.
 
@@ -26,6 +27,7 @@ monetizzazione.
 | D6 | UX stile VirtualBox: lista/rubrica a sinistra, dettaglio a schede a destra | Peppe |
 | D7 | Nome: **Galleria** (scelto da Peppe il 2026-11-06). Scartati in precedenza: Connectio (tool OSS omonimo, ott. 2026), Connect.io (VPN aziendale), Varco (varco.io, prodotto di onboarding dispositivi), Tunnelbox (prodotto omonimo) | ricerca 2026-11-06 |
 | D8 | Licenza **GPL-3.0-or-later**; repo pubblico `github.com/zPeppOz/galleria` | Peppe, 2026-11-06 |
+| D9 | Obiettivo "compatibile con qualsiasi rete" nei due sensi: (a) più protocolli, partendo dalle VPN aziendali via OpenConnect; (b) funzionare anche su reti filtrate. Roadmap e esclusioni in §4.1 | Peppe, 2026-11-09 |
 
 ## 3. Differenziazione (perché esiste)
 
@@ -35,7 +37,9 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
    tray con connessione rapida.
 3. **Configurabilità per profilo** esposta in GUI (DNS, rotte, kill switch, riconnessione) invece che
    solo nel file di testo, con editor raw sempre disponibile.
-4. Pritunl, il concorrente più vicino: UI spartana (giudizio di Peppe) e WireGuard utilizzabile solo con server Pritunl (verificato). Le funzioni 1 e 2 sono quindi il cuore del prodotto: se la UX non è nettamente migliore, il progetto non ha motivo di esistere.
+4. **Un solo client per le VPN di tutti i clienti** (da v0.2, D9): chi lavora per più aziende oggi installa
+   un client diverso per ciascuna (AnyConnect, GlobalProtect, Fortinet...). Galleria li mette nella stessa rubrica.
+5. Pritunl, il concorrente più vicino: UI spartana (giudizio di Peppe) e WireGuard utilizzabile solo con server Pritunl (verificato). Le funzioni 1 e 2 sono quindi il cuore del prodotto: se la UX non è nettamente migliore, il progetto non ha motivo di esistere.
 
 ## 4. Funzionalità
 
@@ -63,7 +67,17 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 ### Fase 3 (solo con trazione)
 - macOS (demone launchd + `utun`, poi eventuale Network Extension a pagamento).
 - Flatpak, AUR, winget.
-- Protocolli aggiuntivi (es. AmneziaWG) **[S]**.
+- Protocolli aggiuntivi secondo la roadmap del §4.1.
+
+### 4.1 Protocolli: roadmap (D9)
+
+| Versione | Protocolli | Come | Note |
+|---|---|---|---|
+| v0.1 | OpenVPN, WireGuard | come §5 | invariato |
+| v0.2 | Cisco AnyConnect, Palo Alto GlobalProtect, Fortinet FortiGate, Pulse Connect Secure, Juniper SSL VPN, F5 BIG-IP, Array Networks | **OpenConnect** (LGPL-2.1 **[V]**), un solo backend per sette protocolli aziendali **[V]**; gira anche su Windows **[V]** | controlli di conformità del PC: vedi R8. Login SSO/SAML nella webview di Tauri **[S: flusso da verificare in spike]** |
+| v0.3 | AmneziaWG; OpenVPN su TCP 443 come opzione guidata | `amneziawg-go` (MIT **[V]**), fork di wireguard-go con offuscamento contro il DPI **[V]** | serve per reti filtrate (D9b) |
+| solo su richiesta | IPsec/IKEv2 (anche L2TP/IPsec), SSTP | strongSwan su Linux (GPL-2.0-or-later, salvo i plugin des/md4/md5 **[V]**; compatibile con la nostra GPL-3.0-or-later), client nativi Windows **[S]** | DNS/rotte molto diversi per OS (R1) |
+| esclusi | Tailscale/ZeroTier/NetBird/Nebula (mesh con server di controllo proprio), Shadowsocks/V2Ray/Trojan (proxy, altro prodotto), Zscaler/WARP/Check Point (proprietari), PPTP (insicuro) | — | — |
 
 ## 5. Architettura proposta
 
@@ -91,6 +105,9 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
   - Windows: **WireGuardNT** (`wireguard.dll`, API in-kernel) **[V]**. La DLL precompilata ha una licenza
     propria che consente la ridistribuzione solo se usata tramite l'API di `wireguard.h` **[V]**
     (vedi rischio R3).
+- **Backend intercambiabili** (proposta, A9): ogni protocollo implementa la stessa interfaccia nel demone
+  (connetti, disconnetti, stato, statistiche, log), così aggiungere OpenConnect o AmneziaWG non tocca GUI,
+  IPC e vincolo "una attiva".
 - **Backend OpenVPN**: binario `openvpn` 2.6 lanciato come processo figlio e pilotato tramite la
   **management interface** (socket locale con password). Su Linux si dipende dal pacchetto della distro;
   su Windows va incluso con il suo driver (ovpn-dco-win / wintun) **[S: modalità e licenze dei driver da verificare]**.
@@ -101,7 +118,7 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 
 ## 6. Modello dati (bozza)
 
-- `Profile`: id, nome, protocollo (`openvpn` | `wireguard`), gruppo, tag[], preferito, note,
+- `Profile`: id, nome, protocollo (`openvpn` | `wireguard`, estendibile secondo §4.1), gruppo, tag[], preferito, note,
   config_ref (config non segreta), secret_refs[] (chiavi nel portachiavi), impostazioni
   (dns, rotte, mtu, kill_switch, auto_reconnect), creato/modificato, ultimo_uso.
 - `Group`: id, nome, ordine, padre (annidamento opzionale).
@@ -166,6 +183,8 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | R5 | Il demone privilegiato è una superficie di attacco | Alto | IPC autenticato, input validato, nessuno script da profili non confermati, audit prima della v1 |
 | R6 | Mercato: Pritunl copre già molto, la differenza sta "solo" nella UX | Medio | Validazione fase 0, lancio presto, tetto di tempo |
 | R7 | Tempo sottratto ai progetti che fatturano | Medio | Criterio di stop, lavoro delegato agli agenti |
+| R8 | VPN aziendali con controllo di conformità del PC (Cisco CSD/HostScan, GlobalProtect HIP): OpenConnect li simula con script, ma un server può accettare il report e negare comunque l'accesso; CSD non è supportato su Windows **[V]** | Medio: alcune aziende non funzioneranno | Dichiararlo nel README, niente promesse di compatibilità totale; elenco "testato con" alimentato dagli utenti |
+| R9 | Allargamento dello scope (D9) che sfora il tetto di 8 settimane | Alto | v0.1 resta OpenVPN + WireGuard; gli altri protocolli solo dopo il lancio |
 
 ## 12. Punti aperti
 
@@ -179,6 +198,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | A6 | Soglie del criterio di stop dopo il lancio | Peppe | DA DECIDERE |
 | A7 | Lista dei difetti di Pritunl/Eddie (validazione) | Peppe | PARZIALE: Pritunl = UI spartana + WireGuard solo con server Pritunl (verificato su forum); Eddie e prova pratica non fatti |
 | A8 | Design system: riuso di xr1 design-system (verificarne la licenza per un progetto OSS) | Peppe | DA DECIDERE |
+| A9 | Interfaccia comune dei backend nel demone già dalla v0.1, e OpenConnect come libreria (`libopenconnect`) o come processo figlio | Nello | DA DECIDERE |
 
 ## Fonti
 
@@ -187,4 +207,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 - wireguard-go (MIT): https://github.com/WireGuard/wireguard-go
 - OpenVPN COPYING (GPLv2 + eccezioni): https://github.com/OpenVPN/openvpn/blob/HEAD/COPYING
 - SignPath Foundation, condizioni: https://signpath.org/terms.html
+- OpenConnect (protocolli, LGPL-2.1): https://www.infradead.org/openconnect/ ; piattaforme e CSD su Windows: https://www.infradead.org/openconnect/platforms.html ; CSD: https://www.infradead.org/openconnect/csd.html ; HIP: https://www.infradead.org/openconnect/hip.html
+- AmneziaWG (MIT, fork di wireguard-go): https://github.com/amnezia-vpn/amneziawg-go
+- strongSwan: https://docs.strongswan.org/docs/latest/howtos/introduction.html , https://github.com/strongswan/strongswan , licenza: https://github.com/strongswan/strongswan/blob/master/LICENSE
 - Homebrew 5.0 e cask non firmati (per la fase macOS): https://brew.sh/2025/11/12/homebrew-5.0.0/ , https://workbrew.com/blog/homebrew-5-0-0

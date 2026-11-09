@@ -1,6 +1,6 @@
 # Galleria
 
-Client desktop open source per OpenVPN e WireGuard: una rubrica di connessioni in stile VirtualBox,
+Client desktop open source per OpenVPN e WireGuard (poi le VPN aziendali via OpenConnect e le reti filtrate): una rubrica di connessioni in stile VirtualBox,
 una connessione attiva alla volta, Linux e Windows (macOS in seguito).
 
 Stato: analisi + mockup cliccabile, nessun codice dell'app.

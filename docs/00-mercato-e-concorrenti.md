@@ -22,6 +22,7 @@ VirtualBox (lista a sinistra, dettaglio a destra), una connessione attiva alla v
 | **Client WireGuard ufficiale** | MIT | tutti | solo WireGuard | Spartano, poco configurabile. |
 | **OpenVPN Connect / Tunnelblick** | proprietario / GPL | Win, macOS / macOS | solo OpenVPN | — |
 | **NetworkManager** (Linux) | GPL | Linux | entrambi (plugin) | Funziona, UX dispersa nei pannelli del desktop. |
+| **OpenConnect GUI** | **da verificare** | Win, macOS **da verificare** | protocolli di OpenConnect | GUI ufficiale del progetto OpenConnect: copre le VPN aziendali (AnyConnect, GlobalProtect, Fortinet...) ma non OpenVPN/WireGuard. Rilevante dalla v0.2 (D9). Stato di manutenzione **da verificare**. |
 | **Qomui** | GPL | Linux | OpenVPN + WireGuard | Qt, solo Linux, orientato ai provider. **Da verificare** se è mantenuto. |
 
 ## Lettura da CEO
@@ -53,3 +54,4 @@ Peppe ha visto Pritunl senza installarlo: il problema principale è l'**interfac
 - Defguard client: https://github.com/DefGuard/client , https://docs.defguard.net/using-defguard-for-end-users/desktop-client
 - Viscosity: https://viscosityapp.com/viscosity/ , https://www.sparklabs.com/support/kb/article/purchasing-viscosity/
 - Qomui: https://github.com/corrad1nho/qomui
+- OpenConnect GUI: https://gitlab.com/openconnect/openconnect-gui , https://gui.openconnect-vpn.net

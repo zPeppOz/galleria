@@ -28,6 +28,10 @@ monetizzazione.
 | D7 | Nome: **Galleria** (scelto da Peppe il 2026-11-06). Scartati in precedenza: Connectio (tool OSS omonimo, ott. 2026), Connect.io (VPN aziendale), Varco (varco.io, prodotto di onboarding dispositivi), Tunnelbox (prodotto omonimo) | ricerca 2026-11-06 |
 | D8 | Licenza **GPL-3.0-or-later**; repo pubblico `github.com/zPeppOz/galleria` | Peppe, 2026-11-06 |
 | D9 | Obiettivo "compatibile con qualsiasi rete" nei due sensi: (a) più protocolli, partendo dalle VPN aziendali via OpenConnect; (b) funzionare anche su reti filtrate. Roadmap e esclusioni in §4.1 | Peppe, 2026-11-09 |
+| D10 | (A9) **Interfaccia comune dei backend già dalla v0.1.** Ogni protocollo implementa le stesse operazioni nel demone: connetti, disconnetti, stato (eventi), statistiche, log, più un elenco di capacità (es. "ha l'handshake", "chiede l'OTP"). DNS, rotte e blocco IPv6 stanno in un modulo comune del demone: il backend gli passa quello che ha ricevuto dal server, dove il protocollo lo permette (per OpenVPN il canale è da provare nello spike). Due backend reali in v0.1 bastano a validare l'interfaccia; niente astrazioni pensate per protocolli che non abbiamo ancora | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
+| D11 | (A9b) **OpenConnect come processo figlio**, non come libreria. Motivi: stesso schema di OpenVPN; niente FFI con `libopenconnect` da mantenere; i segreti passano da stdin (`--passwd-on-stdin`, `--cookie-on-stdin` **[V]**); la rete si configura con `--script` **[V]**, che punterà a un nostro programma fisso (mai uno script del profilo) che consegna rotte e DNS al modulo comune (D10). Su Windows `--script` gira con `cscript.exe` **[V]**: da valutare nello spike della v0.2, insieme al login SSO (`--external-browser` **[V]** o webview) | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
+| D12 | (A3) **IPC con JSON-RPC 2.0**, un messaggio JSON per riga, su socket Unix (Linux) e named pipe (Windows). Gli eventi di stato sono notifiche JSON-RPC sulla stessa connessione. Il primo messaggio è `hello` con la versione del protocollo: se non è compatibile, la GUI mostra un errore chiaro (§8). Tipi delle richieste in un crate Rust condiviso da demone, GUI e CLI; il demone rifiuta campi sconosciuti e messaggi oltre una dimensione massima (M1). La webview non parla mai con il socket: passa dai comandi Tauri, in Rust. gRPC scartato: aggiunge `protoc` e codice generato alla build e non ci serve nulla che JSON-RPC non dia; JSON si ispeziona a mano durante il debug | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
+| D13 | (A5) **Archivio profili in TOML**, un file per profilo (`profiles/<id>.toml`) più un `galleria.toml` per gruppi, ordine e impostazioni, nella cartella di configurazione dell'utente. Ogni file ha `schema_version` per le migrazioni. Scrittura atomica (file temporaneo + rename), così GUI e CLI non si corrompono i file a vicenda; esportare un profilo significa copiare un file. Il demone non legge questi file (M2): riceve la configurazione dalla GUI via IPC. SQLite solo se un giorno servono ricerche su migliaia di profili o il demone deve connettere senza GUI (fase 2, connessione automatica) | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
 
 ## 3. Differenziazione (perché esiste)
 
@@ -99,7 +103,7 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
   - Linux: unit **systemd**; IPC su socket Unix con controllo delle credenziali del chiamante
     (gruppo `galleria`).
   - Windows: **servizio Windows**; IPC su named pipe con ACL per gli utenti autorizzati.
-  - Protocollo IPC: JSON-RPC o gRPC (tonic) — **da decidere con Nello**.
+  - Protocollo IPC: JSON-RPC 2.0, un messaggio per riga, con versione negoziata (D12, proposta).
 - **Backend WireGuard**:
   - Linux: modulo del kernel (in mainline) via netlink. Candidato: il crate `defguard_wireguard_rs`,
     licenza **Apache-2.0 [V]** (file LICENSE e crates.io, versione 0.12.5 del 2026-11-04), compatibile con la
@@ -109,16 +113,16 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
   - Windows: **WireGuardNT** (`wireguard.dll`, API in-kernel) **[V]**. La DLL precompilata ha una licenza
     propria che consente la ridistribuzione solo se usata tramite l'API di `wireguard.h` **[V]**
     (vedi rischio R3).
-- **Backend intercambiabili** (proposta, A9): ogni protocollo implementa la stessa interfaccia nel demone
+- **Backend intercambiabili** (D10, proposta): ogni protocollo implementa la stessa interfaccia nel demone
   (connetti, disconnetti, stato, statistiche, log), così aggiungere OpenConnect o AmneziaWG non tocca GUI,
-  IPC e vincolo "una attiva".
+  IPC e vincolo "una attiva". OpenConnect sarà un processo figlio come OpenVPN (D11, proposta).
 - **Backend OpenVPN**: binario `openvpn` 2.6 lanciato come processo figlio e pilotato tramite la
   **management interface** (socket locale con password). Su Linux si dipende dal pacchetto della distro;
   su Windows va incluso con i suoi driver oppure richiesto come prerequisito (A4). Licenze dei driver **[V]**:
   ovpn-dco-win (driver predefinito da OpenVPN 2.6) è MIT; tap-windows6 è GPLv2; `wintun.dll` precompilata ha la
   stessa licenza restrittiva di `wireguard.dll` (ridistribuibile solo se usata tramite l'API di `wintun.h`).
   L'MSI ufficiale di OpenVPN 2.7 installa solo ovpn-dco e tap-windows6, quello della 2.6 anche wintun **[V]**.
-- **Archivio profili**: metadati e configurazioni non segrete in un file per utente (TOML o SQLite);
+- **Archivio profili**: metadati e configurazioni non segrete in file TOML dell'utente, uno per profilo (D13, proposta);
   le parti segrete (chiavi private, password, chiavi inline) estratte all'import e salvate nel
   **portachiavi dell'utente**. Al connect la GUI le passa al demone, che non le scrive su disco
   (per OpenVPN: file temporaneo con permessi 0600 o passaggio via management interface **[S]**).
@@ -223,13 +227,13 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 |---|---|---|---|
 | A1 | Nome definitivo | Peppe | RISOLTA: Galleria (D7). Verifica marchio/dominio/nome repo ancora da fare |
 | A2 | Licenza | Peppe | RISOLTA: GPL-3.0-or-later (D8) |
-| A3 | IPC: JSON-RPC su socket/pipe o gRPC (tonic) | Nello | DA DECIDERE |
+| A3 | IPC: JSON-RPC su socket/pipe o gRPC (tonic) | Nello | PROPOSTA NELLO: JSON-RPC 2.0 (D12), da ratificare da Peppe |
 | A4 | Windows: includere OpenVPN o richiederlo come prerequisito | Nello | DA DECIDERE |
-| A5 | Storage profili: TOML (leggibile, versionabile) o SQLite | Nello | DA DECIDERE |
+| A5 | Storage profili: TOML (leggibile, versionabile) o SQLite | Nello | PROPOSTA NELLO: TOML, un file per profilo (D13), da ratificare da Peppe |
 | A6 | Soglie del criterio di stop dopo il lancio | Peppe | DA DECIDERE |
 | A7 | Lista dei difetti di Pritunl/Eddie (validazione) | Peppe | PARZIALE: Pritunl = UI spartana + WireGuard solo con server Pritunl (verificato su forum); Eddie e prova pratica non fatti |
 | A8 | Design system: riuso di xr1 design-system (verificarne la licenza per un progetto OSS) | Peppe | DA DECIDERE |
-| A9 | Interfaccia comune dei backend nel demone già dalla v0.1, e OpenConnect come libreria (`libopenconnect`) o come processo figlio | Nello | DA DECIDERE |
+| A9 | Interfaccia comune dei backend nel demone già dalla v0.1, e OpenConnect come libreria (`libopenconnect`) o come processo figlio | Nello | PROPOSTA NELLO: interfaccia comune subito (D10), OpenConnect processo figlio (D11), da ratificare da Peppe |
 | A10 | Blocco IPv6 per i profili "tutto nel tunnel" già in v0.1 (§8) | Nello | DA DECIDERE |
 | A11 | Nessuna telemetria (§8) | Peppe | DA DECIDERE |
 | A12 | Matrice di test (§8) | Nello + Peppe | DA DECIDERE |
@@ -250,6 +254,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 - OpenConnect (protocolli, LGPL-2.1): https://www.infradead.org/openconnect/ ; piattaforme e CSD su Windows: https://www.infradead.org/openconnect/platforms.html ; CSD: https://www.infradead.org/openconnect/csd.html ; HIP: https://www.infradead.org/openconnect/hip.html
 - AmneziaWG (MIT, fork di wireguard-go): https://github.com/amnezia-vpn/amneziawg-go
 - strongSwan: https://docs.strongswan.org/docs/latest/howtos/introduction.html , https://github.com/strongswan/strongswan , licenza: https://github.com/strongswan/strongswan/blob/master/LICENSE
+- OpenConnect, opzioni da riga di comando (`--passwd-on-stdin`, `--cookie-on-stdin`, `--script`, `--external-browser`): https://www.infradead.org/openconnect/manual.html
 - `defguard_wireguard_rs` (Apache-2.0, requisiti Windows): https://github.com/DefGuard/wireguard-rs/blob/main/LICENSE , https://crates.io/crates/defguard_wireguard_rs , https://github.com/DefGuard/wireguard-rs ; compatibilità Apache-2.0 con GPLv3: https://www.apache.org/licenses/GPL-compatibility.html
 - ovpn-dco-win (MIT): https://github.com/OpenVPN/ovpn-dco-win/blob/multipeer/COPYRIGHT.MIT ; tap-windows6 (GPLv2): https://github.com/OpenVPN/tap-windows6/blob/master/COPYING ; wintun (sorgente GPL-2.0, DLL con licenza propria): https://www.wintun.net/ , https://git.zx2c4.com/wintun/plain/prebuilt-binaries-license.txt
 - MSI ufficiale OpenVPN (driver inclusi, chiave di registro `exe_path`): https://github.com/OpenVPN/openvpn-build/blob/master/windows-msi/msi.wxs , https://github.com/OpenVPN/openvpn-build/blob/release/2.6/windows-msi/msi.wxs

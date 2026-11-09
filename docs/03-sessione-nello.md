@@ -30,8 +30,8 @@ Le raccomandazioni sono di Aitano (CEO): la decisione tecnica è di Nello, quell
 | Spike WireGuardNT su Windows | tunnel su da Rust, con licenza compatibile con SignPath (R3) o alternativa `wireguard-go` + wintun | da assegnare |
 | Spike management interface OpenVPN | connessione, stato, byte, credenziali passate senza file su disco | da assegnare |
 | Licenza `defguard_wireguard_rs` | sì/no all'uso | agente, 30' |
-| Supporto `management ... unix` e `pull-filter` in OpenVPN 2.6 | conferma su manuale ufficiale | agente, 30' |
-| Updater Tauri con MSI + servizio Windows | conferma su doc ufficiale | agente, 30' |
+| ~~`management ... unix` e `pull-filter` in OpenVPN 2.6~~ | FATTO 2026-11-09: entrambi presenti; il socket Unix va ristretto con `--management-client-user/group` | — |
+| ~~Updater Tauri con MSI + servizio Windows~~ | FATTO 2026-11-09 sulla doc: updater riusa l'MSI, servizio via frammento WiX; prova pratica nello spike WireGuardNT | — |
 
 ## 4. Chiusura (5')
 

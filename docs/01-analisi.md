@@ -53,7 +53,8 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
   (connessione in corso, connesso, errore), IP assegnato, byte in/out, ultimo handshake (WireGuard).
 - **Credenziali**: richiesta al connect con opzione "ricorda" nel portachiavi del sistema; supporto OTP
   per OpenVPN (`static-challenge`/`auth-user-pass`) **[S: copertura da verificare]**.
-- **Tray**: stato, lista rapida, connetti/disconnetti.
+- **Tray**: stato, lista rapida, connetti/disconnetti. Su Linux Tauri non emette gli eventi di click sull'icona,
+  funziona solo il menu **[V]**: tutte le azioni della tray stanno nel menu.
 - **Riconnessione automatica** su caduta di rete.
 - Duplica/esporta/elimina profilo.
 
@@ -151,8 +152,9 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
   aggiornamenti con una chiave nostra **[V]**; se la chiave privata si perde, chi ha l'app installata non riceve
   più aggiornamenti **[V]** → chiave nei secret di GitHub Actions + copia offline. GUI e demone vanno aggiornati
   insieme: il protocollo IPC ha un numero di versione e la GUI rifiuta un demone incompatibile con un messaggio chiaro.
-  Proposta: Windows aggiorna MSI completo (GUI + servizio) **[S: verificare che l'updater Tauri gestisca l'MSI con
-  il servizio]**; Linux nessun auto-aggiornamento in v0.1 (avviso "nuova versione" + pacchetti), repository
+  Proposta: Windows aggiorna MSI completo (GUI + servizio): l'updater Tauri riusa l'MSI standard **[V]** e l'MSI si
+  estende con frammenti WiX **[V]**, quindi il servizio va dichiarato in un frammento (ServiceInstall/ServiceControl
+  **[S: da provare nello spike Windows]**); Linux nessun auto-aggiornamento in v0.1 (avviso "nuova versione" + pacchetti), repository
   APT/DNF in fase 2.
 - **IPv6** (A10): un profilo che manda tutto il traffico IPv4 nel tunnel ma non ha rotte IPv6 lascerebbe uscire
   il traffico IPv6 dalla rete locale. Proposta: già in v0.1, per i profili "tutto nel tunnel", bloccare l'IPv6 non
@@ -164,12 +166,12 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 
 | Piattaforma | Versioni | Note |
 |---|---|---|
-| Ubuntu | LTS corrente e precedente | GNOME: icona tray solo con estensione AppIndicator (preinstallata su Ubuntu, non su GNOME puro) **[S]** |
-| Fedora | corrente | GNOME, systemd-resolved |
+| Ubuntu | LTS corrente e precedente | GNOME mostra la tray solo con l'estensione AppIndicator, inclusa in `ubuntu-desktop-minimal` (24.04) **[V]** |
+| Fedora | corrente | GNOME, systemd-resolved; estensione AppIndicator non preinstallata **[S]** → la tray è un accessorio, l'app deve essere completa senza |
 | Debian | stabile corrente | |
 | Arch | rolling | solo community (AUR in fase 3), nessuna garanzia |
 | KDE Plasma | su una delle distro sopra | tray nativa |
-| Windows | 11 | Windows 10 fuori supporto Microsoft dal 2025-10-14 **[S: data da riconfermare]**: best effort |
+| Windows | 11 | Windows 10 fuori supporto Microsoft dal 2025-10-14 **[V]**: best effort |
 
 ## 9. Licenza
 
@@ -235,6 +237,10 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 - OpenVPN COPYING (GPLv2 + eccezioni): https://github.com/OpenVPN/openvpn/blob/HEAD/COPYING
 - SignPath Foundation, condizioni: https://signpath.org/terms.html
 - Tauri updater (firma obbligatoria, perdita della chiave): https://v2.tauri.app/plugin/updater/
+- OpenVPN 2.6 `--pull-filter` e `--management`: https://github.com/OpenVPN/openvpn/blob/release/2.6/doc/man-sections/client-options.rst , https://github.com/OpenVPN/openvpn/blob/release/2.6/doc/man-sections/management-options.rst
+- Tauri: installer Windows e frammenti WiX https://v2.tauri.app/distribute/windows-installer/ ; tray https://v2.tauri.app/learn/system-tray/
+- Ubuntu 24.04 `ubuntu-desktop-minimal` (include `gnome-shell-extension-appindicator`): https://packages.ubuntu.com/noble/ubuntu-desktop-minimal
+- Windows 10 fine supporto: https://learn.microsoft.com/en-us/lifecycle/products/windows-10-home-and-pro
 - OpenConnect (protocolli, LGPL-2.1): https://www.infradead.org/openconnect/ ; piattaforme e CSD su Windows: https://www.infradead.org/openconnect/platforms.html ; CSD: https://www.infradead.org/openconnect/csd.html ; HIP: https://www.infradead.org/openconnect/hip.html
 - AmneziaWG (MIT, fork di wireguard-go): https://github.com/amnezia-vpn/amneziawg-go
 - strongSwan: https://docs.strongswan.org/docs/latest/howtos/introduction.html , https://github.com/strongswan/strongswan , licenza: https://github.com/strongswan/strongswan/blob/master/LICENSE

@@ -1,6 +1,6 @@
 # 01 — Analisi tecnico-funzionale
 
-Versione 0.3 — 2026-11-09 — stato: bozza da discutere con Nello (CTO)
+Versione 0.4 — 2026-11-09 — stato: decisioni tecniche D10–D16 proposte da Nello (CTO), da ratificare da Peppe
 Nome: **Galleria** (D7).
 
 Legenda: **[V]** verificato su fonte letta (link in fondo) · **[S]** supposto, da verificare.
@@ -128,7 +128,7 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 - **Archivio profili**: metadati e configurazioni non segrete in file TOML dell'utente, uno per profilo (D13, proposta);
   le parti segrete (chiavi private, password, chiavi inline) estratte all'import e salvate nel
   **portachiavi dell'utente**. Al connect la GUI le passa al demone, che non le scrive su disco
-  (per OpenVPN: file temporaneo con permessi 0600 o passaggio via management interface **[S]**).
+  (per OpenVPN: file temporaneo con permessi 0600 o passaggio via management interface **[S: spike 2, criterio 2.6]**).
 
 ## 6. Modello dati (bozza)
 
@@ -206,7 +206,7 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 
 | Fase | Contenuto | Stima |
 |---|---|---|
-| 0 | Validazione con Pritunl/Eddie, nome, licenza, scelta IPC; spike WireGuardNT + management interface OpenVPN | 1 settimana |
+| 0 | Validazione con Pritunl/Eddie, nome, licenza, scelta IPC; spike WireGuardNT + management interface OpenVPN (criteri in `03-sessione-nello.md` §3) | 1 settimana |
 | 1 | Demone Linux + WireGuard + OpenVPN, CLI minima | 1–2 settimane |
 | 2 | GUI rubrica + import + connetti/disconnetti + tray | 2 settimane |
 | 3 | Porting Windows (servizio, named pipe, WireGuardNT, rilevamento di OpenVPN installato come prerequisito, D14), MSI | 1–2 settimane |

@@ -33,6 +33,8 @@ monetizzazione.
 | D12 | (A3) **IPC con JSON-RPC 2.0**, un messaggio JSON per riga, su socket Unix (Linux) e named pipe (Windows). Gli eventi di stato sono notifiche JSON-RPC sulla stessa connessione. Il primo messaggio è `hello` con la versione del protocollo: se non è compatibile, la GUI mostra un errore chiaro (§8). Tipi delle richieste in un crate Rust condiviso da demone, GUI e CLI; il demone rifiuta campi sconosciuti e messaggi oltre una dimensione massima (M1). La webview non parla mai con il socket: passa dai comandi Tauri, in Rust. gRPC scartato: aggiunge `protoc` e codice generato alla build e non ci serve nulla che JSON-RPC non dia; JSON si ispeziona a mano durante il debug | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
 | D13 | (A5) **Archivio profili in TOML**, un file per profilo (`profiles/<id>.toml`) più un `galleria.toml` per gruppi, ordine e impostazioni, nella cartella di configurazione dell'utente. Ogni file ha `schema_version` per le migrazioni. Scrittura atomica (file temporaneo + rename), così GUI e CLI non si corrompono i file a vicenda; esportare un profilo significa copiare un file. Il demone non legge questi file (M2): riceve la configurazione dalla GUI via IPC. SQLite solo se un giorno servono ricerche su migliaia di profili o il demone deve connettere senza GUI (fase 2, connessione automatica) | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
 | D14 | (A4) **Windows: OpenVPN è un prerequisito in v0.1**, non incluso. L'utente installa l'MSI ufficiale (anche `winget install OpenVPNTechnologies.OpenVPN` **[V]**); il demone trova `openvpn.exe` dal valore `exe_path` in `HKLM\SOFTWARE\OpenVPN` **[V]** (chiave e cartella scrivibili solo dagli amministratori **[S: da controllare nello spike]**), richiede almeno la 2.6 e, se manca, la GUI spiega come installarlo. Motivi: le licenze permetterebbero di includerlo (§5, **[V]**), ma OpenVPN esce con una release circa ogni mese (2.7.5 → 2.7.9 tra luglio e novembre 2026 **[V]**) e ognuna diventerebbe una nostra release; SignPath firma solo binari costruiti da noi **[V]**; i driver li firma già OpenVPN. Costo: un passo in più per l'utente, e l'MSI ufficiale propone anche OpenVPN GUI, che va lasciato fuori **[S: selezione predefinita da controllare nello spike]**. Inclusione: da rivalutare dopo il lancio solo se gli utenti lo chiedono, non come impegno | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
+| D15 | (A10) **Blocco IPv6 già in v0.1** per i profili "tutto nel tunnel" (WireGuard: `AllowedIPs` con `0.0.0.0/0`; OpenVPN: `redirect-gateway` nel profilo o ricevuto dal server) che non portano IPv6 nel tunnel. Un solo meccanismo nel modulo di rete comune (D10): tutto l'IPv6 globale va verso l'interfaccia del tunnel (`::/1` e `8000::/1`, più specifiche della rotta predefinita della rete locale) e lì viene scartato. Che WireGuard scarti i pacchetti fuori da `AllowedIPs` è **[S]**, da provare; per OpenVPN c'è anche la via nativa `redirect-gateway ipv6` + `block-ipv6`, che risponde con ICMPv6 "no route" **[V]**. Disattivabile per profilo. Criteri: nessun pacchetto IPv6 globale sull'interfaccia fisica durante la connessione, e le app ripiegano su IPv4 senza attese lunghe | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
+| D16 | (A13) **Aggiornamenti**: Windows con l'updater di Tauri, che installa l'MSI completo (GUI + servizio) firmato con la nostra chiave; Linux in v0.1 solo avviso "nuova versione" con link ai pacchetti, repository APT/DNF in fase 2. In più: (1) il controllo lo fa la GUI, mai il demone: una sola richiesta all'endpoint delle release su GitHub, senza identificativi, disattivabile nelle impostazioni e scritta nel README, perché è l'unico contatto di rete di Galleria fuori dalla VPN (coerente con A11); (2) OpenVPN su Windows non lo aggiorniamo noi (D14): la GUI avvisa se la versione installata è sotto la minima; (3) se lo spike Windows mostra che updater + servizio non funzionano, in v0.1 anche Windows ha solo l'avviso | Nello, 2026-11-09 — **proposta, da ratificare da Peppe** |
 
 ## 3. Differenziazione (perché esiste)
 
@@ -159,17 +161,17 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 - **Distribuzione**: Linux `.deb` e `.rpm` (installano la unit systemd; AppImage non può installare un
   demone di sistema); Windows MSI che installa il servizio. Release automatiche con GitHub Actions.
 - **Firma Windows**: SignPath Foundation (gratuita per OSS) **[V]**, se il progetto rispetta le condizioni (vedi R3).
-- **Aggiornamenti** (A13): la GUI usa il plugin updater di Tauri, che richiede sempre la firma degli
+- **Aggiornamenti** (A13, D16 proposta): la GUI usa il plugin updater di Tauri, che richiede sempre la firma degli
   aggiornamenti con una chiave nostra **[V]**; se la chiave privata si perde, chi ha l'app installata non riceve
   più aggiornamenti **[V]** → chiave nei secret di GitHub Actions + copia offline. GUI e demone vanno aggiornati
-  insieme: il protocollo IPC ha un numero di versione e la GUI rifiuta un demone incompatibile con un messaggio chiaro.
-  Proposta: Windows aggiorna MSI completo (GUI + servizio): l'updater Tauri riusa l'MSI standard **[V]** e l'MSI si
+  insieme: il protocollo IPC ha un numero di versione e la GUI rifiuta un demone incompatibile con un messaggio chiaro (D12).
+  Windows aggiorna l'MSI completo (GUI + servizio): l'updater Tauri riusa l'MSI standard **[V]** e l'MSI si
   estende con frammenti WiX **[V]**, quindi il servizio va dichiarato in un frammento (ServiceInstall/ServiceControl
   **[S: da provare nello spike Windows]**); Linux nessun auto-aggiornamento in v0.1 (avviso "nuova versione" + pacchetti), repository
-  APT/DNF in fase 2.
-- **IPv6** (A10): un profilo che manda tutto il traffico IPv4 nel tunnel ma non ha rotte IPv6 lascerebbe uscire
-  il traffico IPv6 dalla rete locale. Proposta: già in v0.1, per i profili "tutto nel tunnel", bloccare l'IPv6 non
-  instradato nel tunnel (rotta `::/0` verso il tunnel). È più semplice del kill switch completo, che resta in fase 2.
+  APT/DNF in fase 2. Il controllo delle versioni si può disattivare.
+- **IPv6** (A10, D15 proposta): un profilo che manda tutto il traffico IPv4 nel tunnel ma non ha rotte IPv6 lascerebbe uscire
+  il traffico IPv6 dalla rete locale. Già in v0.1, per i profili "tutto nel tunnel", l'IPv6 globale va verso il tunnel
+  e lì viene scartato (dettagli in D15). È più semplice del kill switch completo, che resta in fase 2.
 - **Telemetria** (A11): proposta **nessuna**. Niente analytics né crash report automatici; per le segnalazioni
   l'utente esporta il log dalla GUI (con i segreti già filtrati). Va scritto nel README: per un client VPN è un argomento.
 - **Modello delle minacce**: vedi [`02-modello-minacce.md`](02-modello-minacce.md).
@@ -235,10 +237,10 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | A7 | Lista dei difetti di Pritunl/Eddie (validazione) | Peppe | PARZIALE: Pritunl = UI spartana + WireGuard solo con server Pritunl (verificato su forum); Eddie e prova pratica non fatti |
 | A8 | Design system: riuso di xr1 design-system (verificarne la licenza per un progetto OSS) | Peppe | DA DECIDERE |
 | A9 | Interfaccia comune dei backend nel demone già dalla v0.1, e OpenConnect come libreria (`libopenconnect`) o come processo figlio | Nello | PROPOSTA NELLO: interfaccia comune subito (D10), OpenConnect processo figlio (D11), da ratificare da Peppe |
-| A10 | Blocco IPv6 per i profili "tutto nel tunnel" già in v0.1 (§8) | Nello | DA DECIDERE |
+| A10 | Blocco IPv6 per i profili "tutto nel tunnel" già in v0.1 (§8) | Nello | PROPOSTA NELLO: sì (D15), da ratificare da Peppe |
 | A11 | Nessuna telemetria (§8) | Peppe | DA DECIDERE |
 | A12 | Matrice di test (§8) | Nello + Peppe | DA DECIDERE |
-| A13 | Canale e meccanismo degli aggiornamenti (§8) | Nello | DA DECIDERE |
+| A13 | Canale e meccanismo degli aggiornamenti (§8) | Nello | PROPOSTA NELLO: updater Tauri + MSI su Windows, solo avviso su Linux (D16), da ratificare da Peppe |
 
 ## Fonti
 
@@ -260,4 +262,5 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 - ovpn-dco-win (MIT): https://github.com/OpenVPN/ovpn-dco-win/blob/multipeer/COPYRIGHT.MIT ; tap-windows6 (GPLv2): https://github.com/OpenVPN/tap-windows6/blob/master/COPYING ; wintun (sorgente GPL-2.0, DLL con licenza propria): https://www.wintun.net/ , https://git.zx2c4.com/wintun/plain/prebuilt-binaries-license.txt
 - MSI ufficiale OpenVPN (driver inclusi, chiave di registro `exe_path`): https://github.com/OpenVPN/openvpn-build/blob/master/windows-msi/msi.wxs , https://github.com/OpenVPN/openvpn-build/blob/release/2.6/windows-msi/msi.wxs , https://github.com/OpenVPN/openvpn-gui/blob/master/README.rst
 - Release OpenVPN (cadenza, versione corrente): https://github.com/OpenVPN/openvpn/releases ; pacchetto winget: https://github.com/microsoft/winget-pkgs/tree/master/manifests/o/OpenVPNTechnologies/OpenVPN
+- OpenVPN 2.6 `--block-ipv6` e `--redirect-gateway ipv6`: https://github.com/OpenVPN/openvpn/blob/release/2.6/doc/man-sections/vpn-network-options.rst
 - Homebrew 5.0 e cask non firmati (per la fase macOS): https://brew.sh/2025/11/12/homebrew-5.0.0/ , https://workbrew.com/blog/homebrew-5-0-0

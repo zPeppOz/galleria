@@ -1,0 +1,90 @@
+
+=== 2.8 IPv6 con profilo 'tutto nel tunnel' solo IPv4, modalita' ipv6=native ===
+2026-11-10T10:28:14Z
+OpenVPN 2.7.0 x86_64-pc-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+
+$ ip -6 route; ip route | head -5
+2001:db8:30::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev tun0 proto kernel metric 256 pref medium
+default via 2001:db8:30::20 dev eth0 metric 1024 pref medium
+0.0.0.0/1 via 10.8.0.1 dev tun0 
+default via 172.30.0.20 dev eth0 
+10.8.0.0/24 dev tun0 proto kernel scope link src 10.8.0.2 
+128.0.0.0/1 via 10.8.0.1 dev tun0 
+172.30.0.0/24 dev eth0 proto kernel scope link src 172.30.0.37 
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000534s total=0.001527s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000482s total=0.001104s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000616s total=0.001313s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000453s total=0.001334s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000515s total=0.001133s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000458s total=0.001106s
+[exit 0]
+
+--- client senza Happy Eyeballs (python socket.create_connection, prova gli indirizzi in ordine) ---
+$ python3 /tmp/seq.py
+ordine getaddrinfo: ['2001:db8:99::1', '198.51.100.1']
+peer=2001:db8:99::1 secs=0.000
+[exit 0]
+
+$ ping -6 -c 2 -W 1 2001:db8:99::1
+PING 2001:db8:99::1 (2001:db8:99::1) 56 data bytes
+64 bytes from 2001:db8:99::1: icmp_seq=1 ttl=64 time=0.104 ms
+64 bytes from 2001:db8:99::1: icmp_seq=2 ttl=64 time=0.070 ms
+
+--- 2001:db8:99::1 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1043ms
+rtt min/avg/max/mdev = 0.070/0.087/0.104/0.017 ms
+[exit 0]
+
+--- pacchetti IPv6 globali su eth0 in 60 s ---
+$ tcpdump -nn -r /evidence/ovpn27/2.8-native.pcap 2>/dev/null | head -12; echo "totale: $(tcpdump -nn -r /evidence/ovpn27/2.8-native.pcap 2>/dev/null | wc -l)"
+10:28:15.691866 IP6 2001:db8:30::37.49572 > 2001:db8:99::1.80: Flags [S], seq 640202743, win 64800, options [mss 1440,sackOK,TS val 3981830486 ecr 0,nop,wscale 10], length 0
+10:28:15.691951 IP6 2001:db8:99::1.80 > 2001:db8:30::37.49572: Flags [S.], seq 3490932400, ack 640202744, win 64260, options [mss 1440,sackOK,TS val 3069964155 ecr 3981830486,nop,wscale 10], length 0
+10:28:15.691960 IP6 2001:db8:30::37.49572 > 2001:db8:99::1.80: Flags [.], ack 1, win 64, options [nop,nop,TS val 3981830486 ecr 3069964155], length 0
+10:28:15.692006 IP6 2001:db8:30::37.49572 > 2001:db8:99::1.80: Flags [P.], seq 1:83, ack 1, win 64, options [nop,nop,TS val 3981830486 ecr 3069964155], length 82: HTTP: GET / HTTP/1.1
+10:28:15.692013 IP6 2001:db8:99::1.80 > 2001:db8:30::37.49572: Flags [.], ack 83, win 63, options [nop,nop,TS val 3069964155 ecr 3981830486], length 0
+10:28:15.692861 IP6 2001:db8:99::1.80 > 2001:db8:30::37.49572: Flags [P.], seq 1:186, ack 83, win 63, options [nop,nop,TS val 3069964156 ecr 3981830486], length 185: HTTP: HTTP/1.0 200 OK
+10:28:15.692885 IP6 2001:db8:30::37.49572 > 2001:db8:99::1.80: Flags [.], ack 186, win 64, options [nop,nop,TS val 3981830487 ecr 3069964156], length 0
+10:28:15.692914 IP6 2001:db8:99::1.80 > 2001:db8:30::37.49572: Flags [P.], seq 186:215, ack 83, win 63, options [nop,nop,TS val 3069964156 ecr 3981830487], length 29: HTTP
+10:28:15.692924 IP6 2001:db8:30::37.49572 > 2001:db8:99::1.80: Flags [.], ack 215, win 64, options [nop,nop,TS val 3981830487 ecr 3069964156], length 0
+10:28:15.692952 IP6 2001:db8:99::1.80 > 2001:db8:30::37.49572: Flags [F.], seq 215, ack 83, win 63, options [nop,nop,TS val 3069964156 ecr 3981830487], length 0
+10:28:15.692972 IP6 2001:db8:30::37.49572 > 2001:db8:99::1.80: Flags [F.], seq 83, ack 216, win 64, options [nop,nop,TS val 3981830487 ecr 3069964156], length 0
+10:28:15.693001 IP6 2001:db8:99::1.80 > 2001:db8:30::37.49572: Flags [.], ack 84, win 63, options [nop,nop,TS val 3069964156 ecr 3981830487], length 0
+totale: 85
+[exit 0]
+
+[daemon exit 0]
+{"config_via":"Pipe","daemon_directives":["management /run/galleria/s792/mgmt.sock unix","management-client-user root","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"/usr/local/lib/galleria/galleriad-s
+openvpn[stdout]| 2026-11-10 10:28:14 GDG6: remote_host_ipv6=n/a
+{"dns_channels":["foreign_option"],"env":{"dev":"tun0","dev_type":"tun","foreign_option_1":"dhcp-option DNS 10.8.0.1","foreign_option_2":"dhcp-option DOMAIN galleria.test","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","route_gateway_1":"10.8.0.1","route_net_gateway":"172.30.0.20","r
+{"cmd":"resolvectl dns tun0 10.8.0.1","event":"netcfg_cmd","ok":true,"stderr":"","t":0.067}
+{"cmd":"resolvectl domain tun0 galleria.test ~.","event":"netcfg_cmd","ok":true,"stderr":"","t":0.069}
+{"cmd":"resolvectl default-route tun0 yes","event":"netcfg_cmd","ok":true,"stderr":"","t":0.072}
+{"dns_channels":["foreign_option"],"env":{"dev":"tun0","dev_type":"tun","foreign_option_1":"dhcp-option DNS 10.8.0.1","foreign_option_2":"dhcp-option DOMAIN galleria.test","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","redirect_gateway":"1","route_gateway_1":"10.8.0.1","route_net_ga
+{"cmd":"(none)","event":"netcfg_cmd","ok":true,"stderr":"tun0 already gone, resolved state dropped with it","t":75.123}
+--- richieste viste dal sito (sorgente) ---
+2001:db8:30::37 "GET / HTTP/1.1" 200 -
+2001:db8:30::37 "GET / HTTP/1.1" 200 -
+2001:db8:30::37 "GET / HTTP/1.1" 200 -
+2001:db8:30::37 "GET / HTTP/1.1" 200 -
+2001:db8:30::37 "GET / HTTP/1.1" 200 -
+2001:db8:30::37 "GET / HTTP/1.1" 200 -

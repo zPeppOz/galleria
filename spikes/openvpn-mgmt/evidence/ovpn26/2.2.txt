@@ -1,0 +1,73 @@
+
+=== 2.2 socket di management: cartella 0700 di root + management-client-user root ===
+2026-11-10T10:52:27Z
+OpenVPN 2.6.19 x86_64-pc-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+
+$ ls -ld /run/galleria /run/galleria/s*; ls -l /run/galleria/s*/
+drwx------ 3 root root 60 Nov 10 10:52 /run/galleria
+drwx------ 2 root root 80 Nov 10 10:52 /run/galleria/s2093
+total 0
+srwxrwxrwx 1 root root 0 Nov 10 10:52 mgmt.sock
+srwxr-xr-x 1 root root 0 Nov 10 10:52 netcfg.sock
+[exit 0]
+
+$ id alice
+uid=1001(alice) gid=1001(alice) groups=1001(alice)
+[exit 0]
+
+--- utente normale, permessi normali ---
+$ runuser -u alice -- socat -T2 - UNIX-CONNECT:$(ls /run/galleria/s*/mgmt.sock 2>/dev/null || echo /run/galleria/x/mgmt.sock) </dev/null
+2026/11/10 10:52:27 socat[2132] E connect(, AF=1 "/run/galleria/s2093/mgmt.sock", 31): Permission denied
+[exit 1]
+
+$ runuser -u alice -- ls /run/galleria
+ls: cannot open directory '/run/galleria': Permission denied
+[exit 2]
+
+--- difesa in profondita': permessi allargati a mano (777), resta il controllo di OpenVPN sull'uid ---
+$ chmod 755 /run/galleria /run/galleria/s*; chmod 777 /run/galleria/s*/mgmt.sock; ls -ld /run/galleria/s* /run/galleria/s*/mgmt.sock
+drwxr-xr-x 2 root root 80 Nov 10 10:52 /run/galleria/s2093
+srwxrwxrwx 1 root root  0 Nov 10 10:52 /run/galleria/s2093/mgmt.sock
+[exit 0]
+
+$ echo 'state' | runuser -u alice -- socat -T2 - UNIX-CONNECT:$(ls /run/galleria/s*/mgmt.sock)
+[exit 0]
+
+--- secondo client root mentre il demone e' collegato ---
+$ echo 'state' | timeout 3 socat -T2 - UNIX-CONNECT:$(ls /run/galleria/s*/mgmt.sock); echo rc=$?
+rc=0
+[exit 0]
+
+$ chmod 700 /run/galleria /run/galleria/s*
+[exit 0]
+
+[daemon exit 0]
+--- log di OpenVPN sui tentativi di connessione al management ---
+openvpn[stdout]| 2026-11-10 10:52:27 MANAGEMENT: client_uid=0
+openvpn[stdout]| 2026-11-10 10:52:27 MANAGEMENT: unix domain socket listening on /run/galleria/s2093/mgmt.sock
+openvpn[stdout]| 2026-11-10 10:52:27 MANAGEMENT: Client connected from /run/galleria/s2093/mgmt.sock
+
+--- D) solo --management-client-user root, senza la cartella 0700 e senza il demone collegato ---
+$ M=$(mktemp -d /tmp/mg.XXXX) && chmod 777 $M
+    (timeout 6 openvpn --config /profiles/base.ovpn --management $M/m.sock unix --management-client-user root --management-hold --management-query-passwords --verb 3 > $M/log 2>&1 &)
+    sleep 1; ls -l $M/m.sock
+    echo '>> alice:'; echo help | runuser -u alice -- socat -T1 - UNIX-CONNECT:$M/m.sock; echo rc=$?
+    sleep 1; echo '>> root:'; echo 'state' | socat -T1 - UNIX-CONNECT:$M/m.sock | head -3
+    sleep 5; echo '>> log openvpn:'; grep -E 'MANAGEMENT' $M/log
+srwxrwxrwx 1 root root 0 Nov 10 10:52 /tmp/mg.HuOb/m.sock
+>> alice:
+2026/11/10 10:52:40 socat[2190] E read(5, 0x5f6739c80000, 8192): Connection reset by peer
+rc=1
+>> root:
+>INFO:OpenVPN Management Interface Version 5 -- type 'help' for more info
+>HOLD:Waiting for hold release:0
+1794307959,CONNECTING,,,,,,
+>> log openvpn:
+2026-11-10 10:52:39 MANAGEMENT: client_uid=0
+2026-11-10 10:52:39 MANAGEMENT: unix domain socket listening on /tmp/mg.HuOb/m.sock
+2026-11-10 10:52:40 MANAGEMENT: unix domain socket client connection rejected -- UID of socket peer (1001) doesn't match required value (0) as given by --management-client-user
+2026-11-10 10:52:41 MANAGEMENT: Client connected from /tmp/mg.HuOb/m.sock
+2026-11-10 10:52:41 MANAGEMENT: CMD 'state'
+2026-11-10 10:52:41 MANAGEMENT: Client disconnected
+[exit 0]
+

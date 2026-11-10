@@ -1,0 +1,8 @@
+# generati da lab/gen-pki.sh, lab/make-profiles.sh e lab/up.sh (PKI di prova, profili con chiavi inline)
+lab/pki/
+lab/profiles/
+lab/bin/
+target/
+evidence/run*.out
+# le prove sono file .log: la regola *.log della radice non vale qui
+!*.log

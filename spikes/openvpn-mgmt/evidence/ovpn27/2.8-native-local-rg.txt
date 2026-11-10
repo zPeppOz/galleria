@@ -1,0 +1,19 @@
+=== probe 2.8-native-local-rg (profiles/native-local-rg.ovpn username=alice password=*** ipv6=native) ===
+OpenVPN 2.7.0 x86_64-pc-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+$ ip -6 route  (durante la connessione)
+2001:db8:30::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev tun0 proto kernel metric 256 pref medium
+default via 2001:db8:30::20 dev eth0 metric 1024 pref medium
+$ curl http://dual.galleria.test/
+remote=2001:db8:99::1 total=0.001036s
+[daemon exit 0]
+--- log openvpn (righe su redirect/ipv6) ---
+openvpn[stdout]| 2026-11-10 10:33:11 WARNING: You have specified redirect-gateway and redirect-private at the same time (or the same option multiple times). This is not well supported and may lead to unexpected results
+openvpn[stdout]| 2026-11-10 10:33:11 PUSH: Received control message: 'PUSH_REPLY,dhcp-option DNS 10.8.0.1,dhcp-option DOMAIN galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.8.0.1,topolo
+openvpn[stdout]| 2026-11-10 10:33:11 Pushed option removed by filter: 'redirect-gateway def1'
+openvpn[stdout]| 2026-11-10 10:33:11 net_route_v6_best_gw query: dst ::
+openvpn[stdout]| 2026-11-10 10:33:11 net_route_v6_best_gw result: via 2001:db8:30::20 dev eth0
+openvpn[stdout]| 2026-11-10 10:33:11 net_route_v6_best_gw query: dst ::
+openvpn[stdout]| 2026-11-10 10:33:11 net_route_v6_best_gw result: via 2001:db8:30::20 dev eth0
+openvpn[stdout]| 2026-11-10 10:33:11 WARNING: OpenVPN was configured to add an IPv6 route. However, no IPv6 has been configured for tun0, therefore the route installation may fail or may not work as expected.

@@ -59,7 +59,7 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 - **Connessione**: connetti/disconnetti; se un'altra è attiva viene chiusa prima (D5); stato in tempo reale
   (connessione in corso, connesso, errore), IP assegnato, byte in/out, ultimo handshake (WireGuard).
 - **Credenziali**: richiesta al connect con opzione "ricorda" nel portachiavi del sistema; supporto OTP
-  per OpenVPN (`static-challenge`/`auth-user-pass`) **[S: copertura da verificare]**.
+  per OpenVPN (`static-challenge`/`auth-user-pass`) **[V su Linux con `static-challenge`, spike 2 criterio 2.5; challenge dinamico `CRV1` non provato]**.
 - **Tray**: stato, lista rapida, connetti/disconnetti. Su Linux Tauri non emette gli eventi di click sull'icona,
   funziona solo il menu **[V]**: tutte le azioni della tray stanno nel menu.
 - **Riconnessione automatica** su caduta di rete.
@@ -128,7 +128,8 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 - **Archivio profili**: metadati e configurazioni non segrete in file TOML dell'utente, uno per profilo (D13, proposta);
   le parti segrete (chiavi private, password, chiavi inline) estratte all'import e salvate nel
   **portachiavi dell'utente**. Al connect la GUI le passa al demone, che non le scrive su disco
-  (per OpenVPN: file temporaneo con permessi 0600 o passaggio via management interface **[S: spike 2, criterio 2.6]**).
+  (per OpenVPN: configurazione passata via pipe, `--config /dev/stdin`, **[V su Linux, spike 2 criterio 2.6]**; segreti
+  via management interface **[V su Linux]**; su Windows **[S: parte Windows dello spike 2]**; esito in `04-esito-spike-2-linux.md`).
 
 ## 6. Modello dati (bozza)
 

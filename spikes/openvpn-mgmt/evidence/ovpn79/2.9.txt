@@ -1,0 +1,52 @@
+
+=== 2.9 errori: password sbagliata, OTP sbagliato, server irraggiungibile ===
+2026-11-10T10:46:33Z
+OpenVPN 2.7.9 x86_64-redhat-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+
+--- password sbagliata ---
+[daemon exit 2]
+{"event":"attempt","n":1,"of":3,"t":0.004}
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":0.055}
+openvpn[stdout]| 2026-11-10 10:46:33 AUTH: Received control message: AUTH_FAILED
+{"event":"mgmt_password","line":"Verification Failed: 'Auth'","t":0.065}
+{"detail":"auth-failure","event":"state","local_ip":"","raw":"1794307593,EXITING,auth-failure,,,,,","remote":"","state":"EXITING","t":0.065}
+openvpn[stdout]| 2026-11-10 10:46:33 MANAGEMENT: >STATE:1794307593,EXITING,auth-failure,,,,,
+{"event":"error","kind":"auth_failed","message":"Accesso negato dal server: nome utente, password o codice OTP non validi.","retry":false,"t":0.065}
+{"code":2,"event":"exit","t":0.065}
+
+--- OTP sbagliato ---
+[daemon exit 2]
+{"event":"attempt","n":1,"of":3,"t":0.005}
+{"event":"mgmt_password","line":"Need 'Auth' username/password SC:1,Enter OTP","t":0.055}
+openvpn[stdout]| 2026-11-10 10:46:33 AUTH: Received control message: AUTH_FAILED
+{"event":"mgmt_password","line":"Verification Failed: 'Auth'","t":0.068}
+{"event":"error","kind":"auth_failed","message":"Accesso negato dal server: nome utente, password o codice OTP non validi.","retry":false,"t":0.069}
+{"code":2,"event":"exit","t":0.069}
+
+--- server irraggiungibile (172.30.0.99), max_attempts=4 ---
+[daemon exit 4] durata 27s
+{"event":"attempt","n":1,"of":4,"t":0.007}
+openvpn[stdout]| 2026-11-10 10:46:38 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 10:46:38 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 10:46:38 Exiting due to fatal error
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(unix_wait_status(256)))","t":4.222}
+{"after_secs":1,"event":"retry","next_attempt":2,"reason":"connection failed","t":4.222}
+{"event":"attempt","n":2,"of":4,"t":5.223}
+openvpn[stdout]| 2026-11-10 10:46:44 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 10:46:44 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 10:46:44 Exiting due to fatal error
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(unix_wait_status(256)))","t":10.823}
+{"after_secs":2,"event":"retry","next_attempt":3,"reason":"connection failed","t":10.823}
+{"event":"attempt","n":3,"of":4,"t":12.823}
+openvpn[stdout]| 2026-11-10 10:46:51 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 10:46:51 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 10:46:51 Exiting due to fatal error
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(unix_wait_status(256)))","t":16.989}
+{"after_secs":4,"event":"retry","next_attempt":4,"reason":"connection failed","t":16.989}
+{"event":"attempt","n":4,"of":4,"t":20.99}
+openvpn[stdout]| 2026-11-10 10:47:00 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 10:47:00 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 10:47:00 Exiting due to fatal error
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(unix_wait_status(256)))","t":26.165}
+{"event":"error","kind":"gave_up","message":"Server non raggiungibile dopo 4 tentativi: connection failed","retry":false,"t":26.165}
+{"code":4,"event":"exit","t":26.165}

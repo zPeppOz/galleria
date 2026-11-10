@@ -1,0 +1,81 @@
+################ ovpn26: OpenVPN 2.6.19
+2.1 control PWNED: 6  sanitized: 0  removed: 11
+2.2 alice: Permission denied  D: 1
+2.4 states: WAIT AUTH ASSIGN_IP ADD_ROUTES CONNECTED EXITING  bytecount: 7 last: {"event":"bytecount","in":"2972","out":"3020","t":8.134} dco: Kernel support for ovpn-dco missing
+2.5 auth: 1 Need hold release from management interface, waiting...|Need 'Auth' username/password|
+2.5 otp: 1 Need hold release from management interface, waiting...|Need 'Auth' username/password SC:1,Enter OTP|
+2.5 keypass: 1 Need hold release from management interface, waiting...|Need 'Auth' username/password|Need 'Private Key' password|
+2.6 pipe scan: [file con materiale della chiave: 0]  sighup: Options error: You must define TUN/TAP device (--dev) retry: 1 reconnect: 2
+2.6 extkey: 1 connected: 1 "algorithm":"ECDSA"
+2.6 tempfile removed: 1
+2.7 dhcpopt env: "dns_channels":["foreign_option"] resolvectl ok: 3 redirect var: 
+2.7 dhcpopt noup dns-updown: 0  withup: 0
+2.7 dnsopt env: "dns_channels":["dns_server","foreign_option"] resolvectl ok: 3 redirect var: 
+2.7 dnsopt noup dns-updown: 0  withup: 0
+2.7 resolvectl query: 2
+2.8 off: pkts=totale: 
+totale: 85 curl= 7 remote=2001:db8:99::1; maxtotal=0.001530 seq=peer=2001:db8:99::1 secs=0.000
+2.8 native: pkts=totale: 
+totale: 0 curl= 6 remote=198.51.100.1; maxtotal=0.001843 seq=peer=198.51.100.1 secs=0.001
+2.8 native6: pkts=totale: 
+totale: 0 curl= 6 remote=198.51.100.1; maxtotal=0.002150 seq=peer=198.51.100.1 secs=0.000
+2.8 common: pkts=totale: 
+totale: 0 curl= 6 remote=198.51.100.1; maxtotal=0.209877 seq=peer=198.51.100.1 secs=10.010
+2.8 reject: pkts=totale: 
+totale: 0 curl= 6 remote=198.51.100.1; maxtotal=0.001824 seq=peer=198.51.100.1 secs=0.001
+2.9 badpass: "kind":"auth_failed" attempts=1  badotp: "kind":"auth_failed"  unreachable: 4 attempts, backoff 1 2 4  "kind":"gave_up" durata 30s
+mgmt version: Management Interface Version 5
+################ ovpn27: OpenVPN 2.7.0
+2.1 control PWNED: 6  sanitized: 0  removed: 11
+2.2 alice: Permission denied  D: 1
+2.4 states: WAIT AUTH ASSIGN_IP ADD_ROUTES CONNECTED EXITING  bytecount: 6 last: {"event":"bytecount","in":"3042","out":"4315","t":7.356} dco: Kernel support for ovpn-dco missing
+2.5 auth: 1 Need hold release from management interface, waiting...|Need 'Auth' username/password|
+2.5 otp: 1 Need hold release from management interface, waiting...|Need 'Auth' username/password SC:1,Enter OTP|
+2.5 keypass: 1 Need hold release from management interface, waiting...|Need 'Auth' username/password|Need 'Private Key' password|
+2.6 pipe scan: [file con materiale della chiave: 0]  sighup: Options error: You must define TUN/TAP device (--dev) retry: 1 reconnect: 2
+2.6 extkey: 1 connected: 1 "algorithm":"ECDSA"
+2.6 tempfile removed: 1
+2.7 dhcpopt env: "dns_channels":["foreign_option"] resolvectl ok: 4 redirect var: "route_redirect_gateway_ipv4":"1"
+2.7 dhcpopt noup dns-updown: 2  withup: 0
+2.7 dnsopt env: "dns_channels":["foreign_option"] resolvectl ok: 4 redirect var: "route_redirect_gateway_ipv4":"1"
+2.7 dnsopt noup dns-updown: 2  withup: 0
+2.7 resolvectl query: 2
+2.8 off: pkts=totale: 
+totale: 85 curl= 7 remote=2001:db8:99::1; maxtotal=0.001687 seq=peer=2001:db8:99::1 secs=0.000
+2.8 native: pkts=totale: 
+totale: 85 curl= 6 remote=2001:db8:99::1; maxtotal=0.001527 seq=peer=2001:db8:99::1 secs=0.000
+2.8 native6: pkts=totale: 
+totale: 0 curl= 6 remote=198.51.100.1; maxtotal=0.002324 seq=peer=198.51.100.1 secs=0.001
+2.8 common: pkts=totale: 
+totale: 0 curl= 6 remote=198.51.100.1; maxtotal=0.213164 seq=peer=198.51.100.1 secs=10.009
+2.8 reject: pkts=totale: 
+totale: 0 curl= 6 remote=198.51.100.1; maxtotal=0.002946 seq=peer=198.51.100.1 secs=0.001
+2.9 badpass: "kind":"auth_failed" attempts=1  badotp: "kind":"auth_failed"  unreachable: 4 attempts, backoff 1 2 4  "kind":"gave_up" durata 27s
+mgmt version: Management Interface Version 5
+################ ovpn79: OpenVPN 2.7.9
+2.1 control PWNED: 6  sanitized: 0  removed: 11
+2.2 alice: Permission denied  D: 1
+2.4 states: WAIT AUTH ASSIGN_IP ADD_ROUTES CONNECTED EXITING  bytecount: 6 last: {"event":"bytecount","in":"3042","out":"4740","t":7.343} dco: 
+2.5 auth: 1 Need hold release from management interface, waiting...|Need 'Auth' username/password|
+2.5 otp: 1 Need hold release from management interface, waiting...|Need 'Auth' username/password SC:1,Enter OTP|
+2.5 keypass: 1 Need hold release from management interface, waiting...|Need 'Auth' username/password|Need 'Private Key' password|
+2.6 pipe scan: [file con materiale della chiave: 0]  sighup: Options error: DEPRECATION: No tls-client or tls-server option in configuration detected. OpenVPN 2.8 will remove the functionality to run a VPN without TLS. See the examples section in the manual page for examples of a similar quick setup with peer-fingerprint. OpenVPN 2.7 allows using this configuration when using --allow-deprecated-insecure-static-crypto but you should move to a proper configuration using TLS as soon as possible. retry: 1 reconnect: 2
+2.6 extkey: 1 connected: 1 "algorithm":"ECDSA"
+2.6 tempfile removed: 1
+2.7 dhcpopt env: "dns_channels":["foreign_option"] resolvectl ok: 4 redirect var: "route_redirect_gateway_ipv4":"1"
+2.7 dhcpopt noup dns-updown: 2  withup: 0
+2.7 dnsopt env: "dns_channels":["foreign_option"] resolvectl ok: 4 redirect var: "route_redirect_gateway_ipv4":"1"
+2.7 dnsopt noup dns-updown: 2  withup: 0
+2.7 resolvectl query: 2
+2.8 off: pkts=totale: 
+totale: 86 curl= 7 remote=2001:db8:99::1; maxtotal=0.001308 seq=peer=2001:db8:99::1 secs=0.000
+2.8 native: pkts=totale: 
+totale: 86 curl= 6 remote=2001:db8:99::1; maxtotal=0.001538 seq=peer=2001:db8:99::1 secs=0.000
+2.8 native6: pkts=totale: 
+totale: 0 curl= 6 remote=198.51.100.1; maxtotal=0.002868 seq=peer=198.51.100.1 secs=0.001
+2.8 common: pkts=totale: 
+totale: 0 curl= 6 remote=198.51.100.1; maxtotal=0.206143 seq=peer=198.51.100.1 secs=10.011
+2.8 reject: pkts=totale: 
+totale: 0 curl= 6 remote=198.51.100.1; maxtotal=0.003114 seq=peer=198.51.100.1 secs=0.001
+2.9 badpass: "kind":"auth_failed" attempts=1  badotp: "kind":"auth_failed"  unreachable: 4 attempts, backoff 1 2 4  "kind":"gave_up" durata 27s
+mgmt version: Management Interface Version 6

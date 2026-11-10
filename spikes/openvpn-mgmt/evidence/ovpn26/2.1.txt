@@ -1,0 +1,70 @@
+
+=== 2.1 profilo malevolo: up/down/route-up/ipchange/plugin/management/status/writepid ===
+2026-11-10T10:12:02Z
+OpenVPN 2.6.19 x86_64-pc-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+
+--- profilo (direttive non inline) ---
+client
+dev tun
+proto udp
+remote 172.30.0.10 1194
+nobind
+remote-cert-tls server
+auth-user-pass
+key-direction 1
+verb 3
+script-security 3
+up "/usr/bin/touch /tmp/PWNED-up"
+down "/usr/bin/touch /tmp/PWNED-down"
+route-up "/usr/bin/touch /tmp/PWNED-route-up"
+ipchange "/usr/bin/touch /tmp/PWNED-ipchange"
+plugin /usr/lib/x86_64-linux-gnu/openvpn/plugins/openvpn-plugin-down-root.so "/usr/bin/touch /tmp/PWNED-plugin"
+management 0.0.0.0 7505
+status /tmp/PWNED-status 1
+writepid /tmp/PWNED-writepid
+setenv EVIL 1
+
+$ rm -f /tmp/PWNED-*
+[exit 0]
+
+--- A) controllo: stesso profilo SENZA pulizia (unsafe_no_sanitize=true) ---
+$ ss -ltnup | grep -E '7505|openvpn' || true
+udp   UNCONN 0      0            0.0.0.0:40127      0.0.0.0:*    users:(("openvpn",pid=213,fd=6))        
+[exit 0]
+
+[daemon exit 0]
+$ ls -l /tmp/PWNED-* 2>&1
+-rw-r--r-- 1 root root   0 Nov 10 10:12 /tmp/PWNED-down
+-rw-r--r-- 1 root root   0 Nov 10 10:12 /tmp/PWNED-ipchange
+-rw-r--r-- 1 root root   0 Nov 10 10:12 /tmp/PWNED-plugin
+-rw-r--r-- 1 root root   0 Nov 10 10:12 /tmp/PWNED-route-up
+-rw------- 1 root root 164 Nov 10 10:12 /tmp/PWNED-status
+-rw-r--r-- 1 root root   0 Nov 10 10:12 /tmp/PWNED-up
+[exit 0]
+
+$ rm -f /tmp/PWNED-*
+[exit 0]
+
+--- B) demone: profilo ripulito ---
+$ ss -ltnup | grep -E '7505|openvpn' || true
+udp   UNCONN 0      0            0.0.0.0:44915      0.0.0.0:*    users:(("openvpn",pid=253,fd=5))        
+[exit 0]
+
+[daemon exit 0]
+{"directive":"verb","event":"profile_directive_removed","line":9,"reason":"blocked directive (M2)","t":0.003}
+{"directive":"script-security","event":"profile_directive_removed","line":66,"reason":"blocked directive (M2)","t":0.003}
+{"directive":"up","event":"profile_directive_removed","line":67,"reason":"blocked directive (M2)","t":0.003}
+{"directive":"down","event":"profile_directive_removed","line":68,"reason":"blocked directive (M2)","t":0.003}
+{"directive":"route-up","event":"profile_directive_removed","line":69,"reason":"blocked directive (M2)","t":0.003}
+{"directive":"ipchange","event":"profile_directive_removed","line":70,"reason":"blocked directive (M2)","t":0.003}
+{"directive":"plugin","event":"profile_directive_removed","line":71,"reason":"blocked directive (M2)","t":0.003}
+{"directive":"management","event":"profile_directive_removed","line":72,"reason":"blocked directive (M2)","t":0.003}
+{"directive":"status","event":"profile_directive_removed","line":73,"reason":"blocked directive (M2)","t":0.003}
+{"directive":"writepid","event":"profile_directive_removed","line":74,"reason":"blocked directive (M2)","t":0.003}
+{"directive":"setenv","event":"profile_directive_removed","line":75,"reason":"blocked directive (M2)","t":0.003}
+{"event":"connected","ip":"10.8.0.2","server":"172.30.0.10","t":0.071}
+
+$ ls -l /tmp/PWNED-* 2>&1
+ls: cannot access '/tmp/PWNED-*': No such file or directory
+[exit 2]
+

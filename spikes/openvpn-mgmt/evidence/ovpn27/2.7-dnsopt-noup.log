@@ -1,0 +1,98 @@
+{"event":"openvpn_version","t":0.004,"version":"OpenVPN 2.7.0 x86_64-pc-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]"}
+{"event":"warning","message":"UNSAFE control run: profile not sanitized","t":0.004}
+{"config_via":"Pipe","daemon_directives":["management /run/galleria/s637/mgmt.sock unix","management-client-user root","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3"],"event":"generated_config","key_mode":"Inline","profile_directives":["client","dev tun","proto udp","remote 172.30.0.11 1194","nobind","remote-cert-tls server","auth-user-pass","key-direction 1","verb 3","<ca> [inline, content omitted]","<cert> [inline, content omitted]","<key> [inline, content omitted]","<tls-auth> [inline, content omitted]"],"t":0.004}
+{"event":"attempt","n":1,"of":3,"t":0.004}
+{"argv":["/usr/sbin/openvpn","--config","/dev/stdin"],"event":"openvpn_spawned","pid":645,"t":0.004}
+openvpn[stdout]| 2026-11-10 10:26:51 Note: --cipher is not set. OpenVPN versions before 2.5 defaulted to BF-CBC as fallback when cipher negotiation failed in this case. If you need this fallback please add '--data-ciphers-fallback BF-CBC' to your configuration and/or add BF-CBC to --data-ciphers. E.g. --data-ciphers DEFAULT:BF-CBC
+openvpn[stdout]| 2026-11-10 10:26:51 Note: Kernel support for ovpn-dco missing, disabling data channel offload.
+openvpn[stdout]| 2026-11-10 10:26:51 OpenVPN 2.7.0 x86_64-pc-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+openvpn[stdout]| 2026-11-10 10:26:51 library versions: OpenSSL 3.5.5 27 Jan 2026, LZO 2.10
+openvpn[stdout]| 2026-11-10 10:26:51 DCO version: N/A
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: client_uid=0
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: unix domain socket listening on /run/galleria/s637/mgmt.sock
+openvpn[stdout]| 2026-11-10 10:26:51 Need hold release from management interface, waiting...
+{"event":"mgmt_connected","socket":"/run/galleria/s637/mgmt.sock","t":0.054}
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: Client connected from /run/galleria/s637/mgmt.sock
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 5 -- type 'help' for more info","t":0.054}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":0.054}
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: CMD 'hold release'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":0.055}
+{"event":"credentials_sent","static_challenge":false,"t":0.055,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: CMD 'password [...]'
+{"detail":"","event":"state","local_ip":"","raw":"1794306411,WAIT,,,,,,","remote":"","state":"WAIT","t":0.056}
+openvpn[stdout]| 2026-11-10 10:26:51 TCP/UDP: Preserving recently used remote address: [AF_INET]172.30.0.11:1194
+openvpn[stdout]| 2026-11-10 10:26:51 Socket Buffers: R=[212992->212992] S=[212992->212992]
+openvpn[stdout]| 2026-11-10 10:26:51 UDPv4 link local: (not bound)
+openvpn[stdout]| 2026-11-10 10:26:51 UDPv4 link remote: [AF_INET]172.30.0.11:1194
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: >STATE:1794306411,WAIT,,,,,,
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: >STATE:1794306411,AUTH,,,,,,
+openvpn[stdout]| 2026-11-10 10:26:51 TLS: Initial packet from [AF_INET]172.30.0.11:1194, sid=3904a606 864adcb3
+openvpn[stdout]| 2026-11-10 10:26:51 WARNING: this configuration may cache passwords in memory -- use the auth-nocache option to prevent this
+{"detail":"","event":"state","local_ip":"","raw":"1794306411,AUTH,,,,,,","remote":"","state":"AUTH","t":0.056}
+openvpn[stdout]| 2026-11-10 10:26:51 VERIFY OK: depth=1, CN=Galleria Lab CA
+openvpn[stdout]| 2026-11-10 10:26:51 VERIFY KU OK
+openvpn[stdout]| 2026-11-10 10:26:51 Validating certificate extended key usage
+openvpn[stdout]| 2026-11-10 10:26:51 ++ Certificate has EKU (str) TLS Web Server Authentication, expects TLS Web Server Authentication
+openvpn[stdout]| 2026-11-10 10:26:51 VERIFY EKU OK
+openvpn[stdout]| 2026-11-10 10:26:51 VERIFY OK: depth=0, CN=server
+openvpn[stdout]| 2026-11-10 10:26:51 Control Channel: TLSv1.3, cipher TLSv1.3 TLS_AES_256_GCM_SHA384, peer certificate: 256 bits ECprime256v1, signature: ecdsa-with-SHA256, peer temporary key: 253 bits X25519, peer signing digest/type: ecdsa_secp256r1_sha256 ECDSA, key agreement: x25519
+openvpn[stdout]| 2026-11-10 10:26:51 [server] Peer Connection Initiated with [AF_INET]172.30.0.11:1194
+openvpn[stdout]| 2026-11-10 10:26:51 TLS: move_session: dest=TM_ACTIVE src=TM_INITIAL reinit_src=1
+openvpn[stdout]| 2026-11-10 10:26:51 TLS: tls_multi_process: initial untrusted session promoted to trusted
+openvpn[stdout]| 2026-11-10 10:26:51 PUSH: Received control message: 'PUSH_REPLY,dns server 0 address 10.9.0.1,dns search-domains galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.9.0.1,topology subnet,ping 10,ping-restart 60,ifconfig 10.9.0.2 255.255.255.0,peer-id 1,cipher AES-256-GCM,protocol-flags cc-exit tls-ekm dyn-tls-crypt,tun-mtu 1500'
+openvpn[stdout]| 2026-11-10 10:26:51 OPTIONS IMPORT: --ifconfig/up options modified
+openvpn[stdout]| 2026-11-10 10:26:51 OPTIONS IMPORT: route options modified
+openvpn[stdout]| 2026-11-10 10:26:51 OPTIONS IMPORT: route-related options modified
+openvpn[stdout]| 2026-11-10 10:26:51 OPTIONS IMPORT: --ip-win32 and/or --dhcp-option options modified
+openvpn[stdout]| 2026-11-10 10:26:51 OPTIONS IMPORT: tun-mtu set to 1500
+openvpn[stdout]| 2026-11-10 10:26:51 net_route_v4_best_gw query: dst 0.0.0.0
+openvpn[stdout]| 2026-11-10 10:26:51 net_route_v4_best_gw result: via 172.30.0.20 dev eth0
+openvpn[stdout]| 2026-11-10 10:26:51 net_route_v4_best_gw query: dst 172.30.0.11
+openvpn[stdout]| 2026-11-10 10:26:51 net_route_v4_best_gw result: via 0.0.0.0 dev eth0
+openvpn[stdout]| 2026-11-10 10:26:51 TUN/TAP device tun0 opened
+openvpn[stdout]| 2026-11-10 10:26:51 tun/tap device [tun0] opened
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: >STATE:1794306411,ASSIGN_IP,,10.9.0.2,,,,
+openvpn[stdout]| 2026-11-10 10:26:51 net_iface_mtu_set: mtu 1500 for tun0
+openvpn[stdout]| 2026-11-10 10:26:51 net_iface_up: set tun0 up
+openvpn[stdout]| 2026-11-10 10:26:51 net_addr_v4_add: 10.9.0.2/24 dev tun0
+openvpn[stdout]| 2026-11-10 10:26:51 /usr/libexec/openvpn/dns-updown
+openvpn[stdout]| setting DNS using resolvconf
+openvpn[stdout]| 2026-11-10 10:26:51 dns up command exited with status 0
+openvpn[stdout]| 2026-11-10 10:26:51 net_route_v4_add: 172.30.0.11/32 via 0.0.0.0 dev eth0 table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:26:51 net_route_v4_add: 0.0.0.0/1 via 10.9.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:26:51 net_route_v4_add: 128.0.0.0/1 via 10.9.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: >STATE:1794306411,ADD_ROUTES,,,,,,
+openvpn[stdout]| 2026-11-10 10:26:51 net_route_v4_add: 192.0.2.0/24 via 10.9.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:26:51 Initialization Sequence Completed
+openvpn[stdout]| 2026-11-10 10:26:51 MANAGEMENT: >STATE:1794306411,CONNECTED,SUCCESS,10.9.0.2,172.30.0.11,1194,,
+openvpn[stdout]| 2026-11-10 10:26:51 Data Channel: cipher 'AES-256-GCM', peer-id: 1
+openvpn[stdout]| 2026-11-10 10:26:51 Timers: ping 10, ping-restart 60
+openvpn[stdout]| 2026-11-10 10:26:51 Protocol options: protocol-flags cc-exit tls-ekm dyn-tls-crypt
+{"detail":"","event":"state","local_ip":"10.9.0.2","raw":"1794306411,ASSIGN_IP,,10.9.0.2,,,,","remote":"","state":"ASSIGN_IP","t":0.071}
+{"detail":"","event":"state","local_ip":"","raw":"1794306411,ADD_ROUTES,,,,,,","remote":"","state":"ADD_ROUTES","t":0.071}
+{"detail":"SUCCESS","event":"state","local_ip":"10.9.0.2","raw":"1794306411,CONNECTED,SUCCESS,10.9.0.2,172.30.0.11,1194,,","remote":"172.30.0.11","state":"CONNECTED","t":0.071}
+{"event":"connected","ip":"10.9.0.2","server":"172.30.0.11","t":0.071}
+{"event":"bytecount","in":"2398","out":"3594","t":1.13}
+{"event":"bytecount","in":"2398","out":"3594","t":2.187}
+{"event":"bytecount","in":"2398","out":"3594","t":3.245}
+{"event":"bytecount","in":"2398","out":"3666","t":5.017}
+{"event":"disconnect_requested","t":5.217}
+openvpn[stdout]| 2026-11-10 10:26:56 MANAGEMENT: CMD 'signal SIGTERM'
+openvpn[stdout]| 2026-11-10 10:26:56 /usr/libexec/openvpn/dns-updown
+openvpn[stdout]| unsetting DNS using resolvconf
+openvpn[stdout]| 2026-11-10 10:26:56 dns down command exited with status 0
+openvpn[stdout]| 2026-11-10 10:26:56 net_route_v4_del: 192.0.2.0/24 via 10.9.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:26:56 net_route_v4_del: 172.30.0.11/32 via 0.0.0.0 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:26:56 net_route_v4_del: 0.0.0.0/1 via 10.9.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:26:56 net_route_v4_del: 128.0.0.0/1 via 10.9.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:26:56 Closing tun/tap interface
+openvpn[stdout]| 2026-11-10 10:26:56 net_addr_v4_del: 10.9.0.2 dev tun0
+openvpn[stdout]| 2026-11-10 10:26:56 SIGTERM[hard,] received, process exiting
+openvpn[stdout]| 2026-11-10 10:26:56 MANAGEMENT: >STATE:1794306416,EXITING,SIGTERM,,,,,
+{"detail":"SIGTERM","event":"state","local_ip":"","raw":"1794306416,EXITING,SIGTERM,,,,,","remote":"","state":"EXITING","t":5.259}
+{"event":"openvpn_exited","exit_reason":"SIGTERM","status":"Ok(ExitStatus(unix_wait_status(0)))","t":5.26}
+{"code":0,"event":"exit","t":5.26}

@@ -1,0 +1,130 @@
+
+=== 2.7 DNS e rotte spinti dal server -> modulo comune ===
+2026-11-10T10:26:32Z
+OpenVPN 2.7.0 x86_64-pc-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+
+##### server che spinge dhcp-option DNS/DOMAIN (gl-server) #####
+--- A) con il nostro programma fisso come --up ---
+$ resolvectl status tun0
+Link 15 (tun0)
+    Current Scopes: DNS
+         Protocols: +DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+       DNS Servers: 10.8.0.1
+        DNS Domain: galleria.test ~.
+     Default Route: yes
+[exit 0]
+
+$ resolvectl query intranet.galleria.test
+intranet.galleria.test: 10.8.0.1                            -- link: tun0
+
+-- Information acquired via protocol DNS in 1.5ms.
+-- Data is authenticated: no; Data was acquired via local or encrypted transport: no
+-- Data from: network
+[exit 0]
+
+$ ip route; ip -6 route
+0.0.0.0/1 via 10.8.0.1 dev tun0 
+default via 172.30.0.20 dev eth0 
+10.8.0.0/24 dev tun0 proto kernel scope link src 10.8.0.2 
+128.0.0.0/1 via 10.8.0.1 dev tun0 
+172.30.0.0/24 dev eth0 proto kernel scope link src 172.30.0.37 
+172.30.0.10 dev eth0 
+192.0.2.0/24 via 10.8.0.1 dev tun0 
+2001:db8:30::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev tun0 proto kernel metric 256 pref medium
+default via 2001:db8:30::20 dev eth0 metric 1024 pref medium
+[exit 0]
+
+[daemon exit 0]
+{"dns_channels":["foreign_option"],"env":{"dev":"tun0","dev_type":"tun","foreign_option_1":"dhcp-option DNS 10.8.0.1","foreign_option_2":"dhcp-option DOMAIN galleria.test","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","route_gateway_1":"10.8.0.1","route_net_gateway":"172.30.0.20","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_redirect_gateway_ipv4":"1","route_vpn_gateway":"10.8.0.1","script_type":"up","tun_mtu":"1500"},"event":"netcfg_env","parsed":{"dev":"tun0","dns_servers":["10.8.0.1"],"domains":["galleria.test"],"redirect_gateway":false},"script_type":"up","t":0.064}
+{"cmd":"resolvectl dns tun0 10.8.0.1","event":"netcfg_cmd","ok":true,"stderr":"","t":0.066}
+{"cmd":"resolvectl domain tun0 galleria.test ~.","event":"netcfg_cmd","ok":true,"stderr":"","t":0.069}
+{"cmd":"resolvectl default-route tun0 yes","event":"netcfg_cmd","ok":true,"stderr":"","t":0.07}
+{"dns_channels":["foreign_option"],"env":{"dev":"tun0","dev_type":"tun","foreign_option_1":"dhcp-option DNS 10.8.0.1","foreign_option_2":"dhcp-option DOMAIN galleria.test","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","redirect_gateway":"1","route_gateway_1":"10.8.0.1","route_net_gateway":"172.30.0.20","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_redirect_gateway_ipv4":"1","route_vpn_gateway":"10.8.0.1","script_type":"down","tun_mtu":"1500"},"event":"netcfg_env","parsed":{"dev":"tun0","dns_servers":["10.8.0.1"],"domains":["galleria.test"],"redirect_gateway":true},"script_type":"down","t":6.228}
+{"cmd":"(none)","event":"netcfg_cmd","ok":true,"stderr":"tun0 already gone, resolved state dropped with it","t":6.228}
+$ resolvectl status tun0 2>&1 | head -3
+Failed to resolve interface "tun0", ignoring: No such device
+[exit 0]
+
+--- B) controllo: senza il nostro --up (unsafe run), cosa fa OpenVPN da solo ---
+$ resolvectl status tun0
+Link 16 (tun0)
+    Current Scopes: DNS
+         Protocols: +DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+       DNS Servers: 10.8.0.1
+        DNS Domain: galleria.test
+     Default Route: yes
+[exit 0]
+
+[daemon exit 0]
+openvpn[stdout]| 2026-11-10 10:26:39 /usr/libexec/openvpn/dns-updown
+openvpn[stdout]| 2026-11-10 10:26:44 /usr/libexec/openvpn/dns-updown
+
+##### server che spinge dns server/search-domains (gl-server-dns) #####
+--- A) con il nostro programma fisso come --up ---
+$ resolvectl status tun0
+Link 17 (tun0)
+    Current Scopes: DNS
+         Protocols: +DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+       DNS Servers: 10.9.0.1
+        DNS Domain: galleria.test ~.
+     Default Route: yes
+[exit 0]
+
+$ resolvectl query intranet.galleria.test
+intranet.galleria.test: 10.9.0.1                            -- link: tun0
+
+-- Information acquired via protocol DNS in 1.2ms.
+-- Data is authenticated: no; Data was acquired via local or encrypted transport: no
+-- Data from: network
+[exit 0]
+
+$ ip route; ip -6 route
+0.0.0.0/1 via 10.9.0.1 dev tun0 
+default via 172.30.0.20 dev eth0 
+10.9.0.0/24 dev tun0 proto kernel scope link src 10.9.0.2 
+128.0.0.0/1 via 10.9.0.1 dev tun0 
+172.30.0.0/24 dev eth0 proto kernel scope link src 172.30.0.37 
+172.30.0.11 dev eth0 
+192.0.2.0/24 via 10.9.0.1 dev tun0 
+2001:db8:30::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev tun0 proto kernel metric 256 pref medium
+default via 2001:db8:30::20 dev eth0 metric 1024 pref medium
+[exit 0]
+
+[daemon exit 0]
+{"dns_channels":["foreign_option"],"env":{"dev":"tun0","dev_type":"tun","foreign_option_1":"dhcp-option DOMAIN galleria.test","foreign_option_2":"dhcp-option DNS 10.9.0.1","ifconfig_local":"10.9.0.2","ifconfig_netmask":"255.255.255.0","route_gateway_1":"10.9.0.1","route_net_gateway":"172.30.0.20","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_redirect_gateway_ipv4":"1","route_vpn_gateway":"10.9.0.1","script_type":"up","tun_mtu":"1500"},"event":"netcfg_env","parsed":{"dev":"tun0","dns_servers":["10.9.0.1"],"domains":["galleria.test"],"redirect_gateway":false},"script_type":"up","t":0.063}
+{"cmd":"resolvectl dns tun0 10.9.0.1","event":"netcfg_cmd","ok":true,"stderr":"","t":0.067}
+{"cmd":"resolvectl domain tun0 galleria.test ~.","event":"netcfg_cmd","ok":true,"stderr":"","t":0.07}
+{"cmd":"resolvectl default-route tun0 yes","event":"netcfg_cmd","ok":true,"stderr":"","t":0.072}
+{"dns_channels":["foreign_option"],"env":{"dev":"tun0","dev_type":"tun","foreign_option_1":"dhcp-option DOMAIN galleria.test","foreign_option_2":"dhcp-option DNS 10.9.0.1","ifconfig_local":"10.9.0.2","ifconfig_netmask":"255.255.255.0","redirect_gateway":"1","route_gateway_1":"10.9.0.1","route_net_gateway":"172.30.0.20","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_redirect_gateway_ipv4":"1","route_vpn_gateway":"10.9.0.1","script_type":"down","tun_mtu":"1500"},"event":"netcfg_env","parsed":{"dev":"tun0","dns_servers":["10.9.0.1"],"domains":["galleria.test"],"redirect_gateway":true},"script_type":"down","t":6.166}
+{"cmd":"(none)","event":"netcfg_cmd","ok":true,"stderr":"tun0 already gone, resolved state dropped with it","t":6.166}
+$ resolvectl status tun0 2>&1 | head -3
+Failed to resolve interface "tun0", ignoring: No such device
+[exit 0]
+
+--- B) controllo: senza il nostro --up (unsafe run), cosa fa OpenVPN da solo ---
+$ resolvectl status tun0
+Link 18 (tun0)
+    Current Scopes: DNS
+         Protocols: +DefaultRoute -LLMNR -mDNS -DNSOverTLS DNSSEC=no/unsupported
+       DNS Servers: 10.9.0.1
+        DNS Domain: galleria.test
+     Default Route: yes
+[exit 0]
+
+[daemon exit 0]
+openvpn[stdout]| 2026-11-10 10:26:51 /usr/libexec/openvpn/dns-updown
+openvpn[stdout]| 2026-11-10 10:26:56 /usr/libexec/openvpn/dns-updown
+
+--- query arrivate ai dnsmasq dei server ---
+Nov 10 10:26:33 dnsmasq[12]: query[AAAA] intranet.galleria.test from 10.8.0.2
+Nov 10 10:26:33 dnsmasq[12]: config error is REFUSED (EDE: not ready)
+Nov 10 10:26:33 dnsmasq[12]: query[A] intranet.galleria.test from 10.8.0.2
+Nov 10 10:26:33 dnsmasq[12]: config intranet.galleria.test is 10.8.0.1
+Nov 10 10:26:44 dnsmasq[12]: query[AAAA] intranet.galleria.test from 10.9.0.2
+Nov 10 10:26:44 dnsmasq[12]: config error is REFUSED (EDE: not ready)
+Nov 10 10:26:44 dnsmasq[12]: query[A] intranet.galleria.test from 10.9.0.2
+Nov 10 10:26:44 dnsmasq[12]: config intranet.galleria.test is 10.9.0.1

@@ -219,9 +219,9 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | 3 | Porting Windows (servizio, named pipe, WireGuardNT, rilevamento di OpenVPN installato come prerequisito, D14), MSI | 1–2 settimane |
 | 4 | Rifinitura, documentazione, release v0.1 pubblica | 1 settimana |
 
-**Criterio di stop**: tetto di ~8 settimane per arrivare alla v0.1. Dopo il lancio pubblico
-(r/selfhosted, r/WireGuard, Hacker News) si valuta se continuare in base a uso reale e segnali
-(stelle, issue, contributori) — soglie da fissare (A6).
+**Criterio di stop**: nessuna soglia (A6, Peppe 2026-11-10); resta la stima di ~8 settimane per arrivare alla v0.1. Dopo il lancio pubblico
+(r/selfhosted, r/WireGuard, Hacker News) si seguono uso reale e segnali (stelle, issue, contributori), senza
+soglie che fermino il progetto.
 
 ## 11. Rischi
 
@@ -246,12 +246,12 @@ Stime part-time con gli agenti di coding, da rivedere dopo la fase 0.
 | A3 | IPC: JSON-RPC su socket/pipe o gRPC (tonic) | Nello | RISOLTA: JSON-RPC 2.0 (D12), ratificata da Aitano su delega di Peppe, 2026-11-10 |
 | A4 | Windows: includere OpenVPN o richiederlo come prerequisito | Nello | RISOLTA: prerequisito in v0.1 (D14), ratificata da Aitano su delega di Peppe, 2026-11-10 |
 | A5 | Storage profili: TOML (leggibile, versionabile) o SQLite | Nello | RISOLTA: TOML, un file per profilo (D13), ratificata da Aitano su delega di Peppe, 2026-11-10 |
-| A6 | Soglie del criterio di stop dopo il lancio | Peppe | DA DECIDERE |
+| A6 | Soglie del criterio di stop dopo il lancio | Peppe | RISOLTA: nessuna soglia di stop (Peppe, 2026-11-10) |
 | A7 | Lista dei difetti di Pritunl/Eddie (validazione) | Peppe | PARZIALE: Pritunl = UI spartana + WireGuard solo con server Pritunl (verificato su forum); Eddie e prova pratica non fatti |
-| A8 | Design system: riuso di xr1 design-system (verificarne la licenza per un progetto OSS) | Peppe | DA DECIDERE |
+| A8 | Design system: riuso di xr1 design-system (verificarne la licenza per un progetto OSS) | Peppe | RISOLTA: si usa il design system XR1 (Peppe, 2026-11-10). Da fare: aggiungere una licenza compatibile con GPL-3.0 al repo XR1-Solution/design-system, che oggi non ne ha |
 | A9 | Interfaccia comune dei backend nel demone già dalla v0.1, e OpenConnect come libreria (`libopenconnect`) o come processo figlio | Nello | RISOLTA: interfaccia comune subito (D10), OpenConnect processo figlio (D11), ratificata da Aitano su delega di Peppe, 2026-11-10 |
 | A10 | Blocco IPv6 per i profili "tutto nel tunnel" già in v0.1 (§8) | Nello | RISOLTA: sì (D15), corretta dopo lo spike 2 e approvata da Peppe il 2026-11-10 |
-| A11 | Nessuna telemetria (§8) | Peppe | DA DECIDERE |
+| A11 | Nessuna telemetria (§8) | Peppe | RISOLTA: nessuna telemetria (Peppe, 2026-11-10) |
 | A12 | Matrice di test (§8) | Nello + Peppe | RISOLTA (§8): obbligatorie Ubuntu 26.04 e 24.04, Fedora corrente, Windows 11 x64; il resto best effort. Ratificata da Aitano su delega di Peppe, 2026-11-10 |
 | A13 | Canale e meccanismo degli aggiornamenti (§8) | Nello | RISOLTA: updater Tauri + MSI su Windows, solo avviso su Linux (D16), ratificata da Aitano su delega di Peppe, 2026-11-10 |
 

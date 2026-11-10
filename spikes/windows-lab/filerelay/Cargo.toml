@@ -1,0 +1,12 @@
+[package]
+name = "filerelay"
+version = "0.0.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+publish = false
+description = "Windows spikes lab (throwaway): carries UDP datagrams between Windows Sandbox and WSL as files in the mapped folders"
+
+[dependencies]
+
+[profile.release]
+strip = true

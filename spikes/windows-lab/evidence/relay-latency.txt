@@ -1,0 +1,35 @@
+UDP echo through the file relay (sandbox -> files -> WSL -> docker echo -> back): 100 sent, 0 lost
+rtt ms: 58 12 12 25 13 16 21 14 18 9 20 21 8 21 26 23 17 15 20 20 22 3 14 16 18 25 15 4 18 20 18 20 20 17 19 21 26 21 21 18 23 23 17 16 19 20 17 3 20 19 18 20 8 15 18 23 19 17 13 26 21 8 22 9 3 9 30 14 20 15 26 20 14 13 20 12 20 20 4 17 19 13 13 19 17 29 16 17 15 8 21 25 17 18 9 23 21 19 21 22
+min 3 avg 17.8 max 58
+
+## senza relay: nessuna via di rete tra Sandbox e WSL (job 001, 002)
+
+   Indirizzo IPv4. . . . . . . . . . . . : 172.23.23.53
+   Gateway predefinito . . . . . . . . . : 172.23.16.1
+tcp 172.25.245.44:8080 -> False
+tcp 172.23.16.1:8080 -> False
+tcp 172.25.240.1:8080 -> False
+tcp 192.168.1.24:8080 -> False
+udp 172.25.245.44 -> FAIL Exception calling "Receive" with "1" argument(s): "Impossibile stabilire la connessione. Risposta non corretta della parte connessa dopo l'intervallo di tempo oppure mancata risposta dall'host collegato"
+udp 172.23.16.1 -> FAIL Exception calling "Receive" with "1" argument(s): "Impossibile stabilire la connessione. Risposta non corretta della parte connessa dopo l'intervallo di tempo oppure mancata risposta dall'host collegato"
+
+Traccia instradamento verso 172.25.245.44 su un massimo di 4 punti di passaggio
+
+  1     *        *        *     Richiesta scaduta.
+  2     *        *        *     Richiesta scaduta.
+  3     *        *        *     Richiesta scaduta.
+  4     *        *        *     Richiesta scaduta.
+
+Traccia completata.
+
+
+172.23.23.53
+nothing: Exception calling "Receive" with "1" argument(s): "Impossibile stabilire la connessione. Risposta non corretta della parte connessa dopo l'intervallo di tempo oppure mancata risposta dall'host collegato"
+
+## ritardo host->guest sulla cartella mappata in sola lettura (handle aperto, elenco cartella), ms
+dirlist  4541 4054 3552 3049 2547 2045 1543 1042 540 20004 19506 19003 18504 18002 17502 17000 16497 15999 15496 14989 14486 13987 13484 12984 12481 11979 11476 10972 10469 9967 9470 8966 8459 7954 7455 6952 6449 5946 5441 4938 4438 3934 3431 2930 2423 1920 1416 916 413
+handle  4375 3931 3430 2924 2424 1921 1420 917 417
+
+## ritardo host->guest sulla cartella scrivibile, riaprendo il file a ogni giro, ms
+reopen : n=24 lags(ms)= 45 -2 3 9 -1 9 -2 -2 8 14 5 8 0 0 5 7 11 -2 3 7 -1 7 -1 8
+poke : n=22 lags(ms)= -4 0 6 11 15 4 -3 2 5 11 6 -2 3 5 7 7 9 0 2 8 -1 5

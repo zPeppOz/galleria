@@ -1,0 +1,9 @@
+<Configuration>
+  <Networking>Default</Networking>
+  <MemoryInMB>8192</MemoryInMB>
+  <MappedFolders>
+    <MappedFolder><HostFolder>C:\Users\hackp\galleria-sbx\in</HostFolder><SandboxFolder>C:\sbx\in</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>
+    <MappedFolder><HostFolder>C:\Users\hackp\galleria-sbx\out</HostFolder><SandboxFolder>C:\sbx\out</SandboxFolder><ReadOnly>false</ReadOnly></MappedFolder>
+  </MappedFolders>
+  <LogonCommand><Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\sbx\in\agent.ps1</Command></LogonCommand>
+</Configuration>

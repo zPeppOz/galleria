@@ -1,0 +1,17 @@
+        Info Looking up installed tauri packages to check mismatched versions...
+   Compiling galleria-spike-app v0.0.1 (C:\gl\app\src-tauri)
+    Finished `release` profile [optimized] target(s) in 45.80s
+       Built application at: C:\gl\app\src-tauri\target\release\galleria-spike-app.exe
+        Info Patching C:\gl\app\src-tauri\target\release\galleria-spike-app.exe with bundle type information: msi
+        Info Target: x64
+     Running candle for "C:\\gl\\app\\src-tauri\\target\\release\\wix\\x64\\main.wxs"
+     Running candle for "C:\\gl\\app\\src-tauri\\wix/service.wxs"
+     Running light to produce C:\gl\app\src-tauri\target\release\bundle\msi\Galleria Spike_0.0.1_x64_en-US.msi
+       Error failed to bundle project: `failed to run C:\Users\WDAGUtilityAccount\AppData\Local\tauri\WixTools314\light.exe: Windows Installer XML Toolset Linker version 3.14.1.8722
+Copyright (c) .NET Foundation and contributors. All rights reserved.
+
+light.exe : error LGHT0217 : Error executing ICE action 'ICE09'. The most common cause of this kind of ICE failure is an incorrectly registered scripting engine. See http://wixtoolset.org/documentation/error217/ for details and how to solve this problem. The following string format was not expected by the external UI message logger: "The installer has encountered an unexpected error installing this package. This may indicate a problem with this package. The error code is 2738. ".
+light.exe : error LGHT0217 : Error executing ICE action 'ICE32'. The most common cause of this kind of ICE failure is an incorrectly registered scripting engine. See http://wixtoolset.org/documentation/error217/ for details and how to solve this problem. The following string format was not expected by the external UI message logger: "The installer has encountered an unexpected error installing this package. This may indicate a problem with this package. The error code is 2738. ".
+C:\gl\app\src-tauri\target\release\wix\x64\main.wxs(33) : warning LGHT1076 : ICE40: REINSTALLMODE is defined in the Property table. This may cause difficulties.
+C:\gl\app\src-tauri\target\release\wix\x64\main.wxs(120) : warning LGHT1076 : ICE57: Component 'CMP_UninstallShortcut' has both per-user and per-machine data with an HKCU Registry KeyPath.
+light.exe : error LGHT0217 : Error executing ICE action 'ICE61'. The most common cause of this kind of ICE failure is an incorrectly registered scripting engine. See http://wixtoolset.org/documentation/error217/ for details and how to solve this problem. The following string format was not expected by the external UI message logger: "The installer has encountered an unexpected error installing this package. This may indicate a problem with this package. The error code is 2738. ".`

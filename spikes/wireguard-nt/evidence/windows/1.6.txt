@@ -1,0 +1,162 @@
+
+=== 1.6 MSI di Tauri con frammento WiX (ServiceInstall/ServiceControl): installazione ===
+2026-11-10T19:14:41Z
+
+--- prima ---
+prodotto MSI: assente
+servizio galleriad: assente
+PS> Get-AuthenticodeSignature 'C:\gl\rel\0.0.1\Galleria Spike_0.0.1_x64_en-US.msi' | Format-List Status
+
+
+Status : NotSigned
+
+
+
+
+
+PS> msiexec /i "C:\gl\rel\0.0.1\Galleria Spike_0.0.1_x64_en-US.msi" /qn /l*v C:\sbx\out\msi\1.6-install.log
+[exit 0]
+
+--- dopo l'installazione ---
+prodotto MSI: Galleria Spike 0.0.1 ({90305F88-9647-4A6E-AF4C-F61E8D0D95DA})
+servizio galleriad: Running, Auto, LocalSystem, pid 1084, "C:\Program Files\Galleria Spike\galleriad.exe" service
+PS> sc.exe qc galleriad
+[SC] QueryServiceConfig OPERAZIONI RIUSCITE
+
+NOME_SERVIZIO: galleriad
+        TIPO                      : 10  WIN32_OWN_PROCESS 
+        TIPO_AVVIO                : 2   AUTO_START
+        CONTROLLO_ERRORE          : 1   NORMAL
+        NOME_PERCORSO_BINARIO     : "C:\Program Files\Galleria Spike\galleriad.exe" service
+        GRUPPO_ORDINE_CARICAMENTO : 
+        TAG                       : 0
+        NOME_VISUALIZZATO         : Galleria daemon (spike)
+        DIPENDENZE                : 
+        SERVICE_START_NAME : LocalSystem
+
+
+PS> Get-Service galleriad | Format-List Name, Status, StartType
+
+
+Name      : galleriad
+Status    : Running
+StartType : Automatic
+
+
+
+
+
+PS> Get-ChildItem 'C:\Program Files\Galleria Spike' | Format-Table Length, Name -AutoSize
+
+  Length Name                        
+  ------ ----                        
+18306048 galleria-spike-app.exe      
+ 1358336 galleriad.exe               
+     961 Uninstall Galleria Spike.lnk
+  160880 WebView2Loader.dll          
+ 1340728 wireguard.dll               
+
+
+
+
+PS> (Get-Acl 'C:\Program Files\Galleria Spike\galleriad.exe').Access | Format-Table IdentityReference, FileSystemRights, AccessControlType -AutoSize
+
+IdentityReference                                                                         FileSystemRights AccessControlType
+-----------------                                                                         ---------------- -----------------
+NT AUTHORITY\SYSTEM                                                                            FullControl             Allow
+BUILTIN\Administrators                                                                         FullControl             Allow
+BUILTIN\Users                                                                  ReadAndExecute, Synchronize             Allow
+AUTORIT· PACCHETTI APPLICAZIONI\TUTTI I PACCHETTI APPLICAZIONI                 ReadAndExecute, Synchronize             Allow
+AUTORIT· PACCHETTI APPLICAZIONI\TUTTI I PACCHETTI APPLICAZIONI CON RESTRIZIONI ReadAndExecute, Synchronize             Allow
+
+
+
+
+PS> "C:\Program Files\Galleria Spike\galleriad.exe" cli hello
+{"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.1"}}
+[exit 0]
+
+--- il servizio installato dall'MSI alza un tunnel (serve un adattatore da togliere) ---
+PS> galleriad.exe cli connect wgtest.conf none
+{"id":1,"jsonrpc":"2.0","result":{"adapter":"galleria-wg","ipv6_block":"None"}}
+[exit 0]
+
+PS> Get-NetAdapter | Format-Table Name, InterfaceDescription, Status -AutoSize
+
+Name     InterfaceDescription              Status
+----     --------------------              ------
+Galleria galleria-wg Tunnel                Up    
+Ethernet Microsoft Hyper-V Network Adapter Up    
+
+
+
+
+PS> Get-PnpDevice -PresentOnly | Where-Object FriendlyName -match 'WireGuard' | Format-Table Status, Class, FriendlyName, InstanceId -AutoSize
+
+
+
+=== 1.6 disinstallazione: toglie servizio e adattatori ===
+2026-11-10T19:16:58Z
+
+PS> msiexec /x "C:\gl\rel\0.0.1\Galleria Spike_0.0.1_x64_en-US.msi" /qn /l*v C:\sbx\out\msi\1.6-uninstall.log
+[exit 0]
+
+--- dopo la disinstallazione ---
+prodotto MSI: assente
+servizio galleriad: assente
+PS> sc.exe query galleriad
+[SC] EnumQueryServicesStatus:OpenService OPERAZIONI NON RIUSCITE 1060:
+
+Il servizio specificato non esiste come servizio installato.
+
+
+
+PS> Get-Process galleriad, galleria-spike-app -ErrorAction SilentlyContinue | Format-Table Name, Id -AutoSize; 'processi rimasti: ' + @(Get-Process galleriad, galleria-spike-app -ErrorAction SilentlyContinue).Count
+processi rimasti: 0
+
+
+PS> Get-NetAdapter | Format-Table Name, InterfaceDescription, Status -AutoSize
+
+Name     InterfaceDescription              Status
+----     --------------------              ------
+Ethernet Microsoft Hyper-V Network Adapter Up    
+
+
+
+
+PS> 'adattatori WireGuard presenti: ' + @(Get-PnpDevice -PresentOnly | Where-Object FriendlyName -match 'WireGuard').Count
+adattatori WireGuard presenti: 0
+
+
+PS> 'cartella di installazione presente: ' + (Test-Path 'C:\Program Files\Galleria Spike'); Get-ChildItem 'C:\Program Files\Galleria Spike' -ErrorAction SilentlyContinue | Format-Table Name
+cartella di installazione presente: False
+
+
+--- cosa resta nel sistema (non tolto dall'MSI) ---
+PS> pnputil.exe /enum-drivers | Select-String -Context 1,5 'wireguard'
+
+  Nome pubblicato:         oem0.inf
+> Nome originale:      wireguard.inf
+> Nome provider:      WireGuard LLC
+  Nome classe:         Net
+  GUID classe:         {4d36e972-e325-11ce-bfc1-08002be10318}
+  Versione driver:     10/12/2021 0.10.0.0
+  Nome firmatario:        Microsoft Windows Hardware Compatibility Publisher
+  Attributi:         Universal
+
+
+
+
+PS> Get-ChildItem C:\ProgramData\galleria-spike | Format-Table Length, Name -AutoSize
+
+Length Name         
+------ ----         
+  1965 galleriad.log
+
+
+
+
+--- registro del servizio durante la disinstallazione ---
+1794338219.156 galleriad[1084] service stopping: closing the tunnel if any
+1794338219.191 galleriad[1084] wg: adapter closed
+1794338219

@@ -1,0 +1,140 @@
+
+=== 1.7 preparazione: 0.0.1 installata dall'MSI, server locale con latest.json ===
+2026-11-10T19:17:25Z
+
+PS> msiexec /i "C:\gl\rel\0.0.1\Galleria Spike_0.0.1_x64_en-US.msi" /qn /l*v C:\sbx\out\msi\1.7-install-0.0.1.log
+[exit 0]
+
+prodotto MSI: Galleria Spike 0.0.1 ({90305F88-9647-4A6E-AF4C-F61E8D0D95DA})
+servizio galleriad: Running, Auto, LocalSystem, pid 4488, "C:\Program Files\Galleria Spike\galleriad.exe" service
+PS> "C:\Program Files\Galleria Spike\galleriad.exe" cli hello
+{"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.1"}}
+[exit 0]
+
+   7757824  9C14621F813B878AF512EA771C37311E593B7DFB14B08756D917A3A6134428C2  app-0.0.2.msi
+   7757824  2345E842367DC7A7615276DB0C574E8267157A4759C33715691B347098DC2D7A  app-tampered.msi
+PS> Get-NetTCPConnection -LocalPort 8765 -State Listen | Format-Table LocalAddress, LocalPort, State -AutoSize
+
+LocalAddress LocalPort  State
+------------ ---------  -----
+127.0.0.1         8765 Listen
+
+
+
+
+chiave pubblica nell'app (usa e getta, solo spike): dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1...
+chiave pubblica sbagliata:                          dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1...
+
+=== 1.7a firma sbagliata: MSI 0.0.2 buono, firmato con un'altra chiave -> rifiutato ===
+2026-11-10T19:19:38Z
+
+latest.json: version 0.0.2, url .../app-0.0.2.msi, signature da C:\gl\rel\wrong\app.msi.sig (782BFE8EA7922805...)
+PS> "C:\Program Files\Galleria Spike\galleria-spike-app.exe"
+[uscita entro 120 s: True, exit 0]
+--- registro dell'app ---
+1794338380 app[2736] app version 0.0.1 ; service hello -> {"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.1"}}
+1794338380 app[2736] update found: 0.0.1 -> 0.0.2
+1794338380 app[2736] update downloaded
+1794338380 app[2736] update REJECTED: The signature was created with a different key than the one provided
+--- richieste al server locale ---
+2026-11-10T19:19:40Z GET /latest.json -> 200 774 byte
+2026-11-10T19:19:40Z GET /app-0.0.2.msi -> 200 7757824 byte
+
+prodotto MSI: Galleria Spike 0.0.1 ({90305F88-9647-4A6E-AF4C-F61E8D0D95DA})
+servizio galleriad: Running, Auto, LocalSystem, pid 4488, "C:\Program Files\Galleria Spike\galleriad.exe" service
+PS> "C:\Program Files\Galleria Spike\galleriad.exe" cli hello
+{"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.1"}}
+[exit 0]
+
+
+=== 1.7b file alterato: firma giusta dell'MSI 0.0.2, ma il file scaricato ha un byte diverso -> rifiutato ===
+2026-11-10T19:19:43Z
+
+latest.json: version 0.0.2, url .../app-tampered.msi, signature da C:\gl\rel\0.0.2\Galleria Spike_0.0.2_x64_en-US.msi.sig (CB4E204A32F6B4F4...)
+PS> "C:\Program Files\Galleria Spike\galleria-spike-app.exe"
+[uscita entro 120 s: True, exit 0]
+--- registro dell'app ---
+1794338384 app[9052] app version 0.0.1 ; service hello -> {"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.1"}}
+1794338384 app[9052] update found: 0.0.1 -> 0.0.2
+1794338384 app[9052] update downloaded
+1794338384 app[9052] update REJECTED: The signature verification failed
+--- richieste al server locale ---
+2026-11-10T19:19:44Z GET /latest.json -> 200 829 byte
+2026-11-10T19:19:44Z GET /app-tampered.msi -> 200 7757824 byte
+
+prodotto MSI: Galleria Spike 0.0.1 ({90305F88-9647-4A6E-AF4C-F61E8D0D95DA})
+servizio galleriad: Running, Auto, LocalSystem, pid 4488, "C:\Program Files\Galleria Spike\galleriad.exe" service
+PS> "C:\Program Files\Galleria Spike\galleriad.exe" cli hello
+{"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.1"}}
+[exit 0]
+
+
+=== 1.7c firma giusta: aggiornamento da 0.0.1 a 0.0.2 ===
+2026-11-10T19:19:46Z
+
+latest.json: version 0.0.2, url .../app-0.0.2.msi, signature da C:\gl\rel\0.0.2\Galleria Spike_0.0.2_x64_en-US.msi.sig (CB4E204A32F6B4F4...)
+PS> "C:\Program Files\Galleria Spike\galleria-spike-app.exe"
+[uscita entro 120 s: True, exit 0]
+--- registro dell'app ---
+1794338387 app[3812] app version 0.0.1 ; service hello -> {"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.1"}}
+1794338387 app[3812] update found: 0.0.1 -> 0.0.2
+1794338387 app[3812] update downloaded
+1794338387 app[3812] update signature verified, launching installer
+1794338511 app[4384] app version 0.0.2 ; service hello -> {"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.2"}}
+1794338511 app[4384] no update available
+--- richieste al server locale ---
+2026-11-10T19:19:47Z GET /latest.json -> 200 826 byte
+2026-11-10T19:19:47Z GET /app-0.0.2.msi -> 200 7757824 byte
+2026-11-10T19:21:51Z GET /latest.json -> 200 826 byte
+
+prodotto MSI: Galleria Spike 0.0.2 ({7B7DB94D-AFA4-4A75-A3B9-A1C812141FA9})
+servizio galleriad: Running, Auto, LocalSystem, pid 7780, "C:\Program Files\Galleria Spike\galleriad.exe" service
+PS> "C:\Program Files\Galleria Spike\galleriad.exe" cli hello
+{"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.2"}}
+[exit 0]
+
+PS> sc.exe qc galleriad
+[SC] QueryServiceConfig OPERAZIONI RIUSCITE
+
+NOME_SERVIZIO: galleriad
+        TIPO                      : 10  WIN32_OWN_PROCESS 
+        TIPO_AVVIO                : 2   AUTO_START
+        CONTROLLO_ERRORE          : 1   NORMAL
+        NOME_PERCORSO_BINARIO     : "C:\Program Files\Galleria Spike\galleriad.exe" service
+        GRUPPO_ORDINE_CARICAMENTO : 
+        TAG                       : 0
+        NOME_VISUALIZZATO         : Galleria daemon (spike)
+        DIPENDENZE                : 
+        SERVICE_START_NAME : LocalSystem
+
+
+--- il binario del servizio installato e' quello della 0.0.2 ---
+installato: 6112B52A68BE28E1760084726E3DC1582CD086D0602AB9D944C8DA7C90A13E35
+0.0.1:      4443849B4CFEE6D0F89935AFDF28C6EDC30ED17A602C92F802B337726D87670A
+0.0.2:      6112B52A68BE28E1760084726E3DC1582CD086D0602AB9D944C8DA7C90A13E35
+--- registro del servizio durante l'aggiornamento ---
+1794338387.430 galleriad[4488] ipc: request `hello` from pid 3812
+1794338508.468 galleriad[4488] service stopping: closing the tunnel if any
+1794338509.952 galleriad[7780] service starting, version 0.0.2
+1794338509.953 galleriad[7780] ipc: listening on \\.\pipe\galleria-spike, acl D:P(A;;GA;;;SY)(A;;GA;;;BA)
+1794338511.498 galleriad[7780] ipc: request `hello` from pid 4384
+1794338525.930 galleriad[7780] ipc: request `hello` from pid 6608
+--- eventi MsiInstaller ---
+2026-11-10T19:19:47Z id=1040 Inizio di una transazione di Windows Installer in corso: C:\Users\WDAGUtilityAccount\AppData\Local\Temp\Galleria Spike-0.0.2-updater-ooM90l\Galleria Spike-0.0.2-installer.msi. ID processo client: 2592.
+2026-11-10T19:21:51Z id=11707 Product: Galleria Spike -- Installation completed successfully.
+2026-11-10T19:21:51Z id=1033 Windows Installer: installazione del prodotto completata. Nome prodotto: Galleria Spike. Versione prodotto: 0.0.2. Lingua prodotto: 1033. Produttore: galleria. Installazione riuscita o stato di errore: 0.
+2026-11-10T19:21:51Z id=1042 Chiusura di una transazione di Windows Installer in corso: C:\Users\WDAGUtilityAccount\AppData\Local\Temp\Galleria Spike-0.0.2-updater-ooM90l\Galleria Spike-0.0.2-installer.msi. ID processo client: 2592.
+
+=== 1.7d dopo l'aggiornamento: GUI e servizio alla stessa versione, nessun altro aggiornamento ===
+2026-11-10T19:22:07Z
+
+PS> "C:\Program Files\Galleria Spike\galleria-spike-app.exe"
+[uscita entro 120 s: True, exit 0]
+--- registro dell'app ---
+1794338528 app[2752] app version 0.0.2 ; service hello -> {"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.2"}}
+1794338528 app[2752] no update available
+--- richieste al server locale ---
+2026-11-10T19:22:08Z GET /latest.json -> 200 826 byte
+
+prodotto MSI: Galleria Spike 0.0.2 ({7B7DB94D-AFA4-4A75-A3B9-A1C812141FA9})
+servizio galleriad: Running, Auto, LocalSystem, pid 7780, "C:\Program Files\Galleria Spike\galleriad.exe" service

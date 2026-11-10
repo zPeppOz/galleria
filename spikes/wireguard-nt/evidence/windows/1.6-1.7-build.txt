@@ -1,0 +1,45 @@
+warm build:     Finished `release` profile [optimized] target(s) in 4m 16s
+tauri-cli 2.12.4
+=== chiavi usa e getta dell'updater (giusta e sbagliata) ===
+spike.key.pub: dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIzQzIxN0M2NjQ3RkUyRTMKUldUajRuOWt4aGZDc3pSbFZQOUYxUlJ4Wjh5UEZ1NFd2elV4eTd4MWNqYmNoWG1yVHZpenVJMnAK
+wrong.key.pub: dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI5Q0MxMjNDQzlENTk3ODcKUldTSGw5WEpQQkxNS1VHK1htYzdUd3E5cHZtaGRzd09uR0F0dlYybUZ0SW5tK3g5ZVFxQk9oeWgK
+=== build 0.0.1 ===
+cargo tauri build exit: 1
+validazione ICE fallita per VBScript assente (errore 2738): log in build-0.0.1-ice.log, si riprova senza validazione
+light.exe sostituito (aggiunge -sval: validazione ICE saltata): rustc exit 0
+cargo tauri build exit: 0
+       Built application at: C:\gl\app\src-tauri\target\release\galleria-spike-app.exe
+        Info Patching C:\gl\app\src-tauri\target\release\galleria-spike-app.exe with bundle type information: msi
+        Info Target: x64
+     Running candle for "C:\\gl\\app\\src-tauri\\target\\release\\wix\\x64\\main.wxs"
+     Running candle for "C:\\gl\\app\\src-tauri\\wix/service.wxs"
+     Running light to produce C:\gl\app\src-tauri\target\release\bundle\msi\Galleria Spike_0.0.1_x64_en-US.msi
+    Finished 1 bundle at:
+        C:\gl\app\src-tauri\target\release\bundle\msi\Galleria Spike_0.0.1_x64_en-US.msi (7.40 MiB)
+
+    Finished 1 updater signature at:
+        C:\gl\app\src-tauri\target\release\bundle\msi\Galleria Spike_0.0.1_x64_en-US.msi.sig
+
+   7757824  05631AE92365EDE29BADF876147E54DC85427488DC1D95430838156CD34F1702  Galleria Spike_0.0.1_x64_en-US.msi
+       444  8656EEEB92F6C15CFD0AE59ADFD10B4AC9FC8DC08619DA92664C3DD1FD3979B6  Galleria Spike_0.0.1_x64_en-US.msi.sig
+=== build 0.0.2 ===
+cargo tauri build exit: 0
+       Built application at: C:\gl\app\src-tauri\target\release\galleria-spike-app.exe
+        Info Patching C:\gl\app\src-tauri\target\release\galleria-spike-app.exe with bundle type information: msi
+        Info Target: x64
+     Running candle for "C:\\gl\\app\\src-tauri\\target\\release\\wix\\x64\\main.wxs"
+     Running candle for "C:\\gl\\app\\src-tauri\\wix/service.wxs"
+     Running light to produce C:\gl\app\src-tauri\target\release\bundle\msi\Galleria Spike_0.0.2_x64_en-US.msi
+    Finished 1 bundle at:
+        C:\gl\app\src-tauri\target\release\bundle\msi\Galleria Spike_0.0.2_x64_en-US.msi (7.40 MiB)
+
+    Finished 1 updater signature at:
+        C:\gl\app\src-tauri\target\release\bundle\msi\Galleria Spike_0.0.2_x64_en-US.msi.sig
+
+   7757824  9C14621F813B878AF512EA771C37311E593B7DFB14B08756D917A3A6134428C2  Galleria Spike_0.0.2_x64_en-US.msi
+       444  CB4E204A32F6B4F456A6B941D1D81596B5572A15BFC93295348000EDDBA66F09  Galleria Spike_0.0.2_x64_en-US.msi.sig
+=== firma sbagliata: lo stesso MSI 0.0.2 firmato con l'altra chiave ===
+signer sign exit: 0
+   7757824  9C14621F813B878AF512EA771C37311E593B7DFB14B08756D917A3A6134428C2  app.msi
+       392  782BFE8EA7922805622F30B3E8FEBAF8BA509FCEA1FBB1A4EEAB45C0A2FA1AAD  app.msi.sig
+build done

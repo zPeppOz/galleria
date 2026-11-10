@@ -1,0 +1,20 @@
+MSI (s) (F4:5C) [20:16:59:009]: Component: GalleriadService; Installed: Local;   Request: Absent;   Action: Absent
+MSI (s) (F4:5C) [20:16:59:051]: RESTART MANAGER: Detected that the service galleriad will be stopped due to a service control action authored in the package before the files are updated. So, we will not attempt to stop this service using Restart Manager
+MSI (s) (F4:5C) [20:16:59:071]: Doing action: StopServices
+Action start 20:16:59: StopServices.
+MSI (s) (F4:5C) [20:16:59:071]: Doing action: DeleteServices
+Action ended 20:16:59: StopServices. Return value 1.
+Action start 20:16:59: DeleteServices.
+Action ended 20:16:59: DeleteServices. Return value 1.
+MSI (s) (F4:5C) [20:16:59:100]: Doing action: InstallServices
+Action start 20:16:59: InstallServices.
+MSI (s) (F4:5C) [20:16:59:115]: Doing action: StartServices
+Action ended 20:16:59: InstallServices. Return value 1.
+Action start 20:16:59: StartServices.
+Action ended 20:16:59: StartServices. Return value 1.
+MSI (s) (F4:5C) [20:16:59:146]: Executing op: ActionStart(Name=StopServices,Description=Stopping services Service: [1],)
+MSI (s) (F4:5C) [20:16:59:146]: Executing op: ServiceControl(,Name=galleriad,Action=2,Wait=1,)
+MSI (s) (F4:5C) [20:17:00:176]: Executing op: ActionStart(Name=DeleteServices,Description=Deleting services Service: [1],)
+MSI (s) (F4:5C) [20:17:00:176]: Executing op: ServiceControl(,Name=galleriad,Action=8,Wait=1,)
+MSI (s) (F4:5C) [20:17:00:510]: Executing op: FileRemove(,FileName=galleriad.exe,,ComponentId={6F3A1C0E-5D0B-4C57-9A43-1D8F0E2B7A11})
+MSI (s) (F4:5C) [20:17:00:512]: Verifying accessibility of file: galleriad.exe

@@ -251,10 +251,6 @@ fn unknown_fields_are_rejected_at_every_request_boundary() {
         );
     }
     for (method, v) in [
-        (
-            "hello",
-            json!({"protocol":1,"client":{"name":"test","version":"0.1","evil":true}}),
-        ),
         ("status", json!({"evil":1})),
         ("disconnect", json!({"evil":1})),
         (
@@ -354,5 +350,64 @@ fn response_serialization_failure_preserves_request_id() {
                 .unwrap()
                 .contains("Synthetic serializer failure")
         );
+    }
+}
+
+#[test]
+fn hello_with_future_fields_reports_incompatible_protocol() {
+    let value = json!({"protocol":2,"future":true,"client":{"name":"future-client","version":"2.0","future":true}});
+    let result = parse_call("hello", value).and_then(|call| match call {
+        Call::Hello(p) => negotiate(p.protocol),
+        _ => panic!("expected hello"),
+    });
+    let error = result.unwrap_err();
+    assert_eq!(
+        error.data.as_ref().and_then(|d| d.get("code")),
+        Some(&json!("incompatible_protocol"))
+    );
+    assert_eq!(error.data.as_ref().unwrap()["daemon_min"], 1);
+    assert_eq!(error.data.as_ref().unwrap()["daemon_max"], 1);
+    assert!(error.message.contains("update Galleria"));
+    assert!(
+        parse_call(
+            "hello",
+            json!({"protocol":1,"extra":true,"client":{"name":"test","version":"1","extra":true}})
+        )
+        .is_ok()
+    );
+}
+
+// Exercise repeated fill_buf/consume cycles rather than an in-memory slice returned in one read.
+struct Fragmented {
+    bytes: Vec<u8>,
+    read: usize,
+}
+impl tokio::io::AsyncRead for Fragmented {
+    fn poll_read(
+        mut self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+        out: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        let n = 17.min(out.remaining()).min(self.bytes.len() - self.read);
+        out.put_slice(&self.bytes[self.read..self.read + n]);
+        self.read += n;
+        std::task::Poll::Ready(Ok(()))
+    }
+}
+#[tokio::test]
+async fn fragmented_line_enforces_limit_without_geometric_allocation() {
+    for extra in [0, 1] {
+        let mut bytes = vec![b'x'; MAX_MESSAGE_BYTES + extra];
+        *bytes.last_mut().unwrap() = b'\n';
+        let mut reader = tokio::io::BufReader::with_capacity(17, Fragmented { bytes, read: 0 });
+        let result = read_frame(&mut reader, MAX_MESSAGE_BYTES).await;
+        if extra == 0 {
+            let frame = result.unwrap().unwrap();
+            assert_eq!(frame.len(), MAX_MESSAGE_BYTES);
+            assert!(frame.capacity() <= MAX_MESSAGE_BYTES);
+        } else {
+            assert!(matches!(result, Err(FrameError::TooLarge)));
+            assert!(reader.get_ref().read <= MAX_MESSAGE_BYTES + 17);
+        }
     }
 }

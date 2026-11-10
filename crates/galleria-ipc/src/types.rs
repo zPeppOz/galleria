@@ -182,13 +182,12 @@ fn request_profile<'de, D: serde::Deserializer<'de>>(d: D) -> Result<ProfileRef,
     })
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+// Hello must reach version negotiation even with fields from a newer client.
 pub struct HelloParams {
     pub protocol: u32,
     pub client: ClientInfo,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ClientInfo {
     pub name: String,
     pub version: String,

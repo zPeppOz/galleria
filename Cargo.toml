@@ -11,6 +11,11 @@ rust-version = "1.96"
 
 [workspace.dependencies]
 galleria-ipc = { path = "crates/galleria-ipc" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["io-util", "macros", "rt", "rt-multi-thread", "sync", "time", "net", "signal", "test-util"] }
+thiserror = "2"
+zeroize = { version = "1", features = ["derive"] }
 
 [workspace.lints.clippy]
 unwrap_used = "deny"

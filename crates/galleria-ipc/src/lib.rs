@@ -1,5 +1,13 @@
 #![forbid(unsafe_code)]
 
+pub mod codec;
+pub mod error;
+pub mod methods;
+pub mod secret;
+pub mod types;
+pub mod wire;
+pub use {codec::*, error::*, methods::*, secret::*, types::*, wire::*};
+
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const PROTOCOL_MIN: u32 = 1;
 pub const PROTOCOL_MAX: u32 = 1;

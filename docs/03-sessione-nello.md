@@ -45,7 +45,7 @@ Due correzioni alle premesse della scaletta:
 
 Durata della fase 0: 1 settimana, cioè spike 1 (3 giorni) + spike 2 (2 giorni). Gli spike producono codice da buttare
 e una nota di esito in `docs/`. Un criterio è superato solo con una prova allegata (output di comando, cattura di
-pacchetti, screenshot). Server WireGuard e OpenVPN di prova in container; client su VM.
+pacchetti, screenshot). Server WireGuard e OpenVPN di prova in container; client su VM (per Windows vedi "Ambiente Windows").
 
 | Spike | Obiettivo | Durata massima | Se fallisce | Chi |
 |---|---|---|---|---|
@@ -56,9 +56,24 @@ pacchetti, screenshot). Server WireGuard e OpenVPN di prova in container; client
 | ~~Socket Unix della management interface su Windows (M5)~~ | FATTO 2026-11-09 sul sorgente: non esiste, su Windows solo TCP locale con password | — | — | — |
 | ~~Updater Tauri con MSI + servizio Windows~~ | FATTO 2026-11-09 sulla doc: updater riusa l'MSI, servizio via frammento WiX; prova pratica nello spike 1 | — | — | — |
 
+### Ambiente Windows (aggiornato 2026-11-10)
+
+Gli spike Windows che installano programmi, driver o servizi, cambiano rotte o DNS, o disinstallano **non si fanno
+sull'host di Peppe**: lì girano OpenVPN 2.7.4 (la VPN di lavoro), il client WireGuard ufficiale, Tailscale, ProtonVPN e
+OpenVPN Connect, e uno spike che lascia un adattatore, un driver o una rotta sbagliati gli ferma il lavoro. Sull'host
+solo verifiche in sola lettura (come le ACL di D14).
+
+- Ambiente proposto: **Windows Sandbox**, da abilitare sull'host (Windows 11 Pro for Workstations). Parte pulita a ogni
+  avvio e si butta alla chiusura: adatta a installazioni e disinstallazioni ripetute, ma le prove vanno copiate fuori
+  prima di chiuderla.
+- Ripiego: **VirtualBox**, già installato sull'host, con una VM Windows 11 x64 e uno snapshot prima di ogni prova.
+- Da verificare prima di partire: IPv6 nella Sandbox **[S]** (serve una rete dual-stack per 1.5 e 2.8; se manca, si
+  passa a VirtualBox); che nella Sandbox si installino driver e servizi (OpenVPN, WireGuardNT, MSI di Tauri) **[S]**; come
+  raggiunge i server di prova (`04-esito-spike-2-linux.md` §7 punto 2).
+
 ### Spike 1 — WireGuardNT su Windows
 
-Ambiente: Windows 11 x64 in VM, rete dual-stack (IPv4 + IPv6).
+Ambiente: Windows 11 x64 in Windows Sandbox o in VM VirtualBox (vedi "Ambiente Windows"), rete dual-stack (IPv4 + IPv6).
 Prima di iniziare: mail a SignPath con la domanda su `wireguard.dll` e `wintun.dll` (R3). La risposta non blocca lo
 spike, ma blocca la scelta di chi firma.
 
@@ -82,7 +97,7 @@ Se fallisce:
 ### Spike 2 — Management interface OpenVPN
 
 Ambiente: Ubuntu 24.04 (OpenVPN 2.6.19 **[V]**), Ubuntu 26.04 o Fedora corrente (2.7.x **[V]**), Windows 11 x64 con
-l'installer ufficiale 2.7 (D14).
+l'installer ufficiale 2.7 (D14), in Windows Sandbox o VM VirtualBox, mai sull'host di Peppe (vedi "Ambiente Windows").
 
 | # | Criterio | Come si verifica |
 |---|---|---|

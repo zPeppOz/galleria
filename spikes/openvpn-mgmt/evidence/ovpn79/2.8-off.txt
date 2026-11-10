@@ -1,0 +1,91 @@
+
+=== 2.8 IPv6 con profilo 'tutto nel tunnel' solo IPv4, modalita' ipv6=off ===
+2026-11-10T10:40:09Z
+OpenVPN 2.7.9 x86_64-redhat-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+
+--- prima della VPN: il sito dual-stack risponde in IPv6 dalla LAN ---
+$ curl -s -o /dev/null -w 'remote=%{remote_ip} time=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 time=0.001421s
+[exit 0]
+
+$ ip -6 route; ip route | head -5
+2001:db8:30::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev tun0 proto kernel metric 256 pref medium
+default via 2001:db8:30::20 dev eth0 metric 1024 pref medium
+0.0.0.0/1 via 10.8.0.1 dev tun0 
+default via 172.30.0.20 dev eth0 
+10.8.0.0/24 dev tun0 proto kernel scope link src 10.8.0.2 
+128.0.0.0/1 via 10.8.0.1 dev tun0 
+172.30.0.0/24 dev eth0 proto kernel scope link src 172.30.0.89 
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000421s total=0.001085s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000379s total=0.001121s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000359s total=0.001109s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000400s total=0.001308s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000354s total=0.001148s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=2001:db8:99::1 connect=0.000450s total=0.001264s
+[exit 0]
+
+--- client senza Happy Eyeballs (python socket.create_connection, prova gli indirizzi in ordine) ---
+$ python3 /tmp/seq.py
+ordine getaddrinfo: ['2001:db8:99::1', '198.51.100.1']
+peer=2001:db8:99::1 secs=0.000
+[exit 0]
+
+$ ping -6 -c 2 -W 1 2001:db8:99::1
+PING 2001:db8:99::1 (2001:db8:99::1) 56 data bytes
+64 bytes from 2001:db8:99::1: icmp_seq=1 ttl=64 time=0.106 ms
+64 bytes from 2001:db8:99::1: icmp_seq=2 ttl=64 time=0.047 ms
+
+--- 2001:db8:99::1 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1060ms
+rtt min/avg/max/mdev = 0.047/0.076/0.106/0.029 ms
+[exit 0]
+
+--- pacchetti IPv6 globali su eth0 in 60 s ---
+$ tcpdump -nn -r /evidence/ovpn79/2.8-off.pcap 2>/dev/null | head -12; echo "totale: $(tcpdump -nn -r /evidence/ovpn79/2.8-off.pcap 2>/dev/null | wc -l)"
+10:40:11.457296 IP6 2001:db8:30::89.51366 > 2001:db8:99::1.80: Flags [S], seq 764832211, win 64800, options [mss 1440,sackOK,TS val 1032405370 ecr 0,nop,wscale 10], length 0
+10:40:11.457344 IP6 2001:db8:99::1.80 > 2001:db8:30::89.51366: Flags [S.], seq 2891656928, ack 764832212, win 64260, options [mss 1440,sackOK,TS val 2967598166 ecr 1032405370,nop,wscale 10], length 0
+10:40:11.457352 IP6 2001:db8:30::89.51366 > 2001:db8:99::1.80: Flags [.], ack 1, win 64, options [nop,nop,TS val 1032405370 ecr 2967598166], length 0
+10:40:11.457401 IP6 2001:db8:30::89.51366 > 2001:db8:99::1.80: Flags [P.], seq 1:83, ack 1, win 64, options [nop,nop,TS val 1032405370 ecr 2967598166], length 82: HTTP: GET / HTTP/1.1
+10:40:11.457408 IP6 2001:db8:99::1.80 > 2001:db8:30::89.51366: Flags [.], ack 83, win 63, options [nop,nop,TS val 2967598166 ecr 1032405370], length 0
+10:40:11.457923 IP6 2001:db8:99::1.80 > 2001:db8:30::89.51366: Flags [P.], seq 1:186, ack 83, win 63, options [nop,nop,TS val 2967598166 ecr 1032405370], length 185: HTTP: HTTP/1.0 200 OK
+10:40:11.457950 IP6 2001:db8:30::89.51366 > 2001:db8:99::1.80: Flags [.], ack 186, win 64, options [nop,nop,TS val 1032405370 ecr 2967598166], length 0
+10:40:11.457972 IP6 2001:db8:99::1.80 > 2001:db8:30::89.51366: Flags [P.], seq 186:215, ack 83, win 63, options [nop,nop,TS val 2967598166 ecr 1032405370], length 29: HTTP
+10:40:11.457974 IP6 2001:db8:30::89.51366 > 2001:db8:99::1.80: Flags [.], ack 215, win 64, options [nop,nop,TS val 1032405370 ecr 2967598166], length 0
+10:40:11.457997 IP6 2001:db8:99::1.80 > 2001:db8:30::89.51366: Flags [F.], seq 215, ack 83, win 63, options [nop,nop,TS val 2967598166 ecr 1032405370], length 0
+10:40:11.458001 IP6 2001:db8:30::89.51366 > 2001:db8:99::1.80: Flags [F.], seq 83, ack 215, win 64, options [nop,nop,TS val 1032405370 ecr 2967598166], length 0
+10:40:11.458016 IP6 2001:db8:99::1.80 > 2001:db8:30::89.51366: Flags [.], ack 84, win 63, options [nop,nop,TS val 2967598166 ecr 1032405370], length 0
+totale: 86
+[exit 0]
+
+[daemon exit 0]
+{"cmd":"resolvectl dns tun0 10.8.0.1","event":"netcfg_cmd","ok":true,"stderr":"","t":0.067}
+{"cmd":"resolvectl domain tun0 galleria.test ~.","event":"netcfg_cmd","ok":true,"stderr":"","t":0.069}
+{"cmd":"resolvectl default-route tun0 yes","event":"netcfg_cmd","ok":true,"stderr":"","t":0.071}
+{"cmd":"(none)","event":"netcfg_cmd","ok":true,"stderr":"tun0 already gone, resolved state dropped with it","t":75.149}
+--- richieste viste dal sito (sorgente) ---
+2001:db8:30::89 "GET / HTTP/1.1" 200 -
+2001:db8:30::89 "GET / HTTP/1.1" 200 -
+2001:db8:30::89 "GET / HTTP/1.1" 200 -
+2001:db8:30::89 "GET / HTTP/1.1" 200 -
+2001:db8:30::89 "GET / HTTP/1.1" 200 -
+2001:db8:30::89 "GET / HTTP/1.1" 200 -

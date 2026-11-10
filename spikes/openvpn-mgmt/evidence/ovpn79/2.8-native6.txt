@@ -1,0 +1,87 @@
+
+=== 2.8 IPv6 con profilo 'tutto nel tunnel' solo IPv4, modalita' ipv6=native6 ===
+2026-11-10T10:42:43Z
+OpenVPN 2.7.9 x86_64-redhat-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+
+$ ip -6 route; ip route | head -5
+::/3 dev tun0 metric 1024 pref medium
+2001:db8:30::/64 dev eth0 proto kernel metric 256 pref medium
+2000::/4 dev tun0 metric 1024 pref medium
+3000::/4 dev tun0 metric 1024 pref medium
+fd15:53b6:dead::/64 dev tun0 proto kernel metric 256 pref medium
+fc00::/7 dev tun0 metric 1024 pref medium
+fe80::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev tun0 proto kernel metric 256 pref medium
+default via 2001:db8:30::20 dev eth0 metric 1024 pref medium
+0.0.0.0/1 via 10.8.0.1 dev tun0 
+default via 172.30.0.20 dev eth0 
+10.8.0.0/24 dev tun0 proto kernel scope link src 10.8.0.2 
+128.0.0.0/1 via 10.8.0.1 dev tun0 
+172.30.0.0/24 dev eth0 proto kernel scope link src 172.30.0.89 
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.001274s total=0.002868s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.000842s total=0.001971s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.000890s total=0.001950s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.000716s total=0.001472s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.000622s total=0.001453s
+[exit 0]
+
+$ curl -s -o /dev/null -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.000722s total=0.001538s
+[exit 0]
+
+--- client senza Happy Eyeballs (python socket.create_connection, prova gli indirizzi in ordine) ---
+$ python3 /tmp/seq.py
+ordine getaddrinfo: ['198.51.100.1', '2001:db8:99::1']
+peer=198.51.100.1 secs=0.001
+[exit 0]
+
+$ ping -6 -c 2 -W 1 2001:db8:99::1
+PING 2001:db8:99::1 (2001:db8:99::1) 56 data bytes
+From fd15:53b6:dead::1 icmp_seq=1 Destination unreachable: No route
+From fd15:53b6:dead::1 icmp_seq=2 Destination unreachable: No route
+
+--- 2001:db8:99::1 ping statistics ---
+2 packets transmitted, 0 received, +2 errors, 100% packet loss, time 1048ms
+
+[exit 1]
+
+--- pacchetti IPv6 globali su eth0 in 60 s ---
+$ tcpdump -nn -r /evidence/ovpn79/2.8-native6.pcap 2>/dev/null | head -12; echo "totale: $(tcpdump -nn -r /evidence/ovpn79/2.8-native6.pcap 2>/dev/null | wc -l)"
+totale: 0
+[exit 0]
+
+[daemon exit 0]
+{"config_via":"Pipe","daemon_directives":["management /run/galleria/s974/mgmt.sock unix","management-client-user root","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"/usr/local/lib/galleria/galleriad-s
+openvpn[stdout]| 2026-11-10 10:42:43 GDG6: remote_host_ipv6=n/a
+{"dns_channels":["foreign_option"],"env":{"dev":"tun0","dev_type":"tun","foreign_option_1":"dhcp-option DNS 10.8.0.1","foreign_option_2":"dhcp-option DOMAIN galleria.test","ifconfig_ipv6_local":"fd15:53b6:dead::2","ifconfig_ipv6_netbits":"64","ifconfig_ipv6_remote":"fd15:53b6:dead::1","ifconfig_loca
+{"cmd":"resolvectl dns tun0 10.8.0.1","event":"netcfg_cmd","ok":true,"stderr":"","t":0.067}
+{"cmd":"resolvectl domain tun0 galleria.test ~.","event":"netcfg_cmd","ok":true,"stderr":"","t":0.069}
+{"cmd":"resolvectl default-route tun0 yes","event":"netcfg_cmd","ok":true,"stderr":"","t":0.071}
+openvpn[stdout]| 2026-11-10 10:42:43 add_route_ipv6(::/3 -> fd15:53b6:dead::1 metric -1) dev tun0
+openvpn[stdout]| 2026-11-10 10:42:43 net_route_v6_add: ::/3 via :: dev tun0 table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:42:43 add_route_ipv6(2000::/4 -> fd15:53b6:dead::1 metric -1) dev tun0
+openvpn[stdout]| 2026-11-10 10:42:43 net_route_v6_add: 2000::/4 via :: dev tun0 table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:42:43 add_route_ipv6(3000::/4 -> fd15:53b6:dead::1 metric -1) dev tun0
+openvpn[stdout]| 2026-11-10 10:42:43 net_route_v6_add: 3000::/4 via :: dev tun0 table 0 metric -1
+--- richieste viste dal sito (sorgente) ---
+::ffff:172.30.0.10 "GET / HTTP/1.1" 200 -
+::ffff:172.30.0.10 "GET / HTTP/1.1" 200 -
+::ffff:172.30.0.10 "GET / HTTP/1.1" 200 -
+::ffff:172.30.0.10 "GET / HTTP/1.1" 200 -
+::ffff:172.30.0.10 "GET / HTTP/1.1" 200 -
+::ffff:172.30.0.10 "GET / HTTP/1.1" 200 -

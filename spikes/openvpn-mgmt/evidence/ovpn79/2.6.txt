@@ -1,0 +1,62 @@
+
+=== 2.6 chiavi inline senza file in chiaro ===
+2026-11-10T10:39:22Z
+OpenVPN 2.7.9 x86_64-redhat-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+
+marcatori: 2a riga della chiave privata e 3a riga di ta.key (non stampati)
+--- A) configurazione via pipe (stdin) ---
+$ tr '\0' ' ' < /proc/460/cmdline; echo; ls -l /proc/460/fd
+/usr/sbin/openvpn --config /dev/stdin 
+total 0
+lr-x------ 1 root root 64 Nov 10 10:39 0 -> pipe:[101854412]
+l-wx------ 1 root root 64 Nov 10 10:39 1 -> pipe:[101854413]
+l-wx------ 1 root root 64 Nov 10 10:39 2 -> pipe:[101854414]
+lrwx------ 1 root root 64 Nov 10 10:39 3 -> socket:[101848985]
+lrwx------ 1 root root 64 Nov 10 10:39 4 -> socket:[101848986]
+lrwx------ 1 root root 64 Nov 10 10:39 5 -> socket:[101848987]
+lrwx------ 1 root root 64 Nov 10 10:39 6 -> /dev/net/tun
+[exit 0]
+
+$ grep -rlF <marcatori> / (esclusi proc, sys, dev e i mount di prova pki/profiles/evidence)
+[file con materiale della chiave: 0]
+
+--- SIGUSR1 (riavvio soft) con config da pipe ---
+$ kill -USR1 460; sleep 4; pgrep -x openvpn
+460
+[exit 0]
+
+{"detail":"SUCCESS","event":"state","local_ip":"10.8.0.2","raw":"1794307162,CONNECTED,SUCCESS,10.8.0.2,172.30.0.10,1194,,","remote":"172.30.0.10","state":"CONNECTED","t":0.069}
+{"detail":"SIGUSR1","event":"state","local_ip":"","raw":"1794307164,RECONNECTING,SIGUSR1,,,,,","remote":"","state":"RECONNECTING","t":1.823}
+{"detail":"SUCCESS","event":"state","local_ip":"10.8.0.2","raw":"1794307164,CONNECTED,SUCCESS,10.8.0.2,172.30.0.10,1194,,","remote":"172.30.0.10","state":"CONNECTED","t":1.836}
+--- SIGHUP (riavvio con rilettura della config) con config da pipe ---
+$ kill -HUP 460; sleep 3; pgrep -x openvpn || echo 'openvpn non gira piu'
+514
+[exit 0]
+
+[daemon exit 0]
+openvpn[stdout]| 2026-11-10 10:39:28 MANAGEMENT: >STATE:1794307168,RECONNECTING,SIGHUP,,,,,
+{"detail":"SIGHUP","event":"state","local_ip":"","raw":"1794307168,RECONNECTING,SIGHUP,,,,,","remote":"","state":"RECONNECTING","t":5.923}
+openvpn[stdout]| Options error: DEPRECATION: No tls-client or tls-server option in configuration detected. OpenVPN 2.8 will remove the functionality to run a VPN without TLS. See the examples section in the manual page for examples of a similar quick setup with peer-fingerprint. OpenVPN 2.7 allows using this configuration when using --allow-deprecated-insecure-static-crypto but you should move to a proper configuration using TLS as soon as possible.
+openvpn[stdout]| 2026-11-10 10:39:29 PUSH: Received control message: 'PUSH_REPLY,dhcp-option DNS 10.8.0.1,dhcp-option DOMAIN galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 60,ifconfig 10.8.0.2 255.255.255.0,peer-id 0,cipher AES-256-GCM,protocol-flags cc-exit tls-ekm dyn-tls-crypt,tun-mtu 1500'
+openvpn[stdout]| 2026-11-10 10:39:29 Timers: ping 10, ping-restart 60
+{"detail":"SIGTERM","event":"state","local_ip":"","raw":"1794307179,EXITING,SIGTERM,,,,,","remote":"","state":"EXITING","t":17.175}
+openvpn[stdout]| 2026-11-10 10:39:39 SIGTERM[hard,] received, process exiting
+openvpn[stdout]| 2026-11-10 10:39:39 MANAGEMENT: >STATE:1794307179,EXITING,SIGTERM,,,,,
+
+--- B) --management-external-key: <key> tolta dalla config, firma fatta dal demone ---
+[daemon exit 0]
+{"directive":"verb","event":"profile_directive_removed","line":9,"reason":"blocked directive (M2)","t":0.004}
+{"directive":"<key>","event":"profile_directive_removed","line":36,"reason":"key kept in daemon memory (external key)","t":0.004}
+{"config_via":"Pipe","daemon_directives":["management /run/galleria/s525/mgmt.sock unix","management-client-user root","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"/usr/local/lib/galleria/galleriad-s
+{"algorithm":"ECDSA","data_len":32,"event":"pk_sign_request","t":0.061}
+{"event":"pk_sign_done","t":0.061}
+{"event":"connected","ip":"10.8.0.2","server":"172.30.0.10","t":0.074}
+
+--- C) ripiego: file temporaneo 0600, cancellato al primo HOLD ---
+$ grep -rlF <marcatori> / (durante la connessione)
+[file con materiale della chiave: 0]
+
+[daemon exit 0]
+{"argv":["/usr/sbin/openvpn","--config","/run/galleria/s543/config.ovpn"],"event":"openvpn_spawned","pid":551,"t":0.005}
+{"event":"tempfile_removed","path":"/run/galleria/s543/config.ovpn","t":0.055}
+{"event":"connected","ip":"10.8.0.2","server":"172.30.0.10","t":0.072}

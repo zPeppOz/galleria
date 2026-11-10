@@ -1,0 +1,42 @@
+
+=== 2.5 credenziali senza file: Auth, OTP (static-challenge), passphrase della chiave ===
+2026-11-10T10:39:15Z
+OpenVPN 2.7.9 x86_64-redhat-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+
+--- auth ---
+[daemon exit 0]
+openvpn[stdout]| 2026-11-10 10:39:15 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 10:39:15 MANAGEMENT: CMD 'password [...]'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":0.055}
+{"event":"credentials_sent","static_challenge":false,"t":0.055,"type":"Auth"}
+{"event":"connected","ip":"10.8.0.2","server":"172.30.0.10","t":0.07}
+
+--- otp ---
+[daemon exit 0]
+{"event":"mgmt_password","line":"Need 'Auth' username/password SC:1,Enter OTP","t":0.071}
+{"event":"credentials_sent","static_challenge":true,"t":0.071,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 10:39:17 MANAGEMENT: CMD 'username "Auth" "bob"'
+openvpn[stdout]| 2026-11-10 10:39:17 MANAGEMENT: CMD 'password [...]'
+{"event":"connected","ip":"10.8.0.2","server":"172.30.0.10","t":0.089}
+
+--- keypass ---
+[daemon exit 0]
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":0.055}
+{"event":"credentials_sent","static_challenge":false,"t":0.055,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 10:39:20 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 10:39:20 MANAGEMENT: CMD 'password [...]'
+{"event":"mgmt_password","line":"Need 'Private Key' password","t":0.057}
+{"event":"credentials_sent","t":0.057,"type":"Private Key"}
+openvpn[stdout]| 2026-11-10 10:39:20 MANAGEMENT: CMD 'password [...]'
+{"event":"connected","ip":"10.8.0.2","server":"172.30.0.10","t":0.072}
+
+--- log del server (verify.sh) ---
+verify.sh: user=alice ok (password)
+verify.sh: user=alice ok (password)
+verify.sh: user=alice ok (password)
+verify.sh: user=bob ok (password + totp 569485)
+verify.sh: user=alice ok (password)
+--- nessun file di credenziali: auth-user-pass e askpass senza argomento nella config generata ---
+['auth-user-pass', '<tls-auth> [inline, content omitted]']
+['auth-user-pass', '<tls-auth> [inline, content omitted]']
+['auth-user-pass', '<tls-auth> [inline, content omitted]', 'static-challenge "Enter OTP" 1']

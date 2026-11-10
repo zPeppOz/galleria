@@ -1,0 +1,159 @@
+{"event":"openvpn_version","t":0.003,"version":"OpenVPN 2.6.19 x86_64-pc-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]"}
+{"directive":"verb","event":"profile_directive_removed","line":9,"reason":"blocked directive (M2)","t":0.003}
+{"config_via":"Pipe","daemon_directives":["management /run/galleria/s1565/mgmt.sock unix","management-client-user root","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"/usr/local/lib/galleria/galleriad-spike netcfg /run/galleria/s1565/netcfg.sock\"","down \"/usr/local/lib/galleria/galleriad-spike netcfg /run/galleria/s1565/netcfg.sock\""],"event":"generated_config","key_mode":"Inline","profile_directives":["client","dev tun","proto udp","remote 172.30.0.10 1194","nobind","remote-cert-tls server","auth-user-pass","key-direction 1","<ca> [inline, content omitted]","<cert> [inline, content omitted]","<key> [inline, content omitted]","<tls-auth> [inline, content omitted]"],"t":0.003}
+{"event":"attempt","n":1,"of":3,"t":0.003}
+{"argv":["/usr/sbin/openvpn","--config","/dev/stdin"],"event":"openvpn_spawned","pid":1573,"t":0.003}
+openvpn[stdout]| 2026-11-10 10:22:33 Note: --cipher is not set. OpenVPN versions before 2.5 defaulted to BF-CBC as fallback when cipher negotiation failed in this case. If you need this fallback please add '--data-ciphers-fallback BF-CBC' to your configuration and/or add BF-CBC to --data-ciphers.
+openvpn[stdout]| 2026-11-10 10:22:33 Note: Kernel support for ovpn-dco missing, disabling data channel offload.
+openvpn[stdout]| 2026-11-10 10:22:33 OpenVPN 2.6.19 x86_64-pc-linux-gnu [SSL (OpenSSL)] [LZO] [LZ4] [EPOLL] [PKCS11] [MH/PKTINFO] [AEAD] [DCO]
+openvpn[stdout]| 2026-11-10 10:22:33 library versions: OpenSSL 3.0.13 30 Jan 2024, LZO 2.10
+openvpn[stdout]| 2026-11-10 10:22:33 DCO version: N/A
+openvpn[stdout]| 2026-11-10 10:22:33 MANAGEMENT: client_uid=0
+openvpn[stdout]| 2026-11-10 10:22:33 MANAGEMENT: unix domain socket listening on /run/galleria/s1565/mgmt.sock
+openvpn[stdout]| 2026-11-10 10:22:33 Need hold release from management interface, waiting...
+{"event":"mgmt_connected","socket":"/run/galleria/s1565/mgmt.sock","t":0.054}
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: Client connected from /run/galleria/s1565/mgmt.sock
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 5 -- type 'help' for more info","t":0.054}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":0.054}
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: CMD 'hold release'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":0.054}
+{"event":"credentials_sent","static_challenge":false,"t":0.054,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: CMD 'password [...]'
+openvpn[stdout]| 2026-11-10 10:22:34 NOTE: the current --script-security setting may allow this configuration to call user-defined scripts
+openvpn[stdout]| 2026-11-10 10:22:34 TCP/UDP: Preserving recently used remote address: [AF_INET]172.30.0.10:1194
+openvpn[stdout]| 2026-11-10 10:22:34 Socket Buffers: R=[212992->212992] S=[212992->212992]
+openvpn[stdout]| 2026-11-10 10:22:34 UDPv4 link local: (not bound)
+openvpn[stdout]| 2026-11-10 10:22:34 UDPv4 link remote: [AF_INET]172.30.0.10:1194
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: >STATE:1794306154,WAIT,,,,,,
+{"detail":"","event":"state","local_ip":"","raw":"1794306154,WAIT,,,,,,","remote":"","state":"WAIT","t":0.056}
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: >STATE:1794306154,AUTH,,,,,,
+openvpn[stdout]| 2026-11-10 10:22:34 TLS: Initial packet from [AF_INET]172.30.0.10:1194, sid=a2938b7d a916ce22
+openvpn[stdout]| 2026-11-10 10:22:34 WARNING: this configuration may cache passwords in memory -- use the auth-nocache option to prevent this
+{"detail":"","event":"state","local_ip":"","raw":"1794306154,AUTH,,,,,,","remote":"","state":"AUTH","t":0.056}
+openvpn[stdout]| 2026-11-10 10:22:34 VERIFY OK: depth=1, CN=Galleria Lab CA
+openvpn[stdout]| 2026-11-10 10:22:34 VERIFY KU OK
+openvpn[stdout]| 2026-11-10 10:22:34 Validating certificate extended key usage
+openvpn[stdout]| 2026-11-10 10:22:34 ++ Certificate has EKU (str) TLS Web Server Authentication, expects TLS Web Server Authentication
+openvpn[stdout]| 2026-11-10 10:22:34 VERIFY EKU OK
+openvpn[stdout]| 2026-11-10 10:22:34 VERIFY OK: depth=0, CN=server
+openvpn[stdout]| 2026-11-10 10:22:34 Control Channel: TLSv1.3, cipher TLSv1.3 TLS_AES_256_GCM_SHA384, peer certificate: 256 bits ECprime256v1, signature: ecdsa-with-SHA256, peer temporary key: 253 bits X25519
+openvpn[stdout]| 2026-11-10 10:22:34 [server] Peer Connection Initiated with [AF_INET]172.30.0.10:1194
+openvpn[stdout]| 2026-11-10 10:22:34 TLS: move_session: dest=TM_ACTIVE src=TM_INITIAL reinit_src=1
+openvpn[stdout]| 2026-11-10 10:22:34 TLS: tls_multi_process: initial untrusted session promoted to trusted
+openvpn[stdout]| 2026-11-10 10:22:34 PUSH: Received control message: 'PUSH_REPLY,dhcp-option DNS 10.8.0.1,dhcp-option DOMAIN galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 60,ifconfig 10.8.0.2 255.255.255.0,peer-id 0,cipher AES-256-GCM,protocol-flags cc-exit tls-ekm dyn-tls-crypt,tun-mtu 1500'
+openvpn[stdout]| 2026-11-10 10:22:34 OPTIONS IMPORT: --ifconfig/up options modified
+openvpn[stdout]| 2026-11-10 10:22:34 OPTIONS IMPORT: route options modified
+openvpn[stdout]| 2026-11-10 10:22:34 OPTIONS IMPORT: route-related options modified
+openvpn[stdout]| 2026-11-10 10:22:34 OPTIONS IMPORT: --ip-win32 and/or --dhcp-option options modified
+openvpn[stdout]| 2026-11-10 10:22:34 OPTIONS IMPORT: tun-mtu set to 1500
+openvpn[stdout]| 2026-11-10 10:22:34 net_route_v4_best_gw query: dst 0.0.0.0
+openvpn[stdout]| 2026-11-10 10:22:34 net_route_v4_best_gw result: via 172.30.0.20 dev eth0
+openvpn[stdout]| 2026-11-10 10:22:34 ROUTE_GATEWAY 172.30.0.20/255.255.255.0 IFACE=eth0 HWADDR=3e:e0:26:e7:0c:62
+openvpn[stdout]| 2026-11-10 10:22:34 TUN/TAP device tun0 opened
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: >STATE:1794306154,ASSIGN_IP,,10.8.0.2,,,,
+openvpn[stdout]| 2026-11-10 10:22:34 net_iface_mtu_set: mtu 1500 for tun0
+openvpn[stdout]| 2026-11-10 10:22:34 net_iface_up: set tun0 up
+openvpn[stdout]| 2026-11-10 10:22:34 net_addr_v4_add: 10.8.0.2/24 dev tun0
+openvpn[stdout]| 2026-11-10 10:22:34 /usr/local/lib/galleria/galleriad-spike netcfg /run/galleria/s1565/netcfg.sock tun0 1500 0 10.8.0.2 255.255.255.0 init
+{"dns_channels":["foreign_option"],"env":{"dev":"tun0","dev_type":"tun","foreign_option_1":"dhcp-option DNS 10.8.0.1","foreign_option_2":"dhcp-option DOMAIN galleria.test","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","route_gateway_1":"10.8.0.1","route_net_gateway":"172.30.0.20","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_vpn_gateway":"10.8.0.1","script_type":"up","tun_mtu":"1500"},"event":"netcfg_env","parsed":{"dev":"tun0","dns_servers":["10.8.0.1"],"domains":["galleria.test"],"redirect_gateway":false},"script_type":"up","t":0.065}
+{"cmd":"resolvectl dns tun0 10.8.0.1","event":"netcfg_cmd","ok":true,"stderr":"","t":0.068}
+{"cmd":"resolvectl domain tun0 galleria.test ~.","event":"netcfg_cmd","ok":true,"stderr":"","t":0.071}
+{"cmd":"resolvectl default-route tun0 yes","event":"netcfg_cmd","ok":true,"stderr":"","t":0.074}
+{"cmd":"ip -6 route add ::/1 dev tun0","event":"netcfg_cmd","ok":true,"stderr":"","t":0.075}
+{"cmd":"ip -6 route add 8000::/1 dev tun0","event":"netcfg_cmd","ok":true,"stderr":"","t":0.076}
+openvpn[stdout]| 2026-11-10 10:22:34 net_route_v4_add: 172.30.0.10/32 via 172.30.0.20 dev eth0 table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:22:34 net_route_v4_add: 0.0.0.0/1 via 10.8.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:22:34 net_route_v4_add: 128.0.0.0/1 via 10.8.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: >STATE:1794306154,ADD_ROUTES,,,,,,
+openvpn[stdout]| 2026-11-10 10:22:34 net_route_v4_add: 192.0.2.0/24 via 10.8.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:22:34 Initialization Sequence Completed
+openvpn[stdout]| 2026-11-10 10:22:34 MANAGEMENT: >STATE:1794306154,CONNECTED,SUCCESS,10.8.0.2,172.30.0.10,1194,,
+openvpn[stdout]| 2026-11-10 10:22:34 Data Channel: cipher 'AES-256-GCM', peer-id: 0
+openvpn[stdout]| 2026-11-10 10:22:34 Timers: ping 10, ping-restart 60
+openvpn[stdout]| 2026-11-10 10:22:34 Protocol options: protocol-flags cc-exit tls-ekm dyn-tls-crypt
+{"detail":"","event":"state","local_ip":"10.8.0.2","raw":"1794306154,ASSIGN_IP,,10.8.0.2,,,,","remote":"","state":"ASSIGN_IP","t":0.076}
+{"detail":"","event":"state","local_ip":"","raw":"1794306154,ADD_ROUTES,,,,,,","remote":"","state":"ADD_ROUTES","t":0.076}
+{"detail":"SUCCESS","event":"state","local_ip":"10.8.0.2","raw":"1794306154,CONNECTED,SUCCESS,10.8.0.2,172.30.0.10,1194,,","remote":"172.30.0.10","state":"CONNECTED","t":0.076}
+{"event":"connected","ip":"10.8.0.2","server":"172.30.0.10","t":0.076}
+{"event":"bytecount","in":"2324","out":"2299","t":1.12}
+{"event":"bytecount","in":"2926","out":"2872","t":2.589}
+{"event":"bytecount","in":"2926","out":"2872","t":3.632}
+{"event":"bytecount","in":"2926","out":"2944","t":5.516}
+{"event":"bytecount","in":"2926","out":"2944","t":6.559}
+{"event":"bytecount","in":"2926","out":"2944","t":7.602}
+{"event":"bytecount","in":"2926","out":"2944","t":8.645}
+{"event":"bytecount","in":"2926","out":"2944","t":9.624}
+{"event":"bytecount","in":"3528","out":"3517","t":10.987}
+{"event":"bytecount","in":"3528","out":"3517","t":12.147}
+{"event":"bytecount","in":"3528","out":"3517","t":13.306}
+{"event":"bytecount","in":"3528","out":"3589","t":14.593}
+{"event":"bytecount","in":"3528","out":"3589","t":15.753}
+{"event":"bytecount","in":"3528","out":"3589","t":16.913}
+{"event":"bytecount","in":"3528","out":"3589","t":17.888}
+{"event":"bytecount","in":"4130","out":"4162","t":19.25}
+{"event":"bytecount","in":"4130","out":"4162","t":20.41}
+{"event":"bytecount","in":"4130","out":"4162","t":21.543}
+{"event":"bytecount","in":"4130","out":"4162","t":22.674}
+{"event":"bytecount","in":"4130","out":"4162","t":23.806}
+{"event":"bytecount","in":"4130","out":"4162","t":24.938}
+{"event":"bytecount","in":"4130","out":"4162","t":26.069}
+{"event":"bytecount","in":"4732","out":"4735","t":27.523}
+{"event":"bytecount","in":"4732","out":"4735","t":28.655}
+{"event":"bytecount","in":"4732","out":"4735","t":29.787}
+{"event":"bytecount","in":"4732","out":"4735","t":30.919}
+{"event":"bytecount","in":"4732","out":"4735","t":32.148}
+{"event":"bytecount","in":"4732","out":"4735","t":33.145}
+{"event":"bytecount","in":"4732","out":"4807","t":34.375}
+{"event":"bytecount","in":"5334","out":"5380","t":35.937}
+{"event":"bytecount","in":"5334","out":"5380","t":37.164}
+{"event":"bytecount","in":"5334","out":"5380","t":38.398}
+{"event":"bytecount","in":"5334","out":"5380","t":39.623}
+{"event":"bytecount","in":"5334","out":"5380","t":40.836}
+{"event":"bytecount","in":"5334","out":"5380","t":42.049}
+{"event":"bytecount","in":"5936","out":"5953","t":44.222}
+{"event":"bytecount","in":"5936","out":"5953","t":45.435}
+{"event":"bytecount","in":"5936","out":"5953","t":46.648}
+{"event":"bytecount","in":"5936","out":"5953","t":47.861}
+{"event":"bytecount","in":"5936","out":"5953","t":49.073}
+{"event":"bytecount","in":"5936","out":"5953","t":50.287}
+{"event":"bytecount","in":"5936","out":"6057","t":52.181}
+{"event":"bytecount","in":"5936","out":"6161","t":53.201}
+{"event":"bytecount","in":"5976","out":"6265","t":54.225}
+{"event":"bytecount","in":"5976","out":"6369","t":55.249}
+{"event":"bytecount","in":"5976","out":"6473","t":56.273}
+{"event":"bytecount","in":"5976","out":"6577","t":57.301}
+{"event":"bytecount","in":"5976","out":"6577","t":58.297}
+{"event":"bytecount","in":"5976","out":"6681","t":59.313}
+{"event":"bytecount","in":"5976","out":"6681","t":60.329}
+{"event":"bytecount","in":"6136","out":"7121","t":62.265}
+{"event":"bytecount","in":"6136","out":"7249","t":63.333}
+{"event":"bytecount","in":"6136","out":"7249","t":64.401}
+{"event":"bytecount","in":"6136","out":"7249","t":65.469}
+{"event":"bytecount","in":"6136","out":"7249","t":66.537}
+{"event":"bytecount","in":"6136","out":"7249","t":67.605}
+{"event":"bytecount","in":"6136","out":"7249","t":68.673}
+{"event":"bytecount","in":"6136","out":"7249","t":69.741}
+{"event":"bytecount","in":"6136","out":"7249","t":70.842}
+{"event":"bytecount","in":"6176","out":"7289","t":71.943}
+{"event":"bytecount","in":"6176","out":"7289","t":73.043}
+{"event":"bytecount","in":"6176","out":"7289","t":74.105}
+{"event":"disconnect_requested","t":75.106}
+openvpn[stdout]| 2026-11-10 10:23:51 MANAGEMENT: CMD 'signal SIGTERM'
+openvpn[stdout]| 2026-11-10 10:23:51 net_route_v4_del: 192.0.2.0/24 via 10.8.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:23:51 net_route_v4_del: 172.30.0.10/32 via 172.30.0.20 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:23:51 net_route_v4_del: 0.0.0.0/1 via 10.8.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:23:51 net_route_v4_del: 128.0.0.0/1 via 10.8.0.1 dev [NULL] table 0 metric -1
+openvpn[stdout]| 2026-11-10 10:23:51 Closing TUN/TAP interface
+openvpn[stdout]| 2026-11-10 10:23:51 net_addr_v4_del: 10.8.0.2 dev tun0
+openvpn[stdout]| 2026-11-10 10:23:51 /usr/local/lib/galleria/galleriad-spike netcfg /run/galleria/s1565/netcfg.sock tun0 1500 0 10.8.0.2 255.255.255.0 init
+{"dns_channels":["foreign_option"],"env":{"dev":"tun0","dev_type":"tun","foreign_option_1":"dhcp-option DNS 10.8.0.1","foreign_option_2":"dhcp-option DOMAIN galleria.test","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","redirect_gateway":"1","route_gateway_1":"10.8.0.1","route_net_gateway":"172.30.0.20","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_vpn_gateway":"10.8.0.1","script_type":"down","tun_mtu":"1500"},"event":"netcfg_env","parsed":{"dev":"tun0","dns_servers":["10.8.0.1"],"domains":["galleria.test"],"redirect_gateway":true},"script_type":"down","t":75.122}
+{"cmd":"(none)","event":"netcfg_cmd","ok":true,"stderr":"tun0 already gone, resolved state dropped with it","t":75.123}
+openvpn[stdout]| 2026-11-10 10:23:51 SIGTERM[hard,] received, process exiting
+openvpn[stdout]| 2026-11-10 10:23:51 MANAGEMENT: >STATE:1794306231,EXITING,SIGTERM,,,,,
+{"detail":"SIGTERM","event":"state","local_ip":"","raw":"1794306231,EXITING,SIGTERM,,,,,","remote":"","state":"EXITING","t":75.123}
+{"event":"openvpn_exited","exit_reason":"SIGTERM","status":"Ok(ExitStatus(unix_wait_status(0)))","t":75.124}
+{"code":0,"event":"exit","t":75.124}

@@ -75,6 +75,10 @@ Proposta (da decidere con Peppe, non applicata a D15): per OpenVPN il modo "nati
 gestito da OpenVPN e legato alla vita del tun; il meccanismo comune con errore immediato resta per WireGuard e va
 provato su Windows nello spike 1.
 
+**Esito (2026-11-10)**: Peppe ha approvato la proposta, D15 è corretta in `01-analisi.md` §2. Aitano ha ricontato le
+catture del 2.8 in modo indipendente, con gli stessi numeri: nessuna protezione 85–86 pacchetti IPv6 globali, nativo
+senza `ifconfig-ipv6` 85/86 su 2.7.0/2.7.9 e 0 sulla 2.6, comune 0 su tutte.
+
 **D10 (modulo di rete comune), una precisazione.** Il canale per DNS funziona (`foreign_option_*` è identico su 2.6
 e 2.7). Le rotte invece OpenVPN le applica da solo e bene; portarle nel modulo comune richiederebbe `route-noexec`,
 non provato. Proposta: per OpenVPN il modulo comune fa DNS e IPv6, le rotte restano a OpenVPN.

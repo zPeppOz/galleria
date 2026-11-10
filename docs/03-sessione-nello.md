@@ -33,7 +33,7 @@ Dettagli e motivi in `01-analisi.md` §2.
 - A3 → D12: JSON-RPC 2.0, un messaggio per riga, `hello` con versione. D'accordo.
 - A5 → D13: TOML, un file per profilo, scrittura atomica. D'accordo.
 - A4 → D14: OpenVPN prerequisito su Windows. D'accordo sul prerequisito; **non** sull'"inclusione dopo" come impegno: le licenze la permettono, ma ogni release di OpenVPN (circa una al mese) diventerebbe una nostra release. Si rivaluta solo se gli utenti lo chiedono.
-- A10 → D15: sì, blocco IPv6 in v0.1. D'accordo sul sì; la correzione è piccola nel codice ma va provata su ogni piattaforma, quindi entra nei criteri degli spike.
+- A10 → D15: sì, blocco IPv6 in v0.1. D'accordo sul sì; la correzione è piccola nel codice ma va provata su ogni piattaforma, quindi entra nei criteri degli spike. Aggiornamento 2026-11-10: D15 corretta dopo lo spike 2 e **approvata da Peppe** (OpenVPN con la via nativa più un `ifconfig-ipv6` locale; modulo comune con errore immediato, non scarto silenzioso).
 - A13 → D16: d'accordo, più tre aggiunte: controllo versioni dalla GUI e disattivabile (A11), avviso se OpenVPN è troppo vecchio, ripiego "solo avviso" anche su Windows se lo spike fallisce.
 - A12: proposta in `01-analisi.md` §8. Differenza da Aitano: tutte e due le Ubuntu LTS obbligatorie (26.04 ha OpenVPN 2.7, 24.04 la 2.6).
 
@@ -68,7 +68,7 @@ spike, ma blocca la scelta di chi firma.
 | 1.2 | Il servizio legge ultimo handshake e byte in/out ogni secondo | i valori crescono durante un ping continuo |
 | 1.3 | Disconnessione pulita: adattatore rimosso, nessuna rotta residua | `Get-NetAdapter` e `route print` uguali a prima della connessione |
 | 1.4 | Build: scelta tra `defguard_wireguard_rs` (toolchain `windows-gnu` **[V]**) e un binding diretto a `wireguard.h`; la scelta compila insieme all'app Tauri | job GitHub Actions verde su runner Windows |
-| 1.5 | IPv6 (D15): profilo "tutto nel tunnel" solo IPv4, nessun pacchetto IPv6 globale esce dall'interfaccia fisica; le app ripiegano su IPv4 | cattura `pktmon` o Wireshark per 60 s; `curl` verso un sito dual-stack risponde in meno di 2 s |
+| 1.5 | IPv6 (D15, meccanismo comune): profilo "tutto nel tunnel" solo IPv4, nessun pacchetto IPv6 globale esce dall'interfaccia fisica; l'IPv6 riceve un errore immediato (rotte unreachable o ICMPv6), non uno scarto silenzioso, e le app ripiegano su IPv4. Su Windows capire come ottenere l'errore immediato **[S]** | cattura `pktmon` o Wireshark per 60 s; verso un sito dual-stack sia `curl` (Happy Eyeballs) sia un client che prova gli indirizzi uno dopo l'altro rispondono via IPv4 in meno di 2 s |
 | 1.6 | MSI di Tauri con frammento WiX (ServiceInstall/ServiceControl): dopo l'installazione il servizio è avviato e automatico; la disinstallazione toglie servizio e adattatori | `sc qc galleriad`, `Get-Service galleriad`, `Get-NetAdapter` |
 | 1.7 | Updater: da 0.0.1 a 0.0.2 con `latest.json` firmato, il servizio viene fermato, sostituito e riavviato; GUI e servizio hanno la stessa versione; un aggiornamento con firma sbagliata viene rifiutato | versione letta con `hello` (D12); log dell'updater |
 | 1.8 | Named pipe minima con ACL: un utente locale non autorizzato riceve accesso negato (M1) | client di prova lanciato con `runas` da un secondo account |
@@ -93,7 +93,7 @@ l'installer ufficiale 2.7 (D14).
 | 2.5 | Credenziali senza file: utente/password su `>PASSWORD:Need 'Auth'`, OTP con `static-challenge`, passphrase della chiave privata | login riuscito sul server di prova con OTP |
 | 2.6 | Chiavi inline (`<key>`, `<tls-auth>`) senza file in chiaro su disco. Provare, in ordine: configurazione passata via pipe **[S]**, `--management-external-key` **[V: l'opzione esiste]**, ripiego di §5 (file temporaneo 0600, su Windows ACL solo SYSTEM, cancellato subito dopo l'avvio) | annotare quale funziona; chiude il [S] di `01-analisi.md` §5 |
 | 2.7 | DNS e rotte spinte dal server arrivano al modulo di rete comune (D10). Provare il canale (per esempio un nostro programma fisso come `--up`, con le variabili `foreign_option_*` **[S]**); su Windows capire cosa applica OpenVPN da solo **[S]** | DNS del server attivi: `resolvectl status` / `Get-DnsClientServerAddress` |
-| 2.8 | IPv6 (D15): stesso criterio di 1.5, provando sia `redirect-gateway ipv6` + `block-ipv6` **[V]** sia il meccanismo comune; se ne sceglie uno | cattura dei pacchetti, `curl` dual-stack |
+| 2.8 | IPv6 (D15, via nativa): stesso criterio di 1.5 con `redirect-gateway ipv6` + `block-ipv6` + un `ifconfig-ipv6` locale generato dal demone quando il server non spinge IPv6. Su Linux superato su 2.6.19, 2.7.0 e 2.7.9 (`04-esito-spike-2-linux.md`); resta Windows | cattura dei pacchetti, `curl` dual-stack e client sequenziale |
 | 2.9 | Errori: password sbagliata → evento AUTH_FAILED → messaggio leggibile; server irraggiungibile → il demone riprova con backoff e si ferma dopo N tentativi | log del demone |
 | 2.10 | Stesso codice su 2.6 e 2.7; le differenze sono annotate | esito dei punti sopra su tutte e tre le macchine |
 

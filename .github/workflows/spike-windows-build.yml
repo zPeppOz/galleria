@@ -1,0 +1,25 @@
+# Spike 1, criterio 1.4: la scelta (crate `wireguard-nt`, binding a wireguard.h) deve compilare insieme all'app Tauri
+# Copiato in .github/workflows il 2026-11-10 (Aitano): parte a ogni push su spike/windows o a mano.
+name: spike-windows-build
+on:
+  push:
+    branches: ["spike/windows"]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: build the service (WireGuardNT binding)
+        working-directory: spikes/wireguard-nt/galleriad
+        run: cargo build --release
+      - name: build the Tauri shell
+        working-directory: spikes/wireguard-nt/app/src-tauri
+        run: cargo build --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spike-windows
+          path: |
+            spikes/wireguard-nt/galleriad/target/release/galleriad.exe
+            spikes/wireguard-nt/app/src-tauri/target/release/galleria-spike-app.exe

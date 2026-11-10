@@ -170,7 +170,7 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
   insieme: il protocollo IPC ha un numero di versione e la GUI rifiuta un demone incompatibile con un messaggio chiaro (D12).
   Windows aggiorna l'MSI completo (GUI + servizio): l'updater Tauri riusa l'MSI standard **[V]** e l'MSI si
   estende con frammenti WiX **[V]**, quindi il servizio va dichiarato in un frammento (ServiceInstall/ServiceControl
-  **[S: da provare nello spike Windows]**); Linux nessun auto-aggiornamento in v0.1 (avviso "nuova versione" + pacchetti), repository
+  **[V: spike 1 criterio 1.6, `05-esito-spike-windows.md` §4; provato da amministratore senza UAC, validazione ICE saltata]**); Linux nessun auto-aggiornamento in v0.1 (avviso "nuova versione" + pacchetti), repository
   APT/DNF in fase 2. Il controllo delle versioni si può disattivare.
 - **IPv6** (A10, D15 approvata): un profilo che manda tutto il traffico IPv4 nel tunnel ma non ha rotte IPv6 lascerebbe uscire
   il traffico IPv6 dalla rete locale. Già in v0.1, per i profili "tutto nel tunnel", l'IPv6 globale non esce e chi lo usa

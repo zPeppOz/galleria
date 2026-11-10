@@ -68,7 +68,7 @@ solo verifiche in sola lettura (come le ACL di D14).
   prima di chiuderla.
 - Ripiego: **VirtualBox**, già installato sull'host, con una VM Windows 11 x64 e uno snapshot prima di ogni prova.
 - Da verificare prima di partire: IPv6 nella Sandbox **[V: non c'è, solo link-local; un IPv6 finto sulla scheda basta per contare i pacchetti, `05-esito-spike-windows.md` §2]** (serve una rete dual-stack per 1.5 e 2.8; se manca, si
-  passa a VirtualBox); che nella Sandbox si installino driver e servizi (OpenVPN, WireGuardNT, MSI di Tauri) **[V per OpenVPN e WireGuardNT; MSI di Tauri non provato]**; come
+  passa a VirtualBox); che nella Sandbox si installino driver e servizi (OpenVPN, WireGuardNT, MSI di Tauri) **[V per OpenVPN, WireGuardNT e MSI di Tauri (1.6); per costruire l'MSI nella Sandbox va saltata la validazione ICE, manca VBScript]**; come
   raggiunge i server di prova (`04-esito-spike-2-linux.md` §7 punto 2).
 
 ### Spike 1 — WireGuardNT su Windows

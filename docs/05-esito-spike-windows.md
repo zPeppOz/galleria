@@ -15,11 +15,14 @@ Le decisioni D10–D16 restano di Peppe: dove le prove le smentiscono lo scrivo 
   tunnel, legge handshake e byte ogni secondo, smonta tutto senza residui, e la named pipe rifiuta un utente senza
   privilegi. Superati 1.1, 1.2, 1.3, 1.8. Per 1.5 l'errore immediato su Windows si ottiene con un blocco WFP; le
   rotte verso il tunnel non hanno funzionato.
-- **Non provati: 1.6 e 1.7 (MSI di Tauri con il servizio, updater).** L'app e il frammento WiX sono scritti e l'app
-  compila nella Sandbox, ma l'MSI non è stato costruito né installato. Il job GitHub Actions di 1.4 è solo scritto.
+- **1.6 e 1.7 superati (secondo giro, stessa data).** L'MSI di Tauri con il frammento WiX installa il servizio
+  avviato e automatico e la disinstallazione toglie servizio e adattatore. L'updater porta GUI e servizio da 0.0.1 a
+  0.0.2 e rifiuta sia una firma fatta con un'altra chiave sia un file alterato. Limiti in §4: provato solo da
+  amministratore senza UAC, MSI senza firma Authenticode, validazione ICE di WiX saltata nella Sandbox. Il job
+  GitHub Actions di 1.4 è solo scritto.
 - Due incidenti da conoscere (§7): l'interoperabilità di WSL con gli `.exe` di Windows si è rotta a metà lavoro per
-  colpa del laboratorio (ripristinata), e i container del laboratorio sono ancora lì perché in questa sessione non
-  potevo fermarli.
+  colpa del laboratorio (ripristinata), e i container del laboratorio li ha poi tolti Aitano perché nella mia
+  sessione non potevo fermarli.
 
 ## 2. Ambiente
 
@@ -81,9 +84,32 @@ Prove in `spikes/wireguard-nt/evidence/windows/`.
 | 1.3 | **superato** | `1.1-1.2-1.3.txt` | Schede, rotte e indirizzi prima e dopo: 41 righe e 41 righe, 0 differenze. Chiudere l'handle dell'adattatore toglie adattatore, indirizzo e rotte |
 | 1.4 | **non provato** (job); build locale riuscita | `spikes/wireguard-nt/ci/spike-windows-build.yml` | Scelta provata: crate `wireguard-nt` 0.5 (binding a `wireguard.h`, licenza MIT). Compila per `x86_64-pc-windows-gnu` da WSL e l'app Tauri compila nella Sandbox con toolchain `windows-gnu` (3 min 19 s). `defguard_wireguard_rs` non l'ho valutato. Il job è scritto, non eseguito e non pubblicato |
 | 1.5 | **superato con il blocco WFP**; fallito con le rotte | `1.5-<modo>.txt`, `1.5-<modo>.pcapng` | Tabella in §5 |
-| 1.6 | **non provato** | — | Scritti: app Tauri minima (`app/`), frammento WiX con `ServiceInstall`/`ServiceControl` (`app/src-tauri/wix/service.wxs`). L'MSI non è stato costruito |
-| 1.7 | **non provato** | — | Scritta la parte dell'app che controlla e installa l'aggiornamento e legge la versione del servizio con `hello`. Mai eseguita |
+| 1.6 | **superato** | `1.6.txt`, `1.6-msi-install.txt`, `1.6-msi-uninstall.txt`, `1.6-1.7-build.txt` | MSI costruito da `cargo tauri build` (tauri-cli 2.12.4, WiX 3.14) con il frammento `app/src-tauri/wix/service.wxs`. `msiexec /i /qn` esce 0: servizio `galleriad` `Running`, `AUTO_START`, `LocalSystem`, percorso `"C:\Program Files\Galleria Spike\galleriad.exe" service`; `hello` risponde 0.0.1; il servizio installato alza l'adattatore `galleria-wg`. `msiexec /x /qn` esce 0 con il tunnel attivo: servizio assente (`sc query` 1060), 0 processi, adattatore sparito, cartella sparita. Restano il driver `wireguard.inf` nel driver store e `C:\ProgramData\galleria-spike` (registro). Limiti sotto la tabella |
+| 1.7 | **superato** | `1.7.txt` | App 0.0.1 installata dall'MSI, `latest.json` e MSI serviti da `127.0.0.1:8765` dentro la Sandbox. Firma fatta con un'altra chiave: `update REJECTED: The signature was created with a different key than the one provided`, resta 0.0.1. File con un byte cambiato e firma giusta: `update REJECTED: The signature verification failed`, resta 0.0.1. Firma giusta: l'MSI 0.0.2 si installa in silenzio, il servizio 0.0.1 viene fermato e parte lo 0.0.2 (fermo 1,5 s nel registro del servizio; sha256 del binario installato uguale a quello 0.0.2), l'app riparte da sola e registra `app version 0.0.2 ; service hello -> … "version":"0.0.2"`, poi `no update available`. Limiti sotto la tabella |
 | 1.8 | **superato** | `1.8.txt` | Pipe `\\.\pipe\galleria-spike` con ACL `D:P(A;;GA;;;SY)(A;;GA;;;BA)`. Amministratore: `hello` risponde. Secondo account locale del gruppo Users (`gltest`): `Accesso negato (os error 5)` sia per `hello` sia per `disconnect`; nel registro del servizio le sue richieste non compaiono |
+
+Limiti di 1.6 e 1.7 (cosa le prove **non** dicono):
+
+- **Solo da amministratore senza UAC.** Nella Sandbox l'utente è amministratore e l'UAC è spento. L'MSI è per
+  macchina e installa un servizio: su un PC normale ogni aggiornamento chiede l'elevazione. Con
+  `installMode: quiet`, usato qui, la documentazione di Tauri dice che servono già i privilegi di amministratore.
+  **Non provato**: aggiornamento lanciato da un utente standard o con UAC attivo.
+- **Chiave dell'updater usa e getta.** Generata dentro la Sandbox con `cargo tauri signer generate`, mai uscita
+  dall'ospite e sparita con lui: **non è la chiave di release**. Nelle prove c'è solo la chiave pubblica.
+- **MSI senza firma Authenticode** (`Get-AuthenticodeSignature`: `NotSigned`): SmartScreen e la firma del codice
+  (R3) non sono toccati da questa prova.
+- **Validazione ICE di WiX saltata.** Nella Sandbox manca VBScript e `light.exe` fallisce con l'errore 2738
+  (`1.6-1.7-build-ice-failure.txt`): l'MSI è stato collegato con `-sval`. Su un runner con VBScript la validazione
+  gira e potrebbe segnalare errori sul frammento che qui non ho visto. Microsoft sta togliendo VBScript da Windows:
+  è un rischio per la build con WiX 3, da tenere d'occhio sul runner di GitHub.
+- **Aggiornamento senza tunnel attivo.** Non ho provato cosa vede l'utente se l'aggiornamento parte con la VPN su
+  (in 1.6 la disinstallazione con il tunnel attivo lo chiude in modo pulito).
+- **Tempi.** Ogni transazione MSI nella Sandbox è durata circa 2 minuti (aggiornamento: 124 s tra inizio e fine
+  negli eventi `MsiInstaller`), quasi tutti prima delle azioni sui servizi. Non ho cercato la causa e non so se
+  vale fuori dalla Sandbox.
+- Build fatta con toolchain `x86_64-pc-windows-gnu` e `updater` con `native-tls`; in 0.0.2 cambia solo il numero
+  di versione. Il riavvio dell'ospite non è provato (la Sandbox non sopravvive al riavvio): che il servizio parta
+  al boot lo dice solo `AUTO_START`.
 
 ## 5. Dove le prove smentiscono o precisano le decisioni
 
@@ -171,6 +197,15 @@ Tre cose di sicurezza emerse e **non provate**:
 3. Un server OpenVPN tratta come rinegoziazione un nuovo login dalla stessa porta sorgente ("username attempted to
    change from 'alice' to 'bob'"): era il relay, corretto con un socket per sessione.
 4. Altre insidie del pilotaggio della Sandbox in `spikes/windows-lab/README.md`.
+5. **Pulizia dopo il primo giro (fatta da Aitano).** Nella mia sessione `docker stop`/`docker rm` erano bloccati:
+   Aitano ha tolto tutti i container `gl-*` e la rete `galleria-lab` e ha verificato che l'interop di WSL funziona
+   (`WSLInterop` registrato). La voce `python3.14` di `binfmt_misc` è rimasta dov'è, per sua indicazione.
+6. **Secondo giro (1.6 e 1.7).** Nessun container avviato. La Sandbox non partiva: era rimasto un
+   `WindowsSandboxServer.exe` che non rispondeva (`wsb list` in timeout); il `taskkill /F` mi è stato bloccato e non
+   l'ho aggirato, il processo è uscito da solo al terzo tentativo di avvio. Nella Sandbox ho installato in più il
+   runtime VC di Microsoft (serve a `cargo-tauri`) e ho provato a registrare una copia di `vbscript.dll` letta
+   dall'host (non è servito). A fine lavoro Sandbox chiusa con `wsb stop`; resta in esecuzione
+   `WindowsSandboxServer.exe`, il processo di servizio dell'app Sandbox, senza macchina virtuale.
 
 ## 8. [S] chiusi e aperti
 
@@ -182,9 +217,12 @@ Chiusi (aggiornati in `01-analisi.md` e `03-sessione-nello.md`):
 - `03` 2.6 e `01` §5: configurazione via pipe su Windows → named pipe.
 - `03` 2.7: cosa applica OpenVPN da solo su Windows; `foreign_option_*` su Windows non arriva.
 - `01` D14: OpenVPN GUI nella selezione predefinita dell'MSI.
+- `01` §"aggiornamenti" e `03` "Ambiente Windows": servizio dichiarato in un frammento WiX dell'MSI di Tauri
+  (1.6) e MSI di Tauri installabile nella Sandbox.
 
 Aperti:
-- **1.6 e 1.7**: MSI di Tauri con il servizio e updater (`01` §"aggiornamenti": resta **[S]**). 1.4: job su runner Windows.
+- 1.6 e 1.7: aggiornamento da utente standard o con UAC attivo; validazione ICE su una macchina con VBScript;
+  aggiornamento con il tunnel attivo; durata delle transazioni MSI fuori dalla Sandbox. 1.4: job su runner Windows.
 - 1.5: perché le rotte verso l'adattatore WireGuard non hanno fermato i pacchetti; quale servizio apre le
   connessioni IPv6 legate alla scheda; blocco WFP con OpenVPN e come sessione dinamica.
 - 2.7: come portare al modulo comune il DNS spinto dal server su Windows.
@@ -195,10 +233,10 @@ Aperti:
 
 ## 9. Cosa resta a Peppe
 
-1. **Togliere i container del laboratorio**: in questa sessione i comandi `docker stop` e `docker rm` mi sono stati
-   bloccati. `docker rm -f gl-server gl-server-dns gl-target gl-client26 gl-client27 gl-client79 gl-wg gl-udpecho gl-binfmt-fix`
-   e `docker network rm galleria-lab`. Finché `gl-client*` esistono, un loro riavvio rompe di nuovo l'interop di WSL.
-2. Decidere se far fare **1.6 e 1.7** in un altro giro: la Sandbox si riprepara con gli script di `spikes/windows-lab/`.
+1. ~~Togliere i container del laboratorio~~: fatto da Aitano (§7 punto 5).
+2. ~~Decidere se far fare 1.6 e 1.7~~: fatti nel secondo giro, superati con i limiti scritti in §4. Resta da
+   decidere **come si eleva l'aggiornamento su un PC con UAC** (D16): l'MSI per macchina con il servizio chiede
+   l'elevazione a ogni aggiornamento, e questo non è stato provato.
 3. **D15 su Windows** (§5): blocco WFP per tutti i backend al posto della via nativa.
 4. **DNS di OpenVPN su Windows** (§5): applicarlo noi leggendo le opzioni spinte, o passare dal servizio interattivo.
 5. **Chi può parlare con il demone su Windows** (ACL della pipe).

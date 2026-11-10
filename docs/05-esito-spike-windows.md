@@ -231,6 +231,17 @@ Aperti:
 - Controllo del proprietario della porta della management; ACL della pipe per una GUI non elevata.
 - `defguard_wireguard_rs` contro `wireguard-nt`: provata solo la seconda.
 
+## 9-bis. Decisioni prese dopo gli spike (2026-11-10)
+
+Peppe ha delegato ad Aitano le decisioni tecniche aperte ("prendi tu le decisioni, vai sempre"). Prese e scritte in
+`01-analisi.md`:
+- **D15 su Windows**: blocco IPv6 con filtro WFP dinamico per tutti i backend; via nativa di OpenVPN solo su Linux.
+- **D17**: DNS di OpenVPN su Windows applicato dal nostro modulo comune leggendo il `PUSH_REPLY` dalla management;
+  servizio interattivo solo come ripiego. Da verificare come primo criterio della fase 1.
+- **D18**: ACL della pipe a SYSTEM, Administrators e utenti INTERACTIVE.
+- **Ratificate** D10–D14, D16 e la matrice di test (A12) come proposte da Nello.
+Restano a Peppe: A6 (soglie di stop), A8 (design system), A11 (telemetria), la mail a SignPath e il push del branch.
+
 ## 9. Cosa resta a Peppe
 
 1. ~~Togliere i container del laboratorio~~: fatto da Aitano (§7 punto 5).

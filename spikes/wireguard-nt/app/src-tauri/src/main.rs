@@ -41,8 +41,15 @@ fn main() {
                     Ok(u) => match u.check().await {
                         Ok(Some(update)) => {
                             log(&format!("update found: {} -> {}", update.current_version, update.version));
-                            match update.download_and_install(|_, _| {}, || log("update downloaded, signature ok")).await {
-                                Ok(()) => log("update installer launched"),
+                            // download() verifies the signature after the last chunk: Ok means verified
+                            match update.download(|_, _| {}, || log("update downloaded")).await {
+                                Ok(bytes) => {
+                                    log("update signature verified, launching installer");
+                                    // on Windows install() starts msiexec and exits this process
+                                    if let Err(e) = update.install(bytes) {
+                                        log(&format!("update install failed: {e}"));
+                                    }
+                                }
                                 Err(e) => log(&format!("update REJECTED: {e}")),
                             }
                         }

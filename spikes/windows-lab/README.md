@@ -50,4 +50,22 @@ bash spikes/wireguard-nt/lab/win/run-wg.sh 1.1                                  
 spikes/windows-lab/lab.sh stop
 ```
 
+Per 1.6 e 1.7 (MSI di Tauri e updater) non serve il laboratorio Docker. In `in\dl` servono anche `cargo-tauri.zip`,
+`rustup-init.exe`, `w64devkit.exe`, `vc_redist.x64.exe` e `wireguard-nt-0.10.1.zip`:
+
+```
+spikes/windows-lab/lab.sh start
+spikes/windows-lab/lab.sh job spikes/windows-lab/sandbox/install-toolchain.ps1 600
+spikes/windows-lab/lab.sh job spikes/windows-lab/sandbox/app-warm.ps1
+bash spikes/wireguard-nt/lab/win/msi/run-msi.sh build && bash spikes/wireguard-nt/lab/win/msi/run-msi.sh 1.6 && bash spikes/wireguard-nt/lab/win/msi/run-msi.sh 1.7
+spikes/windows-lab/lab.sh stop
+```
+
+Altre due insidie di questa parte: `cargo-tauri` precompilato non parte senza il runtime VC (esce con `0xC0000135`
+senza stampare nulla); nella Sandbox manca VBScript, quindi la validazione ICE di WiX fallisce con l'errore 2738
+(`build.ps1` sostituisce `light.exe` con uno che aggiunge `-sval`). Se `lab.sh start` non porta su l'agent e
+`wsb list` va in timeout, è rimasto un `WindowsSandboxServer.exe` bloccato dalla sessione prima: il 2026-11-10 è
+uscito da solo al terzo tentativo di avvio. Il ramo `build` di `run-msi.sh` raccoglie passi eseguiti a mano uno per
+volta: per intero non è stato rieseguito.
+
 Pulizia: `docker rm -f gl-server gl-server-dns gl-target gl-wg gl-udpecho gl-binfmt-fix`.

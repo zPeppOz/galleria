@@ -7,6 +7,9 @@ $env:RUSTUP_HOME = 'C:\tools\rustup'; $env:CARGO_HOME = 'C:\tools\cargo'
 & "$dl\rustup-init.exe" -y --default-host x86_64-pc-windows-gnu --default-toolchain stable --profile minimal --no-modify-path 2>&1 | Select-Object -Last 5
 & "$dl\w64devkit.exe" -oC:\tools -y | Select-Object -Last 2
 Expand-Archive "$dl\cargo-tauri.zip" C:\tools\cargo\bin -Force
+# cargo-tauri precompilato e' una build MSVC: senza il runtime VC esce con 0xC0000135 (DLL non trovata) e non stampa nulla
+# (https://aka.ms/vs/17/release/vc_redist.x64.exe, firma Microsoft)
+$p = Start-Process "$dl\vc_redist.x64.exe" -ArgumentList '/install','/quiet','/norestart' -PassThru; $p.WaitForExit(); "vc_redist exit: $($p.ExitCode)"
 [Environment]::SetEnvironmentVariable('RUSTUP_HOME', 'C:\tools\rustup', 'Machine')
 [Environment]::SetEnvironmentVariable('CARGO_HOME', 'C:\tools\cargo', 'Machine')
 [Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path','Machine') + ';C:\tools\cargo\bin;C:\tools\w64devkit\bin', 'Machine')

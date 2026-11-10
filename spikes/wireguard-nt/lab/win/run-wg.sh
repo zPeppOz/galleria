@@ -1,6 +1,6 @@
 #!/bin/bash
 # Spike 1 su Windows: lancia lab/win/c-<criterio>.ps1 nella Sandbox e raccoglie le prove in evidence/windows/.
-# Uso: run-wg.sh 1.1 | 1.5 | 1.8      (1.1 copre anche 1.2 e 1.3; per 1.6 e 1.7 vedi msi/)
+# Uso: run-wg.sh 1.1 | 1.5 | 1.8      (1.1 copre anche 1.2 e 1.3; per 1.6 e 1.7 vedi msi/run-msi.sh)
 # Serve: Sandbox con l'agent e relay su (spikes/windows-lab/lab.sh start, lab.sh relays), server di prova su (lab/up.sh).
 set -uo pipefail
 cd "$(dirname "$0")/.."

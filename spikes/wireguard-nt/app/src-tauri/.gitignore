@@ -1,2 +1,5 @@
 target/
 gen/
+# updater signing keys: the spike generates throwaway ones inside the Sandbox, none belongs in the repo
+*.key
+*.key.pub

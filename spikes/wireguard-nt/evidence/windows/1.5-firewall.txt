@@ -1,0 +1,119 @@
+
+=== 1.5 IPv6 con profilo WireGuard 'tutto nel tunnel' solo IPv4 (AllowedIPs = 0.0.0.0/0), blocco IPv6 = firewall ===
+2026-11-10T18:31:33Z
+
+none     = nessuna protezione
+route    = D15 com'e' scritta: ::/1 e 8000::/1 verso l'adattatore WireGuard, dove nessun peer li accetta
+firewall = regola di uscita che blocca 2000::/3 e fc00::/7 (un filtro WFP)
+Scheda fisica: IPv6 globale finto 2001:db8:5::10/64 con gateway e vicino statico: i pacchetti escono davvero (nessuno risponde).
+
+PS> galleriad.exe cli connect C:\sbx\in\wg\wgtest.conf firewall
+{"id":1,"jsonrpc":"2.0","result":{"adapter":"galleria-wg","ipv6_block":"Firewall"}}
+[exit 0]
+
+PS> Get-NetRoute -AddressFamily IPv6 | Where-Object { $_.DestinationPrefix -notlike 'fe80*' -and $_.DestinationPrefix -notlike 'ff00*' -and $_.DestinationPrefix -ne '::1/128' } | Format-Table ifIndex, InterfaceAlias, DestinationPrefix, NextHop, RouteMetric -AutoSize
+
+ifIndex InterfaceAlias DestinationPrefix  NextHop       RouteMetric
+------- -------------- -----------------  -------       -----------
+    205 Ethernet       2001:db8:5::10/128 ::                    256
+    205 Ethernet       2001:db8:5::/64    ::                    256
+    205 Ethernet       ::/0               2001:db8:5::1         256
+
+
+
+
+PS> netsh advfirewall firewall show rule name=galleria-spike-block-ipv6 | Select-String 'Nome regola|Rule Name|Direzione|Direction|IP remoto|RemoteIP|Azione|Action'
+
+Nome regola:                          galleria-spike-block-ipv6
+Direzione:                            Out
+RemoteIP:                             2000::/3,fc00::/7
+Azione:                               Blocca
+
+
+
+
+PS> ping -n 2 10.99.0.1 | Select-String 'Risposta|Reply|scaduta|timed'
+
+Risposta da 10.99.0.1: byte=32 durata=19ms TTL=64
+Risposta da 10.99.0.1: byte=32 durata=20ms TTL=64
+
+
+
+
+
+Parametri registratore:
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.028890s total=0.046598s exit=0
+
+
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.033090s total=0.053364s exit=0
+
+
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.033517s total=0.053593s exit=0
+
+
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.023503s total=0.029199s exit=0
+
+
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.033158s total=0.054294s exit=0
+
+
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.072804s total=0.095611s exit=0
+
+
+--- connessioni TCP IPv6 verso indirizzi globali viste durante la cattura (campionate) ---
+
+--- client senza Happy Eyeballs sul nome (indirizzi nell'ordine dato dal sistema, timeout 10 s per indirizzo) ---
+seqprobe: dual.galleria.test -> [198.51.100.1:80, [2001:db8:99::1]:80]
+seqprobe: connected to 198.51.100.1:80 after 0.050s (this address 0.040s); reply: "hello from dual-stack target"
+--- stesso client direttamente sull'indirizzo IPv6: quanto ci mette a fallire ---
+seqprobe: 2001:db8:99::1 -> [[2001:db8:99::1]:80]
+seqprobe: [2001:db8:99::1]:80 failed after 0.012s: Tentativo di accesso al socket con modalità non consentite dalle rispettive autorizzazioni di accesso. (os error 10013)
+seqprobe: no address worked, total 0.014s
+
+PS> ping -6 -n 2 -w 1000 2001:db8:99::1
+
+Esecuzione di Ping 2001:db8:99::1 con 32 byte di dati:
+Errore generale.
+Errore generale.
+
+Statistiche Ping per 2001:db8:99::1:
+    Pacchetti: Trasmessi = 2, Ricevuti = 0, 
+    Persi = 2 (100% persi),
+
+
+Scaricamento log in corso...
+cattura durata 61 s
+Pacchetti formattati:   154
+File formattato:      C:\sbx\out\ev1\1.5-firewall.pcapng
+PS> galleriad.exe cli status
+{"id":1,"jsonrpc":"2.0","result":{"adapter":"galleria-wg","connected":true,"peers":[{"endpoint":"127.0.0.1:51820","last_handshake_age_secs":66,"last_handshake_unix":1794335493,"rx_bytes":14428,"tx_bytes":14036}],"up_secs":66}}
+[exit 0]
+
+PS> galleriad.exe cli disconnect
+{"id":1,"jsonrpc":"2.0","result":{"was_connected":true}}
+[exit 0]
+
+PS> netsh advfirewall firewall show rule name=galleria-spike-block-ipv6 | Select-Object -First 2
+
+Nessuna regola corrispondente al criterio specificato.
+
+
+--- registro del servizio ---
+1794335493.687 galleriad[6088] wg: loaded C:\gl\wg\wireguard.dll
+1794335493.938 galleriad[6088] wg: adapter `galleria-wg` created, driver version 10
+1794335493.943 galleriad[6088] wg: adapter up, addresses [10.99.0.2/24], 1 peer(s), ipv6 block Firewall
+1794335494.068 galleriad[6088] net: netsh advfirewall firewall add rule name=galleria-spike-block-ipv6 dir=out action=block remoteip=2000::/3,fc00::/7 -> ok=true OK.
+1794335560.240 galleriad[6088] ipc: request `status` from pid 1300
+1794335560.257 galleriad[6088] ipc: request `disconnect` from pid 6104
+1794335560.381 galleriad[6088] net: netsh advfirewall firewall delete rule name=galleria-spike-block-ipv6 -> ok=true Regole eliminate 1.  OK.
+1794335560.421 galleriad[6088] wg: adapter closed
+--- pacchetti IPv6 globali nella cattura di 60 s (stesso filtro dello spike Linux), per destinazione ---
+totale: 0
+verso il sito di prova 2001:db8:99::1: 0
+per sorgente > destinazione:

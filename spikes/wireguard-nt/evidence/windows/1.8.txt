@@ -1,0 +1,52 @@
+
+=== 1.8 named pipe con ACL: un utente locale non autorizzato riceve accesso negato (M1) ===
+2026-11-10T18:28:04Z
+
+--- ACL dichiarata dal servizio alla creazione della pipe ---
+1794334710.830 galleriad[6088] ipc: listening on \\.\pipe\galleria-spike, acl D:P(A;;GA;;;SY)(A;;GA;;;BA)
+PS> [IO.Directory]::GetFiles('\\.\pipe\') | Where-Object { $_ -match 'galleria-spike' }
+\\.\pipe\galleria-spike
+
+
+--- utente amministratore (WDAGUtilityAccount, elevato): autorizzato ---
+PS> whoami /groups | Select-String 'Administrators|S-1-5-32-544|Mandatory'
+
+NT AUTHORITY\Account locale e membro del gruppo Administrators Gruppo conosciuto S-1-5-114    Gruppo obbligatorio, Abilitato per impostazione predefinita, Gruppo abilitato                     
+BUILTIN\Administrators                                         Alias             S-1-5-32-544 Gruppo obbligatorio, Abilitato per impostazione predefinita, Gruppo abilitato, Proprietario gruppo
+
+
+
+
+PS> galleriad.exe cli hello
+{"id":1,"jsonrpc":"2.0","result":{"daemon":"galleriad","protocol":1,"version":"0.0.1"}}
+[exit 0]
+
+--- secondo account locale, senza privilegi (creato ora, gruppo Users) ---
+PS> Get-LocalUser gltest | Format-Table Name, Enabled -AutoSize; (Get-LocalGroup | Where-Object { (Get-LocalGroupMember $_ -ErrorAction SilentlyContinue).Name -match 'gltest' }).Name
+
+Name   Enabled
+----   -------
+gltest    True
+
+
+Users
+
+
+PS> (come gltest) galleriad.exe cli hello
+cannot open \\.\pipe\galleria-spike: Accesso negato. (os error 5) (os error Some(5))
+
+--- stesso account: una richiesta che cambierebbe la rete ---
+PS> (come gltest) galleriad.exe cli disconnect
+cannot open \\.\pipe\galleria-spike: Accesso negato. (os error 5) (os error Some(5))
+
+--- controllo: come gltest il programma parte davvero (un comando che non usa la pipe) ---
+PS> (come gltest) probe.exe seqprobe 127.0.0.1 1 1
+seqprobe: 127.0.0.1 -> [127.0.0.1:1]
+seqprobe: 127.0.0.1:1 failed after 1.006s: connection timed out
+seqprobe: no address worked, total 1.012s
+
+--- registro del servizio: le richieste arrivate (quelle di gltest non ci sono) ---
+1794335273.123 galleriad[6088] ipc: request `status` from pid 6520
+1794335275.153 galleriad[6088] ipc: request `status` from pid 2260
+1794335278.285 galleriad[6088] ipc: request `disconnect` from pid 5872
+1794335284.593 galleriad[6088] ipc: request `hello` from pid 436

@@ -1,0 +1,5 @@
+$ timeout 3 openvpn --dev null --verb 3   (configurazione senza TLS)
+2026-11-10 10:58:23 No tls-client or tls-server option in configuration detected. Disabling data channel offload.
+Options error: DEPRECATION: No tls-client or tls-server option in configuration detected. OpenVPN 2.8 will remove the functionality to run a VPN without TLS. See the examples section in the manual page for examples of a similar quick setup with peer-fingerprint. OpenVPN 2.7 allows using this configuration when using --allow-deprecated-insecure-static-crypto but you should move to a proper configur
+Use --help for more information.
+[exit 1]

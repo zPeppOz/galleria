@@ -307,9 +307,14 @@ fn parameter_structs_require_objects_at_every_level() {
             json!({"session":1,"request":1,"values":[null,null,null,null]}),
         ),
     ] {
+        let expected = if method == "hello" && value.is_array() {
+            -32000
+        } else {
+            -32602
+        };
         assert_eq!(
             parse_call(method, value).unwrap_err().code,
-            -32602,
+            expected,
             "{method}"
         );
     }
@@ -373,8 +378,15 @@ fn hello_with_future_fields_reports_incompatible_protocol() {
             "hello",
             json!({"protocol":1,"extra":true,"client":{"name":"test","version":"1","extra":true}})
         )
-        .is_ok()
+        .is_err_and(|e| e.code == -32602)
     );
+    for value in [
+        json!({"protocol":2}),
+        json!({"protocol":"future","extra":true}),
+    ] {
+        let error = parse_call("hello", value).unwrap_err();
+        assert_eq!(error.data.unwrap()["code"], "incompatible_protocol");
+    }
 }
 
 // Exercise repeated fill_buf/consume cycles rather than an in-memory slice returned in one read.
@@ -397,7 +409,14 @@ impl tokio::io::AsyncRead for Fragmented {
 #[tokio::test]
 async fn fragmented_line_enforces_limit_without_geometric_allocation() {
     for extra in [0, 1] {
-        let mut bytes = vec![b'x'; MAX_MESSAGE_BYTES + extra];
+        let mut bytes = vec![
+            b'x';
+            if extra == 0 {
+                MAX_MESSAGE_BYTES
+            } else {
+                10 * MAX_MESSAGE_BYTES
+            }
+        ];
         *bytes.last_mut().unwrap() = b'\n';
         let mut reader = tokio::io::BufReader::with_capacity(17, Fragmented { bytes, read: 0 });
         let result = read_frame(&mut reader, MAX_MESSAGE_BYTES).await;

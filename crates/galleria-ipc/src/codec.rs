@@ -84,12 +84,7 @@ pub async fn read_frame<R: AsyncBufRead + Unpin>(
         }
         let end = buf.iter().position(|b| *b == b'\n').map(|n| n + 1);
         let count = end.unwrap_or(buf.len());
-        if count > max.saturating_sub(out.len()) {
-            return Err(FrameError::TooLarge);
-        }
-        // Exact reservations prevent Vec's geometric growth from exceeding the frame limit.
-        out.reserve_exact(count);
-        out.extend_from_slice(&buf[..count]);
+        append_frame(&mut out, &buf[..count], max)?;
         r.consume(count);
         if end.is_some() {
             return Ok(Some(out));
@@ -97,5 +92,31 @@ pub async fn read_frame<R: AsyncBufRead + Unpin>(
         if out.len() == max {
             return Err(FrameError::TooLarge);
         }
+    }
+}
+
+fn append_frame(out: &mut Vec<u8>, chunk: &[u8], max: usize) -> Result<(), FrameError> {
+    if chunk.len() > max.saturating_sub(out.len()) {
+        return Err(FrameError::TooLarge);
+    }
+    out.reserve_exact(chunk.len());
+    out.extend_from_slice(chunk);
+    Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oversized_chunk_is_rejected_before_copying() {
+        let mut out = vec![b'x'; 99];
+        assert!(matches!(
+            append_frame(&mut out, &[b'x'; 17], 100),
+            Err(FrameError::TooLarge)
+        ));
+        assert_eq!(out.len(), 99);
+        assert!(out.capacity() <= 100);
     }
 }

@@ -33,6 +33,12 @@ pub fn parse_call(method: &str, value: Value) -> Result<Call, RpcError> {
     struct Empty {}
     match method {
         "hello" => {
+            // Negotiate before interpreting the version-specific request schema.
+            let protocol = value
+                .get("protocol")
+                .and_then(Value::as_u64)
+                .and_then(|p| u32::try_from(p).ok());
+            negotiate(protocol.unwrap_or(0))?;
             object_fields(&value, &["/client"])?;
             params(value).map(Call::Hello)
         }

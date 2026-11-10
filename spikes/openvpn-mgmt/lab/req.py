@@ -6,8 +6,10 @@ import json, subprocess, sys
 req = {"profile": open(sys.argv[1]).read()}
 for kv in sys.argv[2:]:
     k, v = kv.split("=", 1)
-    if k in ("max_attempts", "hold_secs"):
+    if k in ("max_attempts", "hold_secs", "mgmt_connect_delay_secs"):
         v = int(v)
+    elif v.startswith("["):
+        v = json.loads(v)
     elif v in ("true", "false"):
         v = v == "true"
     elif k == "otp" and v.startswith("totp:"):

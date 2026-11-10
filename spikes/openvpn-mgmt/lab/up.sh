@@ -40,7 +40,7 @@ docker run -d --name gl-server-dns --hostname vpnserver-dns --network galleria-l
   -v "$PWD/pki:/pki:ro" galleria-lab-server /etc/openvpn/lab/entrypoint.sh server-dns.conf >/dev/null
 
 # 26 = Ubuntu 24.04 (OpenVPN 2.6), 27 = Ubuntu 26.04 (2.7.0), 79 = Fedora corrente (2.7.9)
-CLIENTS="${CLIENTS:-26 27 79}"
+CLIENTS="${CLIENTS-26 27 79}"
 for v in $CLIENTS; do
   img=galleria-lab-client$v; [ $v = 79 ] && img=galleria-lab-clientfedora
   ip4=172.30.0.$((v+10)); ip6=2001:db8:30::$((v+10))

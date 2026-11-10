@@ -1,0 +1,20 @@
+[package]
+name = "galleria-spike-app"
+version = "0.0.1"
+edition = "2021"
+license = "GPL-3.0-or-later"
+publish = false
+description = "Spike 1 (throwaway): Tauri shell used only to test the MSI, the service fragment and the updater"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde_json = "1"
+# native-tls: no ring/aws-lc to compile with the windows-gnu toolchain
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls"] }
+
+[profile.release]
+strip = true
+opt-level = 1

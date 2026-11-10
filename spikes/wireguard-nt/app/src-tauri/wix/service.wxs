@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spike 1: the service is installed by the Tauri MSI through this WiX fragment (bundle.windows.wix.fragmentPaths).
+     The service binary and wireguard.dll are staged in C:\gl\stage before `cargo tauri build`. -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <DirectoryRef Id="INSTALLDIR">
+      <Component Id="GalleriadService" Guid="6f3a1c0e-5d0b-4c57-9a43-1d8f0e2b7a11" Win64="yes">
+        <File Id="GalleriadExe" Name="galleriad.exe" Source="C:\gl\stage\galleriad.exe" KeyPath="yes" />
+        <File Id="WireguardDll" Name="wireguard.dll" Source="C:\gl\stage\wireguard.dll" />
+        <ServiceInstall Id="GalleriadServiceInstall" Name="galleriad" DisplayName="Galleria daemon (spike)"
+                        Description="Galleria VPN daemon, spike 1" Type="ownProcess" Start="auto"
+                        Account="LocalSystem" ErrorControl="normal" Arguments="service" Vital="yes" />
+        <ServiceControl Id="GalleriadServiceControl" Name="galleriad" Start="install" Stop="both"
+                        Remove="uninstall" Wait="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>

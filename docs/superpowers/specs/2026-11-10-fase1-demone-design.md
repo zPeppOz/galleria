@@ -279,12 +279,12 @@ pub fn step(phase: &Phase, input: Input, policy: &RetryPolicy) -> (Phase, Vec<Ef
 |---|---|---|---|
 | `disconnected`/`error` | `connect` | `connecting{1}` | avvia backend |
 | attivo (qualsiasi) | `connect` senza `replace` | invariato | risposta `already_active` |
-| attivo (qualsiasi) | `connect` con `replace` | `disconnecting{poi connect}` | ferma backend, smonta rete |
+| attivo (qualsiasi) | `connect` con `replace` | `disconnecting{poi connect}` | smonta rete, poi ferma backend (ordine sotto) |
 | `connecting`/`reconnecting` | backend chiede un dato mancante | `needs_input` | timer 120 s |
 | `needs_input` | `provide_input` | `connecting` (stesso tentativo) | inoltra al backend |
-| `needs_input` | timer scaduto | `error{input_timeout}` | ferma backend, smonta rete |
+| `needs_input` | timer scaduto | `error{input_timeout}` | smonta rete, poi ferma backend (ordine sotto) |
 | `connecting`/`reconnecting` | tunnel su e rete applicata | `connected` | avvia statistiche |
-| `connecting`/`reconnecting` | rete non applicabile | `error{net_setup_failed}` o `{dns_unavailable}` | ferma backend, smonta rete |
+| `connecting`/`reconnecting` | rete non applicabile | `error{net_setup_failed}` o `{dns_unavailable}` | smonta rete, poi ferma backend (ordine sotto) |
 | `connecting{n}` | backend uscito: trasporto, n < 4 | `connecting{n+1}` dopo l'attesa | smonta rete, timer |
 | `connecting{4}` | backend uscito: trasporto | `error{server_unreachable}` | smonta rete |
 | `connected` | backend uscito senza richiesta | `reconnecting{1}` | smonta rete, timer |
@@ -292,7 +292,7 @@ pub fn step(phase: &Phase, input: Input, policy: &RetryPolicy) -> (Phase, Vec<Ef
 | `reconnecting{n}` | backend uscito: trasporto, n < 8 | `reconnecting{n+1}` | smonta rete, timer |
 | `reconnecting{8}` | backend uscito: trasporto | `error{server_unreachable}` | smonta rete |
 | qualsiasi | backend uscito: autenticazione | `error{auth_failed}` | smonta rete, **nessun** nuovo tentativo |
-| attivo (qualsiasi) | `disconnect` | `disconnecting` → `disconnected` | ferma backend, smonta rete |
+| attivo (qualsiasi) | `disconnect` | `disconnecting` → `disconnected` | smonta rete, poi ferma backend (ordine sotto) |
 
 Attese tra i tentativi: 1, 2, 4, 8, 16, 30, 30… secondi (`RetryPolicy`: 4 tentativi alla prima connessione come
 nello spike 2 criterio 2.9, 8 dopo una caduta, tetto 30 s). Con `options.reconnect.enabled = false` una caduta porta

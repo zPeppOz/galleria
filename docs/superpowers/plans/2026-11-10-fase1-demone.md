@@ -313,7 +313,7 @@ fn internal_restart_goes_to_reconnecting_without_respawn() {
 | Test | Asserzione |
 |---|---|
 | `never_two_live_backends` (proptest) | per sequenze casuali di connect / connect-replace / disconnect / uscite del fake, il massimo del contatore `live` è ≤ 1 |
-| `replace_waits_for_teardown_before_spawning` | nel registro: `stop(1)`, `teardown`, poi `spawn(2)` |
+| `replace_waits_for_teardown_before_spawning` | nel registro: `teardown` (rete), `stop(1)`, uscita del backend 1, poi `spawn(2)` (ordine di smontaggio della spec §5.2) |
 | `net_teardown_precedes_backend_stop` | ordine registrato alla `disconnect` |
 | `connect_while_active_is_already_active` | `data.code == "already_active"`, `data.profile.name` valorizzato |
 | `disconnect_is_idempotent` | due `disconnect` di fila → `state == Disconnected`, nessun panico |

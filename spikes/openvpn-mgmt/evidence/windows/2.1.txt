@@ -1,0 +1,62 @@
+
+=== 2.1 profilo malevolo su Windows: up/down/route-up/ipchange/management/status/writepid ===
+2026-11-10T18:09:44Z
+OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+
+--- direttive pericolose del profilo ---
+
+script-security 3
+up "C:/Windows/System32/cmd.exe /c echo x > C:\\\\gl\\\\PWNED-up.txt"
+down "C:/Windows/System32/cmd.exe /c echo x > C:\\\\gl\\\\PWNED-down.txt"
+route-up "C:/Windows/System32/cmd.exe /c echo x > C:\\\\gl\\\\PWNED-route-up.txt"
+ipchange "C:/Windows/System32/cmd.exe /c echo x > C:\\\\gl\\\\PWNED-ipchange.txt"
+management 0.0.0.0 7505
+status C:/gl/PWNED-status.txt 1
+writepid C:/gl/PWNED-writepid.txt
+setenv EVIL 1
+
+PS> Remove-Item C:\gl\PWNED-* -ErrorAction SilentlyContinue
+
+
+--- A) controllo: stesso profilo SENZA pulizia (unsafe_no_sanitize=true) ---
+(non connesso)
+PS> netstat -ano | Select-String ':7505 '
+
+
+[daemon {"code":4,"event":"exit","t":15.703}]
+PS> Get-ChildItem C:\gl\PWNED-* | Format-Table Name, Length -AutoSize
+
+Name             Length
+----             ------
+PWNED-status.txt    163
+
+
+
+
+PS> Remove-Item C:\gl\PWNED-* -ErrorAction SilentlyContinue
+
+
+--- B) demone: profilo ripulito ---
+connesso
+PS> netstat -ano | Select-String ':7505 '
+
+
+[daemon {"code":0,"event":"exit","t":13.629}]
+{"directive":"verb","event":"profile_directive_removed","line":10,"reason":"blocked directive (M2)","t":0.02}
+{"directive":"script-security","event":"profile_directive_removed","line":67,"reason":"blocked directive (M2)","t":0.02}
+{"directive":"up","event":"profile_directive_removed","line":68,"reason":"blocked directive (M2)","t":0.02}
+{"directive":"down","event":"profile_directive_removed","line":69,"reason":"blocked directive (M2)","t":0.02}
+{"directive":"route-up","event":"profile_directive_removed","line":70,"reason":"blocked directive (M2)","t":0.02}
+{"directive":"ipchange","event":"profile_directive_removed","line":71,"reason":"blocked directive (M2)","t":0.021}
+{"directive":"management","event":"profile_directive_removed","line":72,"reason":"blocked directive (M2)","t":0.021}
+{"directive":"status","event":"profile_directive_removed","line":73,"reason":"blocked directive (M2)","t":0.021}
+{"directive":"writepid","event":"profile_directive_removed","line":74,"reason":"blocked directive (M2)","t":0.021}
+{"directive":"setenv","event":"profile_directive_removed","line":75,"reason":"blocked directive (M2)","t":0.021}
+{"event":"connected","ip":"10.8.0.2","server":"127.0.0.1","t":4.326}
+
+PS> Get-ChildItem C:\gl\PWNED-* -ErrorAction SilentlyContinue | Format-Table Name, Length -AutoSize; 'file PWNED: ' + @(Get-ChildItem C:\gl\PWNED-* -ErrorAction SilentlyContinue).Count
+file PWNED: 0
+
+
+
+

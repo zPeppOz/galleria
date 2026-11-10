@@ -1,0 +1,181 @@
+{"event":"openvpn_version","t":0.016,"version":"OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026"}
+{"directive":"verb","event":"profile_directive_removed","line":10,"reason":"blocked directive (M2)","t":0.019}
+{"config_via":"Pipe","daemon_directives":["management 127.0.0.1 50119 stdin","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"C:/gl/d639299310230737767/galleriad-spike.exe netcfg galleria-netcfg-7716-e003058fda56aa58\"","down \"C:/gl/d639299310230737767/galleriad-spike.exe netcfg galleria-netcfg-7716-e003058fda56aa58\""],"event":"generated_config","key_mode":"Inline","profile_directives":["client","dev tun","proto udp","remote 127.0.0.1 11199","redirect-gateway local","nobind","remote-cert-tls server","auth-user-pass","key-direction 1","<ca> [inline, content omitted]","<cert> [inline, content omitted]","<key> [inline, content omitted]","<tls-auth> [inline, content omitted]"],"t":0.019}
+{"event":"attempt","n":1,"of":4,"t":0.02}
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-7716-2d52f5ca41ed94ab"],"event":"openvpn_spawned","pid":2292,"stdin":"pipe: management password","t":0.022}
+openvpn[stdout]| 2026-11-10 19:10:50 Note: --cipher is not set. OpenVPN versions before 2.5 defaulted to BF-CBC as fallback when cipher negotiation failed in this case. If you need this fallback please add '--data-ciphers-fallback BF-CBC' to your configuration and/or add BF-CBC to --data-ciphers. E.g. --data-ciphers DEFAULT:BF-CBC
+openvpn[stdout]| 2026-11-10 19:10:50 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 19:10:50 Windows version: 10.0.26100,amd64
+openvpn[stdout]| 2026-11-10 19:10:50 library versions: OpenSSL 3.6.5 29 Sep 2026, LZO 2.10
+openvpn[stdout]| 2026-11-10 19:10:50 DCO version: 2.8.14
+openvpn[stderr]| Enter Management Password:
+openvpn[stdout]| 2026-11-10 19:10:50 MANAGEMENT: TCP Socket listening on [AF_INET]127.0.0.1:50119
+openvpn[stdout]| 2026-11-10 19:10:50 Need hold release from management interface, waiting...
+openvpn[stdout]| 2026-11-10 19:10:51 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:50120
+{"endpoint":"tcp 127.0.0.1:50119 (openvpn listens)","event":"mgmt_connected","t":0.527}
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 6 -- type 'help' for more info","t":0.527}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":0.527}
+openvpn[stdout]| 2026-11-10 19:10:51 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 19:10:51 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 19:10:51 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 19:10:51 MANAGEMENT: CMD 'hold release'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":0.929}
+{"event":"credentials_sent","static_challenge":false,"t":0.929,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 19:10:51 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 19:10:51 MANAGEMENT: CMD 'password [...]'
+openvpn[stdout]| 2026-11-10 19:10:51 NOTE: the current --script-security setting may allow this configuration to call user-defined scripts
+openvpn[stdout]| 2026-11-10 19:10:51 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11199
+openvpn[stdout]| 2026-11-10 19:10:51 UDP link local: (not bound)
+openvpn[stdout]| 2026-11-10 19:10:51 UDP link remote: [AF_INET]127.0.0.1:11199
+openvpn[stdout]| 2026-11-10 19:10:51 MANAGEMENT: >STATE:1794334251,WAIT,,,,,,
+{"detail":"","event":"state","local_ip":"","raw":"1794334251,WAIT,,,,,,","remote":"","state":"WAIT","t":0.945}
+{"event":"bytecount","in":"0","out":"42","t":2.143}
+{"event":"bytecount","in":"0","out":"42","t":3.338}
+{"event":"bytecount","in":"0","out":"84","t":4.539}
+openvpn[stdout]| 2026-11-10 19:10:56 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 19:10:56 Closing ovpn-dco interface
+openvpn[stdout]| 2026-11-10 19:10:56 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 19:10:56 MANAGEMENT: >STATE:1794334256,RECONNECTING,server_poll,,,,,
+{"detail":"server_poll","event":"state","local_ip":"","raw":"1794334256,RECONNECTING,server_poll,,,,,","remote":"","state":"RECONNECTING","t":5.74}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":5.741}
+openvpn[stdout]| 2026-11-10 19:10:56 MANAGEMENT: CMD 'hold release'
+openvpn[stdout]| 2026-11-10 19:10:56 MANAGEMENT: Client disconnected
+openvpn[stdout]| 2026-11-10 19:10:56 All connections have been connect-retry-max (1) times unsuccessful, exiting
+openvpn[stdout]| 2026-11-10 19:10:56 Exiting due to fatal error
+{"event":"fatal","message":"All connections have been connect-retry-max (1) times unsuccessful, exiting","t":5.741}
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":5.745}
+{"after_secs":1,"event":"retry","next_attempt":2,"reason":"connection failed","t":5.746}
+{"event":"attempt","n":2,"of":4,"t":6.746}
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-7716-62263e6e579844b7"],"event":"openvpn_spawned","pid":6920,"stdin":"pipe: management password","t":6.748}
+openvpn[stdout]| 2026-11-10 19:10:56 Note: --cipher is not set. OpenVPN versions before 2.5 defaulted to BF-CBC as fallback when cipher negotiation failed in this case. If you need this fallback please add '--data-ciphers-fallback BF-CBC' to your configuration and/or add BF-CBC to --data-ciphers. E.g. --data-ciphers DEFAULT:BF-CBC
+openvpn[stdout]| 2026-11-10 19:10:56 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 19:10:56 Windows version: 10.0.26100,amd64
+openvpn[stdout]| 2026-11-10 19:10:56 library versions: OpenSSL 3.6.5 29 Sep 2026, LZO 2.10
+openvpn[stdout]| 2026-11-10 19:10:56 DCO version: 2.8.14
+openvpn[stderr]| Enter Management Password:
+openvpn[stdout]| 2026-11-10 19:10:56 MANAGEMENT: TCP Socket listening on [AF_INET]127.0.0.1:50119
+openvpn[stdout]| 2026-11-10 19:10:56 Need hold release from management interface, waiting...
+{"endpoint":"tcp 127.0.0.1:50119 (openvpn listens)","event":"mgmt_connected","t":7.255}
+openvpn[stdout]| 2026-11-10 19:10:57 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:50121
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 6 -- type 'help' for more info","t":7.256}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":7.256}
+openvpn[stdout]| 2026-11-10 19:10:57 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 19:10:57 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 19:10:57 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 19:10:57 MANAGEMENT: CMD 'hold release'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":7.66}
+{"event":"credentials_sent","static_challenge":false,"t":7.66,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 19:10:57 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 19:10:57 MANAGEMENT: CMD 'password [...]'
+openvpn[stdout]| 2026-11-10 19:10:57 NOTE: the current --script-security setting may allow this configuration to call user-defined scripts
+openvpn[stdout]| 2026-11-10 19:10:57 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11199
+openvpn[stdout]| 2026-11-10 19:10:57 UDP link local: (not bound)
+openvpn[stdout]| 2026-11-10 19:10:57 UDP link remote: [AF_INET]127.0.0.1:11199
+openvpn[stdout]| 2026-11-10 19:10:57 MANAGEMENT: >STATE:1794334257,WAIT,,,,,,
+{"detail":"","event":"state","local_ip":"","raw":"1794334257,WAIT,,,,,,","remote":"","state":"WAIT","t":7.676}
+{"event":"bytecount","in":"0","out":"42","t":8.784}
+{"event":"bytecount","in":"0","out":"42","t":9.888}
+{"event":"bytecount","in":"0","out":"84","t":10.996}
+{"event":"bytecount","in":"0","out":"84","t":12.096}
+openvpn[stdout]| 2026-11-10 19:11:02 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 19:11:02 Closing ovpn-dco interface
+openvpn[stdout]| 2026-11-10 19:11:02 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 19:11:02 MANAGEMENT: >STATE:1794334262,RECONNECTING,server_poll,,,,,
+{"detail":"server_poll","event":"state","local_ip":"","raw":"1794334262,RECONNECTING,server_poll,,,,,","remote":"","state":"RECONNECTING","t":13.201}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":13.201}
+openvpn[stdout]| 2026-11-10 19:11:03 MANAGEMENT: CMD 'hold release'
+{"event":"fatal","message":"All connections have been connect-retry-max (1) times unsuccessful, exiting","t":13.202}
+openvpn[stdout]| 2026-11-10 19:11:03 MANAGEMENT: Client disconnected
+openvpn[stdout]| 2026-11-10 19:11:03 All connections have been connect-retry-max (1) times unsuccessful, exiting
+openvpn[stdout]| 2026-11-10 19:11:03 Exiting due to fatal error
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":13.207}
+{"after_secs":2,"event":"retry","next_attempt":3,"reason":"connection failed","t":13.207}
+{"event":"attempt","n":3,"of":4,"t":15.207}
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-7716-8e31e73830dad5fd"],"event":"openvpn_spawned","pid":4768,"stdin":"pipe: management password","t":15.209}
+openvpn[stdout]| 2026-11-10 19:11:05 Note: --cipher is not set. OpenVPN versions before 2.5 defaulted to BF-CBC as fallback when cipher negotiation failed in this case. If you need this fallback please add '--data-ciphers-fallback BF-CBC' to your configuration and/or add BF-CBC to --data-ciphers. E.g. --data-ciphers DEFAULT:BF-CBC
+openvpn[stdout]| 2026-11-10 19:11:05 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 19:11:05 Windows version: 10.0.26100,amd64
+openvpn[stdout]| 2026-11-10 19:11:05 library versions: OpenSSL 3.6.5 29 Sep 2026, LZO 2.10
+openvpn[stdout]| 2026-11-10 19:11:05 DCO version: 2.8.14
+openvpn[stderr]| Enter Management Password:
+openvpn[stdout]| 2026-11-10 19:11:05 MANAGEMENT: TCP Socket listening on [AF_INET]127.0.0.1:50119
+openvpn[stdout]| 2026-11-10 19:11:05 Need hold release from management interface, waiting...
+{"endpoint":"tcp 127.0.0.1:50119 (openvpn listens)","event":"mgmt_connected","t":15.723}
+openvpn[stdout]| 2026-11-10 19:11:05 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:50124
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 6 -- type 'help' for more info","t":15.724}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":15.724}
+openvpn[stdout]| 2026-11-10 19:11:05 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 19:11:05 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 19:11:05 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 19:11:05 MANAGEMENT: CMD 'hold release'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":16.129}
+{"event":"credentials_sent","static_challenge":false,"t":16.129,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 19:11:05 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 19:11:05 MANAGEMENT: CMD 'password [...]'
+openvpn[stdout]| 2026-11-10 19:11:05 NOTE: the current --script-security setting may allow this configuration to call user-defined scripts
+openvpn[stdout]| 2026-11-10 19:11:05 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11199
+openvpn[stdout]| 2026-11-10 19:11:05 UDP link local: (not bound)
+openvpn[stdout]| 2026-11-10 19:11:05 UDP link remote: [AF_INET]127.0.0.1:11199
+openvpn[stdout]| 2026-11-10 19:11:05 MANAGEMENT: >STATE:1794334265,WAIT,,,,,,
+{"detail":"","event":"state","local_ip":"","raw":"1794334265,WAIT,,,,,,","remote":"","state":"WAIT","t":16.145}
+{"event":"bytecount","in":"0","out":"42","t":17.17}
+{"event":"bytecount","in":"0","out":"42","t":18.198}
+{"event":"bytecount","in":"0","out":"84","t":19.219}
+openvpn[stdout]| 2026-11-10 19:11:10 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 19:11:10 Closing ovpn-dco interface
+openvpn[stdout]| 2026-11-10 19:11:10 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 19:11:10 MANAGEMENT: >STATE:1794334270,RECONNECTING,server_poll,,,,,
+{"detail":"server_poll","event":"state","local_ip":"","raw":"1794334270,RECONNECTING,server_poll,,,,,","remote":"","state":"RECONNECTING","t":20.234}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":20.234}
+openvpn[stdout]| 2026-11-10 19:11:10 MANAGEMENT: CMD 'hold release'
+openvpn[stdout]| 2026-11-10 19:11:10 MANAGEMENT: Client disconnected
+openvpn[stdout]| 2026-11-10 19:11:10 All connections have been connect-retry-max (1) times unsuccessful, exiting
+openvpn[stdout]| 2026-11-10 19:11:10 Exiting due to fatal error
+{"event":"fatal","message":"All connections have been connect-retry-max (1) times unsuccessful, exiting","t":20.234}
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":20.24}
+{"after_secs":4,"event":"retry","next_attempt":4,"reason":"connection failed","t":20.24}
+{"event":"attempt","n":4,"of":4,"t":24.241}
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-7716-17a8aa8b5c8d9e22"],"event":"openvpn_spawned","pid":6180,"stdin":"pipe: management password","t":24.243}
+openvpn[stdout]| 2026-11-10 19:11:14 Note: --cipher is not set. OpenVPN versions before 2.5 defaulted to BF-CBC as fallback when cipher negotiation failed in this case. If you need this fallback please add '--data-ciphers-fallback BF-CBC' to your configuration and/or add BF-CBC to --data-ciphers. E.g. --data-ciphers DEFAULT:BF-CBC
+openvpn[stdout]| 2026-11-10 19:11:14 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 19:11:14 Windows version: 10.0.26100,amd64
+openvpn[stdout]| 2026-11-10 19:11:14 library versions: OpenSSL 3.6.5 29 Sep 2026, LZO 2.10
+openvpn[stdout]| 2026-11-10 19:11:14 DCO version: 2.8.14
+openvpn[stderr]| Enter Management Password:
+openvpn[stdout]| 2026-11-10 19:11:14 MANAGEMENT: TCP Socket listening on [AF_INET]127.0.0.1:50119
+openvpn[stdout]| 2026-11-10 19:11:14 Need hold release from management interface, waiting...
+{"endpoint":"tcp 127.0.0.1:50119 (openvpn listens)","event":"mgmt_connected","t":24.745}
+openvpn[stdout]| 2026-11-10 19:11:14 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:50125
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 6 -- type 'help' for more info","t":24.746}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":24.746}
+openvpn[stdout]| 2026-11-10 19:11:14 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 19:11:14 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 19:11:14 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 19:11:14 MANAGEMENT: CMD 'hold release'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":25.151}
+{"event":"credentials_sent","static_challenge":false,"t":25.151,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 19:11:14 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 19:11:14 MANAGEMENT: CMD 'password [...]'
+openvpn[stdout]| 2026-11-10 19:11:14 NOTE: the current --script-security setting may allow this configuration to call user-defined scripts
+openvpn[stdout]| 2026-11-10 19:11:14 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11199
+openvpn[stdout]| 2026-11-10 19:11:14 UDP link local: (not bound)
+openvpn[stdout]| 2026-11-10 19:11:14 UDP link remote: [AF_INET]127.0.0.1:11199
+openvpn[stdout]| 2026-11-10 19:11:14 MANAGEMENT: >STATE:1794334274,WAIT,,,,,,
+{"detail":"","event":"state","local_ip":"","raw":"1794334274,WAIT,,,,,,","remote":"","state":"WAIT","t":25.167}
+{"event":"bytecount","in":"0","out":"42","t":26.369}
+{"event":"bytecount","in":"0","out":"84","t":27.568}
+{"event":"bytecount","in":"0","out":"84","t":28.77}
+openvpn[stdout]| 2026-11-10 19:11:19 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 19:11:19 Closing ovpn-dco interface
+openvpn[stdout]| 2026-11-10 19:11:19 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 19:11:19 MANAGEMENT: >STATE:1794334279,RECONNECTING,server_poll,,,,,
+{"detail":"server_poll","event":"state","local_ip":"","raw":"1794334279,RECONNECTING,server_poll,,,,,","remote":"","state":"RECONNECTING","t":29.971}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":29.971}
+openvpn[stdout]| 2026-11-10 19:11:19 MANAGEMENT: CMD 'hold release'
+openvpn[stdout]| 2026-11-10 19:11:19 MANAGEMENT: Client disconnected
+openvpn[stdout]| 2026-11-10 19:11:19 All connections have been connect-retry-max (1) times unsuccessful, exiting
+openvpn[stdout]| 2026-11-10 19:11:19 Exiting due to fatal error
+{"event":"fatal","message":"All connections have been connect-retry-max (1) times unsuccessful, exiting","t":29.971}
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":29.976}
+{"event":"error","kind":"gave_up","message":"Server non raggiungibile dopo 4 tentativi: connection failed","retry":false,"t":29.976}
+{"code":4,"event":"exit","t":29.976}

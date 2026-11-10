@@ -1,0 +1,147 @@
+
+=== 2.4 stato e byte dalla management interface, con DCO (predefinito su Windows) e senza ===
+2026-11-10T17:59:34Z
+OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+
+--- 2.4 ---
+connesso
+PS> Get-NetAdapter | Format-Table Name, InterfaceDescription, Status -AutoSize
+
+Name                         InterfaceDescription              Status      
+----                         --------------------              ------      
+OpenVPN TAP-Windows6         TAP-Windows Adapter V9            Disconnected
+Ethernet                     Microsoft Hyper-V Network Adapter Up          
+OpenVPN Data Channel Offload OpenVPN Data Channel Offload      Up          
+
+
+
+
+PS> ping -n 6 10.8.0.1
+
+Esecuzione di Ping 10.8.0.1 con 32 byte di dati:
+Risposta da 10.8.0.1: byte=32 durata=21ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=18ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=20ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=20ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=17ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=9ms TTL=64
+
+Statistiche Ping per 10.8.0.1:
+    Pacchetti: Trasmessi = 6, Ricevuti = 6, 
+    Persi = 0 (0% persi),
+Tempo approssimativo percorsi andata/ritorno in millisecondi:
+    Minimo = 9ms, Massimo =  21ms, Medio =  17ms
+
+
+[daemon {"code":0,"event":"exit","t":32.563}]
+--- sequenza degli stati ---
+1794333576,WAIT,,,,,,
+1794333576,AUTH,,,,,,
+1794333576,ASSIGN_IP,,10.8.0.2,,,,
+1794333580,ADD_ROUTES,,,,,,
+1794333580,CONNECTED,SUCCESS,10.8.0.2,127.0.0.1,11194,,
+1794333608,EXITING,SIGTERM,,,,,
+--- byte in/out (un evento al secondo) ---
+t=4.364 in=2393 out=3464
+t=5.633 in=3918 out=6765
+t=6.89 in=4207 out=7774
+t=8.154 in=12695 out=11899
+t=9.408 in=13852 out=13840
+t=10.673 in=13936 out=14302
+t=11.782 in=14020 out=14575
+t=12.889 in=14020 out=14575
+t=13.99 in=14020 out=14575
+t=15.09 in=14020 out=14764
+t=16.203 in=14020 out=14764
+t=17.309 in=14020 out=14953
+t=18.407 in=14020 out=14953
+t=19.515 in=14020 out=14953
+t=20.623 in=14020 out=14953
+t=21.826 in=14060 out=14953
+t=23.033 in=14236 out=15129
+t=24.24 in=14236 out=15129
+t=25.45 in=14236 out=15129
+t=26.658 in=14236 out=15129
+t=27.866 in=14236 out=15129
+t=29.068 in=14236 out=15129
+--- DCO nel log di OpenVPN ---
+{"event":"openvpn_version","t":0.015,"version":"OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026"}
+openvpn[stdout]| 2026-11-10 18:59:35 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 18:59:35 DCO version: 2.8.14
+openvpn[stdout]| 2026-11-10 18:59:36 ovpn-dco device [OpenVPN Data Channel Offload] opened
+openvpn[stdout]| 2026-11-10 18:59:39 C:/gl/d639299303520392571/galleriad-spike.exe netcfg galleria-netcfg-6068-1f38effa67f4b731 OpenVPN Data Channel Offload 1500 0 10.8.0.2 255.255.255.0 init
+{"dns_channels":[],"env":{"dev":"OpenVPN Data Channel Offload","dev_type":"tun","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","route_gateway_1":"10.8.0.1","route_metric_1":"200","route_net_gateway":"172.23.16.1","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_redirect_gateway_ipv4":"1","route_vpn_gateway":"10.8.0.1","script_type":"up","tun_mtu":"1500"},"event":"netcfg_env","par
+openvpn[stdout]| 2026-11-10 18:59:40 Data Channel: cipher 'AES-256-GCM', peer-id: 0
+openvpn[stdout]| 2026-11-10 19:00:05 Closing ovpn-dco interface
+openvpn[stdout]| 2026-11-10 19:00:08 C:/gl/d639299303520392571/galleriad-spike.exe netcfg galleria-netcfg-6068-1f38effa67f4b731 OpenVPN Data Channel Offload 1500 0 10.8.0.2 255.255.255.0 init
+{"dns_channels":[],"env":{"dev":"OpenVPN Data Channel Offload","dev_type":"tun","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","redirect_gateway":"1","route_gateway_1":"10.8.0.1","route_metric_1":"200","route_net_gateway":"172.23.16.1","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_redirect_gateway_ipv4":"1","route_vpn_gateway":"10.8.0.1","script_type":"down","tun_mtu":"1500"},
+
+--- 2.4-nodco ---
+connesso
+PS> Get-NetAdapter | Format-Table Name, InterfaceDescription, Status -AutoSize
+
+Name                         InterfaceDescription              Status      
+----                         --------------------              ------      
+OpenVPN TAP-Windows6         TAP-Windows Adapter V9            Up          
+Ethernet                     Microsoft Hyper-V Network Adapter Up          
+OpenVPN Data Channel Offload OpenVPN Data Channel Offload      Disconnected
+
+
+
+
+PS> ping -n 6 10.8.0.1
+
+Esecuzione di Ping 10.8.0.1 con 32 byte di dati:
+Risposta da 10.8.0.1: byte=32 durata=18ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=20ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=16ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=21ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=10ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=24ms TTL=64
+
+Statistiche Ping per 10.8.0.1:
+    Pacchetti: Trasmessi = 6, Ricevuti = 6, 
+    Persi = 0 (0% persi),
+Tempo approssimativo percorsi andata/ritorno in millisecondi:
+    Minimo = 10ms, Massimo =  24ms, Medio =  18ms
+
+
+[daemon {"code":0,"event":"exit","t":22.566}]
+--- sequenza degli stati ---
+1794333609,WAIT,,,,,,
+1794333609,AUTH,,,,,,
+1794333610,GET_CONFIG,,,,,,
+1794333610,ASSIGN_IP,,10.8.0.2,,,,
+1794333615,ADD_ROUTES,,,,,,
+1794333615,CONNECTED,SUCCESS,10.8.0.2,127.0.0.1,11194,,
+1794333630,EXITING,SIGTERM,,,,,
+--- byte in/out (un evento al secondo) ---
+t=2.186 in=2019 out=3439
+t=3.783 in=3066 out=6220
+t=5.241 in=3363 out=6637
+t=7.471 in=3715 out=7201
+t=8.98 in=4487 out=7973
+t=10.279 in=4776 out=8394
+t=11.623 in=4860 out=8558
+t=12.637 in=4944 out=8642
+t=14.186 in=5236 out=8934
+t=15.42 in=5340 out=9038
+t=16.653 in=5340 out=9038
+t=18.476 in=5340 out=9170
+t=19.712 in=5340 out=9170
+t=20.781 in=5340 out=9170
+t=21.901 in=5516 out=9346
+--- DCO nel log di OpenVPN ---
+{"event":"openvpn_version","t":0.016,"version":"OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026"}
+{"config_via":"Pipe","daemon_directives":["management 127.0.0.1 49940 stdin","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"C:/gl/d639299303520392571/galleriad-spike.exe netcfg galleria-netcfg-5664-54db96c8e7c20947\"","down \"C:/gl/d639299303520392571/galleriad-spike.exe netcfg galleria-netcfg-5664-54db96c8e7c20947\"","
+openvpn[stdout]| 2026-11-10 19:00:08 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 19:00:08 DCO version: 2.8.14
+openvpn[stdout]| 2026-11-10 19:00:10 TAP-Windows Driver Version 9.27 
+openvpn[stdout]| 2026-11-10 19:00:10 Set TAP-Windows TUN subnet mode network/local/netmask = 10.8.0.0/10.8.0.2/255.255.255.0 [SUCCEEDED]
+openvpn[stdout]| 2026-11-10 19:00:10 Notified TAP-Windows driver to set a DHCP IP/netmask of 10.8.0.2/255.255.255.0 on interface {A5C9F668-9580-41C6-9002-68DDCB13CA8B} [DHCP-serv: 10.8.0.0, lease-time: 31536000]
+openvpn[stdout]| 2026-11-10 19:00:10 tap-windows6 device [OpenVPN TAP-Windows6] opened
+openvpn[stdout]| 2026-11-10 19:00:10 C:/gl/d639299303520392571/galleriad-spike.exe netcfg galleria-netcfg-5664-54db96c8e7c20947 OpenVPN TAP-Windows6 1500 0 10.8.0.2 255.255.255.0 init
+{"dns_channels":[],"env":{"dev":"OpenVPN TAP-Windows6","dev_type":"tun","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","route_gateway_1":"10.8.0.1","route_net_gateway":"172.23.16.1","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_redirect_gateway_ipv4":"1","route_vpn_gateway":"10.8.0.1","script_type":"up","tun_mtu":"1500"},"event":"netcfg_env","parsed":{"dev":"OpenVPN TAP-Window
+openvpn[stdout]| 2026-11-10 19:00:10 Data Channel: cipher 'AES-256-GCM', peer-id: 0
+openvpn[stdout]| 2026-11-10 19:00:30 Closing tap-windows6 interface
+

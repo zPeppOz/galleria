@@ -1,0 +1,44 @@
+openvpn msi exit 0
+OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+library versions: OpenSSL 3.6.5 29 Sep 2026, LZO 2.10
+
+Name                       Status StartType
+----                       ------ ---------
+OpenVPNService            Running Automatic
+OpenVPNServiceInteractive Running Automatic
+
+
+
+
+IPAddress                    PrefixLength AddressState
+---------                    ------------ ------------
+fe80::48cc:c12:3234:3d73%205           64    Preferred
+2001:db8:5::10                         64    Preferred
+172.23.24.159                          20    Preferred
+
+
+
+
+ifIndex DestinationPrefix NextHop       RouteMetric
+------- ----------------- -------       -----------
+    205 0.0.0.0/0         172.23.16.1             0
+    205 ::/0              2001:db8:5::1         256
+
+
+
+
+IPAddress     LinkLayerAddress      State
+---------     ----------------      -----
+2001:db8:5::1 02-00-00-00-00-01 Permanent
+
+
+
+
+  Id ProcessName
+  -- -----------
+2716 filerelay  
+4856 filerelay  
+7704 filerelay  
+
+
+

@@ -1,0 +1,186 @@
+{"event":"openvpn_version","t":0.016,"version":"OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026"}
+{"directive":"verb","event":"profile_directive_removed","line":10,"reason":"blocked directive (M2)","t":0.019}
+{"config_via":"Pipe","daemon_directives":["management 127.0.0.1 50164 stdin","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"C:/gl/d639299311782442165/galleriad-spike.exe netcfg galleria-netcfg-4080-136c23891957c23f\"","down \"C:/gl/d639299311782442165/galleriad-spike.exe netcfg galleria-netcfg-4080-136c23891957c23f\"","redirect-gateway ipv6","block-ipv6"],"event":"generated_config","key_mode":"Inline","profile_directives":["client","dev tun","proto udp","remote 127.0.0.1 11194","redirect-gateway local","nobind","remote-cert-tls server","auth-user-pass","key-direction 1","<ca> [inline, content omitted]","<cert> [inline, content omitted]","<key> [inline, content omitted]","<tls-auth> [inline, content omitted]"],"t":0.019}
+{"event":"attempt","n":1,"of":3,"t":0.021}
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-4080-85515a9a33376039"],"event":"openvpn_spawned","pid":5300,"stdin":"pipe: management password","t":0.022}
+openvpn[stdout]| 2026-11-10 19:13:21 WARNING: You have specified redirect-gateway and redirect-private at the same time (or the same option multiple times). This is not well supported and may lead to unexpected results
+openvpn[stdout]| 2026-11-10 19:13:21 Note: --cipher is not set. OpenVPN versions before 2.5 defaulted to BF-CBC as fallback when cipher negotiation failed in this case. If you need this fallback please add '--data-ciphers-fallback BF-CBC' to your configuration and/or add BF-CBC to --data-ciphers. E.g. --data-ciphers DEFAULT:BF-CBC
+openvpn[stdout]| 2026-11-10 19:13:21 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 19:13:21 Windows version: 10.0.26100,amd64
+openvpn[stdout]| 2026-11-10 19:13:21 library versions: OpenSSL 3.6.5 29 Sep 2026, LZO 2.10
+openvpn[stdout]| 2026-11-10 19:13:21 DCO version: 2.8.14
+openvpn[stderr]| Enter Management Password:
+openvpn[stdout]| 2026-11-10 19:13:21 MANAGEMENT: TCP Socket listening on [AF_INET]127.0.0.1:50164
+openvpn[stdout]| 2026-11-10 19:13:21 Need hold release from management interface, waiting...
+openvpn[stdout]| 2026-11-10 19:13:22 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:50165
+{"endpoint":"tcp 127.0.0.1:50164 (openvpn listens)","event":"mgmt_connected","t":0.54}
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 6 -- type 'help' for more info","t":0.54}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":0.54}
+openvpn[stdout]| 2026-11-10 19:13:22 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 19:13:22 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 19:13:22 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 19:13:22 MANAGEMENT: CMD 'hold release'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":0.943}
+{"event":"credentials_sent","static_challenge":false,"t":0.943,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 19:13:22 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 19:13:22 MANAGEMENT: CMD 'password [...]'
+openvpn[stdout]| 2026-11-10 19:13:22 NOTE: the current --script-security setting may allow this configuration to call user-defined scripts
+openvpn[stdout]| 2026-11-10 19:13:22 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:13:22 UDP link local: (not bound)
+openvpn[stdout]| 2026-11-10 19:13:22 UDP link remote: [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:13:22 MANAGEMENT: >STATE:1794334402,WAIT,,,,,,
+{"detail":"","event":"state","local_ip":"","raw":"1794334402,WAIT,,,,,,","remote":"","state":"WAIT","t":0.958}
+openvpn[stdout]| 2026-11-10 19:13:22 MANAGEMENT: >STATE:1794334402,AUTH,,,,,,
+openvpn[stdout]| 2026-11-10 19:13:22 TLS: Initial packet from [AF_INET]127.0.0.1:11194, sid=9a39be4c 74777996
+openvpn[stdout]| 2026-11-10 19:13:22 WARNING: this configuration may cache passwords in memory -- use the auth-nocache option to prevent this
+{"detail":"","event":"state","local_ip":"","raw":"1794334402,AUTH,,,,,,","remote":"","state":"AUTH","t":0.981}
+openvpn[stdout]| 2026-11-10 19:13:22 VERIFY OK: depth=1, CN=Galleria Lab CA
+openvpn[stdout]| 2026-11-10 19:13:22 VERIFY KU OK
+openvpn[stdout]| 2026-11-10 19:13:22 Validating certificate extended key usage
+openvpn[stdout]| 2026-11-10 19:13:22 ++ Certificate has EKU (str) TLS Web Server Authentication, expects TLS Web Server Authentication
+openvpn[stdout]| 2026-11-10 19:13:22 VERIFY EKU OK
+openvpn[stdout]| 2026-11-10 19:13:22 VERIFY OK: depth=0, CN=server
+openvpn[stdout]| 2026-11-10 19:13:22 Control Channel: TLSv1.3, cipher TLSv1.3 TLS_AES_256_GCM_SHA384, peer certificate: 256 bits ECprime256v1, signature: ecdsa-with-SHA256, peer temporary key: 253 bits X25519, peer signing digest/type: ecdsa_secp256r1_sha256 ECDSA, key agreement: x25519
+openvpn[stdout]| 2026-11-10 19:13:22 [server] Peer Connection Initiated with [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:13:22 TLS: move_session: dest=TM_ACTIVE src=TM_INITIAL reinit_src=1
+openvpn[stdout]| 2026-11-10 19:13:22 TLS: tls_multi_process: initial untrusted session promoted to trusted
+openvpn[stdout]| 2026-11-10 19:13:22 PUSH: Received control message: 'PUSH_REPLY,dhcp-option DNS 10.8.0.1,dhcp-option DOMAIN galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 60,ifconfig 10.8.0.2 255.255.255.0,peer-id 1,cipher AES-256-GCM,protocol-flags cc-exit tls-ekm dyn-tls-crypt,tun-mtu 1500'
+openvpn[stdout]| 2026-11-10 19:13:22 WARNING: You have specified redirect-gateway and redirect-private at the same time (or the same option multiple times). This is not well supported and may lead to unexpected results
+openvpn[stdout]| 2026-11-10 19:13:22 OPTIONS IMPORT: --ifconfig/up options modified
+openvpn[stdout]| 2026-11-10 19:13:22 OPTIONS IMPORT: route options modified
+openvpn[stdout]| 2026-11-10 19:13:22 OPTIONS IMPORT: route-related options modified
+openvpn[stdout]| 2026-11-10 19:13:22 OPTIONS IMPORT: --ip-win32 and/or --dhcp-option options modified
+openvpn[stdout]| 2026-11-10 19:13:22 OPTIONS IMPORT: tun-mtu set to 1500
+openvpn[stdout]| 2026-11-10 19:13:22 interactive service msg_channel=0
+openvpn[stdout]| 2026-11-10 19:13:22 ROUTE_GATEWAY 172.23.16.1/255.255.240.0 I=205 HWADDR=00:15:5d:c1:ab:e2
+openvpn[stdout]| 2026-11-10 19:13:22 GDG6: remote_host_ipv6=n/a
+openvpn[stdout]| 2026-11-10 19:13:22 GDG6: II=205 DP=::/0 NH=2001:db8:5::1
+openvpn[stdout]| 2026-11-10 19:13:22 GDG6: Metric=256, Loopback=0, AA=1, I=0
+openvpn[stdout]| 2026-11-10 19:13:22 ROUTE6_GATEWAY 2001:db8:5::1 I=205
+openvpn[stdout]| 2026-11-10 19:13:22 GDG6: II=205 DP=::/0 NH=2001:db8:5::1
+openvpn[stdout]| 2026-11-10 19:13:22 GDG6: Metric=256, Loopback=0, AA=1, I=0
+openvpn[stdout]| 2026-11-10 19:13:22 ovpn-dco device [OpenVPN Data Channel Offload] opened
+openvpn[stdout]| 2026-11-10 19:13:22 MANAGEMENT: >STATE:1794334402,ASSIGN_IP,,10.8.0.2,,,,
+{"detail":"","event":"state","local_ip":"10.8.0.2","raw":"1794334402,ASSIGN_IP,,10.8.0.2,,,,","remote":"","state":"ASSIGN_IP","t":1.055}
+openvpn[stdout]| 2026-11-10 19:13:23 NETSH: C:\Windows\system32\netsh.exe interface ip set address 213 static 10.8.0.2 255.255.255.0 store=active
+openvpn[stdout]| 2026-11-10 19:13:23 NETSH: C:\Windows\system32\netsh.exe interface ip delete dns 213 all
+openvpn[stdout]| 2026-11-10 19:13:23 NETSH: C:\Windows\system32\netsh.exe interface ip set dns 213 static 10.8.0.1 validate=no
+openvpn[stdout]| 2026-11-10 19:13:23 NETSH: C:\Windows\system32\netsh.exe interface ip delete wins 213 all
+openvpn[stdout]| 2026-11-10 19:13:23 PowerShell: C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command Set-DnsClient -InterfaceIndex 213 -ConnectionSpecificSuffix 'galleria.test'
+openvpn[stdout]| 2026-11-10 19:13:26 IPv4 MTU set to 1500 on interface 213 using SetIpInterfaceEntry()
+openvpn[stdout]| 2026-11-10 19:13:26 C:/gl/d639299311782442165/galleriad-spike.exe netcfg galleria-netcfg-4080-136c23891957c23f OpenVPN Data Channel Offload 1500 0 10.8.0.2 255.255.255.0 init
+openvpn[stdout]| 2026-11-10 19:13:26 env_block: add PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem
+{"dns_channels":[],"env":{"dev":"OpenVPN Data Channel Offload","dev_type":"tun","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","route_gateway_1":"10.8.0.1","route_metric_1":"200","route_net_gateway":"172.23.16.1","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_redirect_gateway_ipv4":"1","route_redirect_gateway_ipv6":"1","route_vpn_gateway":"10.8.0.1","script_type":"up","tun_mtu":"1500"},"event":"netcfg_env","parsed":{"dev":"OpenVPN Data Channel Offload","dns_servers":[],"domains":[],"redirect_gateway":false},"script_type":"up","t":4.099}
+{"cmd":"(none)","event":"netcfg_cmd","ok":true,"stderr":"windows: nothing applied by the daemon in this spike","t":4.099}
+openvpn[stdout]| 2026-11-10 19:13:26 C:\Windows\system32\route.exe ADD 0.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 19:13:26 ROUTE: CreateIpForwardEntry succeeded with dwForwardMetric1=25 and dwForwardType=4
+openvpn[stdout]| 2026-11-10 19:13:26 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 19:13:26 C:\Windows\system32\route.exe ADD 128.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 19:13:26 ROUTE: CreateIpForwardEntry succeeded with dwForwardMetric1=25 and dwForwardType=4
+openvpn[stdout]| 2026-11-10 19:13:26 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 19:13:26 MANAGEMENT: >STATE:1794334406,ADD_ROUTES,,,,,,
+{"detail":"","event":"state","local_ip":"","raw":"1794334406,ADD_ROUTES,,,,,,","remote":"","state":"ADD_ROUTES","t":4.104}
+openvpn[stdout]| 2026-11-10 19:13:26 C:\Windows\system32\route.exe ADD 192.0.2.0 MASK 255.255.255.0 10.8.0.1 METRIC 200
+openvpn[stdout]| 2026-11-10 19:13:26 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 19:13:26 WARNING: OpenVPN was configured to add an IPv6 route. However, no IPv6 has been configured for OpenVPN Data Channel Offload, therefore the route installation may fail or may not work as expected.
+openvpn[stdout]| 2026-11-10 19:13:26 Initialization Sequence Completed
+openvpn[stdout]| 2026-11-10 19:13:26 MANAGEMENT: >STATE:1794334406,CONNECTED,SUCCESS,10.8.0.2,127.0.0.1,11194,,
+openvpn[stdout]| 2026-11-10 19:13:26 Data Channel: cipher 'AES-256-GCM', peer-id: 1
+{"detail":"SUCCESS","event":"state","local_ip":"10.8.0.2","raw":"1794334406,CONNECTED,SUCCESS,10.8.0.2,127.0.0.1,11194,,","remote":"127.0.0.1","state":"CONNECTED","t":4.105}
+{"event":"connected","ip":"10.8.0.2","server":"127.0.0.1","t":4.105}
+openvpn[stdout]| 2026-11-10 19:13:26 Timers: ping 10, ping-restart 60
+openvpn[stdout]| 2026-11-10 19:13:26 Protocol options: protocol-flags cc-exit tls-ekm dyn-tls-crypt
+{"event":"bytecount","in":"2394","out":"3462","t":4.105}
+{"event":"bytecount","in":"3855","out":"6908","t":5.268}
+{"event":"bytecount","in":"4979","out":"8571","t":6.424}
+{"event":"bytecount","in":"5352","out":"9887","t":7.579}
+{"event":"bytecount","in":"14372","out":"14420","t":8.732}
+{"event":"bytecount","in":"14372","out":"14492","t":9.885}
+{"event":"bytecount","in":"14466","out":"14964","t":11.039}
+{"event":"bytecount","in":"14466","out":"15153","t":12.205}
+{"event":"bytecount","in":"15012","out":"15567","t":13.373}
+{"event":"bytecount","in":"15012","out":"15945","t":14.529}
+{"event":"bytecount","in":"15012","out":"15945","t":15.697}
+{"event":"bytecount","in":"15012","out":"15945","t":16.865}
+{"event":"bytecount","in":"15012","out":"16134","t":18.018}
+{"event":"bytecount","in":"15012","out":"16134","t":19.182}
+{"event":"bytecount","in":"15558","out":"16548","t":20.338}
+{"event":"bytecount","in":"15558","out":"16548","t":21.58}
+{"event":"bytecount","in":"15558","out":"16548","t":22.827}
+{"event":"bytecount","in":"15734","out":"16724","t":24.07}
+{"event":"bytecount","in":"15734","out":"16724","t":25.315}
+{"event":"bytecount","in":"15734","out":"16724","t":26.565}
+{"event":"bytecount","in":"16280","out":"17138","t":27.809}
+{"event":"bytecount","in":"16280","out":"17138","t":29.056}
+{"event":"bytecount","in":"16280","out":"17138","t":30.301}
+{"event":"bytecount","in":"16280","out":"17138","t":31.451}
+{"event":"bytecount","in":"16280","out":"17138","t":32.605}
+{"event":"bytecount","in":"16280","out":"17138","t":33.76}
+{"event":"bytecount","in":"16826","out":"17552","t":34.909}
+{"event":"bytecount","in":"16826","out":"17552","t":36.063}
+{"event":"bytecount","in":"16826","out":"17552","t":37.213}
+{"event":"bytecount","in":"16826","out":"17552","t":38.37}
+{"event":"bytecount","in":"16826","out":"17552","t":39.524}
+{"event":"bytecount","in":"16826","out":"17552","t":40.676}
+{"event":"bytecount","in":"16826","out":"17552","t":41.875}
+{"event":"bytecount","in":"17436","out":"17966","t":43.075}
+{"event":"bytecount","in":"17436","out":"17966","t":44.272}
+{"event":"bytecount","in":"17436","out":"17966","t":45.468}
+{"event":"bytecount","in":"17530","out":"18060","t":46.667}
+{"event":"bytecount","in":"17530","out":"18060","t":47.87}
+{"event":"bytecount","in":"17530","out":"18060","t":49.062}
+{"event":"bytecount","in":"18076","out":"18436","t":50.261}
+{"event":"bytecount","in":"18076","out":"18436","t":51.472}
+{"event":"bytecount","in":"18076","out":"18436","t":52.672}
+{"event":"bytecount","in":"18076","out":"18436","t":53.885}
+{"event":"bytecount","in":"18076","out":"18436","t":55.086}
+{"event":"bytecount","in":"18076","out":"18436","t":56.29}
+{"event":"bytecount","in":"18076","out":"18436","t":57.492}
+{"event":"bytecount","in":"18076","out":"18436","t":58.698}
+{"event":"bytecount","in":"18116","out":"18436","t":59.896}
+{"event":"bytecount","in":"18116","out":"18436","t":61.099}
+{"event":"bytecount","in":"18116","out":"18436","t":62.225}
+{"event":"bytecount","in":"18116","out":"18436","t":63.355}
+{"event":"bytecount","in":"18116","out":"18436","t":64.489}
+{"event":"bytecount","in":"18116","out":"18436","t":65.612}
+{"event":"bytecount","in":"18116","out":"18436","t":66.737}
+{"event":"bytecount","in":"18116","out":"18436","t":67.862}
+{"event":"bytecount","in":"18116","out":"18436","t":68.996}
+{"event":"bytecount","in":"18156","out":"18436","t":70.132}
+{"event":"bytecount","in":"18156","out":"18436","t":71.257}
+{"event":"bytecount","in":"18156","out":"18436","t":72.27}
+{"event":"bytecount","in":"18156","out":"18436","t":73.284}
+{"event":"bytecount","in":"18156","out":"18436","t":74.306}
+{"event":"bytecount","in":"18156","out":"18436","t":75.317}
+{"event":"bytecount","in":"18156","out":"18436","t":76.335}
+{"event":"bytecount","in":"18156","out":"18436","t":77.346}
+{"event":"bytecount","in":"18156","out":"18436","t":78.358}
+{"event":"bytecount","in":"18156","out":"18436","t":79.368}
+{"event":"bytecount","in":"18196","out":"18436","t":80.383}
+{"event":"bytecount","in":"18196","out":"18436","t":81.395}
+{"event":"bytecount","in":"18196","out":"18436","t":82.659}
+{"event":"bytecount","in":"18372","out":"18612","t":83.925}
+{"event":"bytecount","in":"18372","out":"18612","t":85.196}
+{"event":"bytecount","in":"18372","out":"18612","t":86.458}
+{"event":"bytecount","in":"18372","out":"18612","t":87.73}
+{"event":"bytecount","in":"18372","out":"18612","t":89.004}
+{"event":"disconnect_requested","t":89.205}
+openvpn[stdout]| 2026-11-10 19:14:51 MANAGEMENT: CMD 'signal SIGTERM'
+openvpn[stdout]| 2026-11-10 19:14:51 C:\Windows\system32\route.exe DELETE 192.0.2.0 MASK 255.255.255.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 19:14:51 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 19:14:51 C:\Windows\system32\route.exe DELETE 0.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 19:14:51 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 19:14:51 C:\Windows\system32\route.exe DELETE 128.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 19:14:51 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 19:14:51 Closing ovpn-dco interface
+openvpn[stdout]| 2026-11-10 19:14:51 PowerShell: C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command Set-DnsClient -InterfaceIndex 213 -ConnectionSpecificSuffix ''
+openvpn[stdout]| 2026-11-10 19:14:53 NETSH: C:\Windows\system32\netsh.exe interface ipv4 delete dns 213 all
+openvpn[stdout]| 2026-11-10 19:14:53 NETSH: C:\Windows\system32\netsh.exe interface ipv4 delete address 213 10.8.0.2 store=active
+openvpn[stdout]| 2026-11-10 19:14:54 C:/gl/d639299311782442165/galleriad-spike.exe netcfg galleria-netcfg-4080-136c23891957c23f OpenVPN Data Channel Offload 1500 0 10.8.0.2 255.255.255.0 init
+openvpn[stdout]| 2026-11-10 19:14:54 env_block: add PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem
+{"dns_channels":[],"env":{"dev":"OpenVPN Data Channel Offload","dev_type":"tun","ifconfig_local":"10.8.0.2","ifconfig_netmask":"255.255.255.0","redirect_gateway":"1","route_gateway_1":"10.8.0.1","route_metric_1":"200","route_net_gateway":"172.23.16.1","route_netmask_1":"255.255.255.0","route_network_1":"192.0.2.0","route_redirect_gateway_ipv4":"1","route_redirect_gateway_ipv6":"1","route_vpn_gateway":"10.8.0.1","script_type":"down","tun_mtu":"1500"},"event":"netcfg_env","parsed":{"dev":"OpenVPN Data Channel Offload","dns_servers":[],"domains":[],"redirect_gateway":true},"script_type":"down","t":92.16}
+openvpn[stdout]| 2026-11-10 19:14:54 SIGTERM[hard,] received, process exiting
+openvpn[stdout]| 2026-11-10 19:14:54 MANAGEMENT: >STATE:1794334494,EXITING,SIGTERM,,,,,
+{"detail":"SIGTERM","event":"state","local_ip":"","raw":"1794334494,EXITING,SIGTERM,,,,,","remote":"","state":"EXITING","t":92.161}
+{"event":"openvpn_exited","exit_reason":"SIGTERM","status":"Ok(ExitStatus(ExitStatus(0)))","t":92.166}
+{"code":0,"event":"exit","t":92.166}

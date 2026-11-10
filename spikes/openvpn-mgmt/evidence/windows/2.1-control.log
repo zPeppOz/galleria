@@ -1,0 +1,214 @@
+{"event":"openvpn_version","t":0.016,"version":"OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026"}
+{"event":"warning","message":"UNSAFE control run: profile not sanitized","t":0.019}
+{"config_via":"Pipe","daemon_directives":["management 127.0.0.1 50087 stdin","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3"],"event":"generated_config","key_mode":"Inline","profile_directives":["client","dev tun","proto udp","remote 127.0.0.1 11194","redirect-gateway local","nobind","remote-cert-tls server","auth-user-pass","key-direction 1","verb 3","<ca> [inline, content omitted]","<cert> [inline, content omitted]","<key> [inline, content omitted]","<tls-auth> [inline, content omitted]","script-security 3","up \"C:/Windows/System32/cmd.exe /c echo x > C:\\\\\\\\gl\\\\\\\\PWNED-up.txt\"","down \"C:/Windows/System32/cmd.exe /c echo x > C:\\\\\\\\gl\\\\\\\\PWNED-down.txt\"","route-up \"C:/Windows/System32/cmd.exe /c echo x > C:\\\\\\\\gl\\\\\\\\PWNED-route-up.txt\"","ipchange \"C:/Windows/System32/cmd.exe /c echo x > C:\\\\\\\\gl\\\\\\\\PWNED-ipchange.txt\"","management 0.0.0.0 7505","status C:/gl/PWNED-status.txt 1","writepid C:/gl/PWNED-writepid.txt","setenv EVIL 1"],"t":0.019}
+{"event":"attempt","n":1,"of":3,"t":0.02}
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-6740-5970c636063fceb1"],"event":"openvpn_spawned","pid":1372,"stdin":"pipe: management password","t":0.022}
+openvpn[stdout]| 2026-11-10 19:09:44 Note: --cipher is not set. OpenVPN versions before 2.5 defaulted to BF-CBC as fallback when cipher negotiation failed in this case. If you need this fallback please add '--data-ciphers-fallback BF-CBC' to your configuration and/or add BF-CBC to --data-ciphers. E.g. --data-ciphers DEFAULT:BF-CBC
+openvpn[stdout]| 2026-11-10 19:09:44 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 19:09:44 Windows version: 10.0.26100,amd64
+openvpn[stdout]| 2026-11-10 19:09:44 library versions: OpenSSL 3.6.5 29 Sep 2026, LZO 2.10
+openvpn[stdout]| 2026-11-10 19:09:44 DCO version: 2.8.14
+openvpn[stderr]| Enter Management Password:
+openvpn[stdout]| 2026-11-10 19:09:44 MANAGEMENT: TCP Socket listening on [AF_INET]127.0.0.1:50087
+openvpn[stdout]| 2026-11-10 19:09:44 Need hold release from management interface, waiting...
+openvpn[stdout]| 2026-11-10 19:09:45 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:50088
+{"endpoint":"tcp 127.0.0.1:50087 (openvpn listens)","event":"mgmt_connected","t":0.535}
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 6 -- type 'help' for more info","t":0.536}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":0.536}
+openvpn[stdout]| 2026-11-10 19:09:45 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 19:09:45 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 19:09:45 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 19:09:45 MANAGEMENT: CMD 'hold release'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":0.938}
+{"event":"credentials_sent","static_challenge":false,"t":0.938,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 19:09:45 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 19:09:45 MANAGEMENT: CMD 'password [...]'
+openvpn[stdout]| 2026-11-10 19:09:45 NOTE: the current --script-security setting may allow this configuration to call user-defined scripts
+openvpn[stdout]| 2026-11-10 19:09:45 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:09:45 UDP link local: (not bound)
+openvpn[stdout]| 2026-11-10 19:09:45 UDP link remote: [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:09:45 MANAGEMENT: >STATE:1794334185,WAIT,,,,,,
+{"detail":"","event":"state","local_ip":"","raw":"1794334185,WAIT,,,,,,","remote":"","state":"WAIT","t":0.954}
+openvpn[stdout]| 2026-11-10 19:09:45 MANAGEMENT: >STATE:1794334185,AUTH,,,,,,
+openvpn[stdout]| 2026-11-10 19:09:45 TLS: Initial packet from [AF_INET]127.0.0.1:11194, sid=6428fd47 9ba03b5c
+openvpn[stdout]| 2026-11-10 19:09:45 WARNING: this configuration may cache passwords in memory -- use the auth-nocache option to prevent this
+{"detail":"","event":"state","local_ip":"","raw":"1794334185,AUTH,,,,,,","remote":"","state":"AUTH","t":0.963}
+openvpn[stdout]| 2026-11-10 19:09:45 VERIFY OK: depth=1, CN=Galleria Lab CA
+openvpn[stdout]| 2026-11-10 19:09:45 VERIFY KU OK
+openvpn[stdout]| 2026-11-10 19:09:45 Validating certificate extended key usage
+openvpn[stdout]| 2026-11-10 19:09:45 ++ Certificate has EKU (str) TLS Web Server Authentication, expects TLS Web Server Authentication
+openvpn[stdout]| 2026-11-10 19:09:45 VERIFY EKU OK
+openvpn[stdout]| 2026-11-10 19:09:45 VERIFY OK: depth=0, CN=server
+openvpn[stdout]| 2026-11-10 19:09:45 Control Channel: TLSv1.3, cipher TLSv1.3 TLS_AES_256_GCM_SHA384, peer certificate: 256 bits ECprime256v1, signature: ecdsa-with-SHA256, peer temporary key: 253 bits X25519, peer signing digest/type: ecdsa_secp256r1_sha256 ECDSA, key agreement: x25519
+openvpn[stdout]| 2026-11-10 19:09:45 [server] Peer Connection Initiated with [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:09:45 env_block: add PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem
+openvpn[stdout]| 2026-11-10 19:09:45 WARNING: Failed running command (--ipchange): returned error code 1
+openvpn[stdout]| 2026-11-10 19:09:45 TLS: move_session: dest=TM_ACTIVE src=TM_INITIAL reinit_src=1
+openvpn[stdout]| 2026-11-10 19:09:45 TLS: tls_multi_process: initial untrusted session promoted to trusted
+openvpn[stdout]| 2026-11-10 19:09:45 PUSH: Received control message: 'PUSH_REPLY,dhcp-option DNS 10.8.0.1,dhcp-option DOMAIN galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 60,ifconfig 10.8.0.2 255.255.255.0,peer-id 0,cipher AES-256-GCM,protocol-flags cc-exit tls-ekm dyn-tls-crypt,tun-mtu 1500'
+openvpn[stdout]| 2026-11-10 19:09:45 WARNING: You have specified redirect-gateway and redirect-private at the same time (or the same option multiple times). This is not well supported and may lead to unexpected results
+openvpn[stdout]| 2026-11-10 19:09:45 OPTIONS IMPORT: --ifconfig/up options modified
+openvpn[stdout]| 2026-11-10 19:09:45 OPTIONS IMPORT: route options modified
+openvpn[stdout]| 2026-11-10 19:09:45 OPTIONS IMPORT: route-related options modified
+openvpn[stdout]| 2026-11-10 19:09:45 OPTIONS IMPORT: --ip-win32 and/or --dhcp-option options modified
+openvpn[stdout]| 2026-11-10 19:09:45 OPTIONS IMPORT: tun-mtu set to 1500
+openvpn[stdout]| 2026-11-10 19:09:45 interactive service msg_channel=0
+openvpn[stdout]| 2026-11-10 19:09:45 ROUTE_GATEWAY 172.23.16.1/255.255.240.0 I=205 HWADDR=00:15:5d:c1:ab:e2
+openvpn[stdout]| 2026-11-10 19:09:45 ovpn-dco device [OpenVPN Data Channel Offload] opened
+openvpn[stdout]| 2026-11-10 19:09:45 MANAGEMENT: >STATE:1794334185,ASSIGN_IP,,10.8.0.2,,,,
+{"detail":"","event":"state","local_ip":"10.8.0.2","raw":"1794334185,ASSIGN_IP,,10.8.0.2,,,,","remote":"","state":"ASSIGN_IP","t":1.067}
+openvpn[stdout]| 2026-11-10 19:09:45 NETSH: C:\Windows\system32\netsh.exe interface ip set address 213 static 10.8.0.2 255.255.255.0 store=active
+openvpn[stdout]| 2026-11-10 19:09:45 NETSH: C:\Windows\system32\netsh.exe interface ip delete dns 213 all
+openvpn[stdout]| 2026-11-10 19:09:45 NETSH: C:\Windows\system32\netsh.exe interface ip set dns 213 static 10.8.0.1 validate=no
+openvpn[stdout]| 2026-11-10 19:09:45 NETSH: C:\Windows\system32\netsh.exe interface ip delete wins 213 all
+openvpn[stdout]| 2026-11-10 19:09:46 PowerShell: C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command Set-DnsClient -InterfaceIndex 213 -ConnectionSpecificSuffix 'galleria.test'
+openvpn[stdout]| 2026-11-10 19:09:48 IPv4 MTU set to 1500 on interface 213 using SetIpInterfaceEntry()
+openvpn[stdout]| 2026-11-10 19:09:48 C:/Windows/System32/cmd.exe /c echo x > C:\gl\PWNED-up.txt OpenVPN Data Channel Offload 1500 0 10.8.0.2 255.255.255.0 init
+openvpn[stdout]| 2026-11-10 19:09:48 env_block: add PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem
+{"event":"fatal","message":"WARNING: Failed running command (--up/--down): returned error code 1","t":4.233}
+openvpn[stdout]| 2026-11-10 19:09:48 MANAGEMENT: Client disconnected
+openvpn[stdout]| 2026-11-10 19:09:48 WARNING: Failed running command (--up/--down): returned error code 1
+openvpn[stdout]| 2026-11-10 19:09:48 Exiting due to fatal error
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":4.247}
+{"after_secs":1,"event":"retry","next_attempt":2,"reason":"connection failed","t":4.248}
+{"event":"attempt","n":2,"of":3,"t":5.248}
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-6740-d4eccce876db149f"],"event":"openvpn_spawned","pid":3420,"stdin":"pipe: management password","t":5.249}
+openvpn[stdout]| 2026-11-10 19:09:50 Note: --cipher is not set. OpenVPN versions before 2.5 defaulted to BF-CBC as fallback when cipher negotiation failed in this case. If you need this fallback please add '--data-ciphers-fallback BF-CBC' to your configuration and/or add BF-CBC to --data-ciphers. E.g. --data-ciphers DEFAULT:BF-CBC
+openvpn[stdout]| 2026-11-10 19:09:50 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 19:09:50 Windows version: 10.0.26100,amd64
+openvpn[stdout]| 2026-11-10 19:09:50 library versions: OpenSSL 3.6.5 29 Sep 2026, LZO 2.10
+openvpn[stdout]| 2026-11-10 19:09:50 DCO version: 2.8.14
+openvpn[stderr]| Enter Management Password:
+openvpn[stdout]| 2026-11-10 19:09:50 MANAGEMENT: TCP Socket listening on [AF_INET]127.0.0.1:50087
+openvpn[stdout]| 2026-11-10 19:09:50 Need hold release from management interface, waiting...
+{"endpoint":"tcp 127.0.0.1:50087 (openvpn listens)","event":"mgmt_connected","t":5.752}
+openvpn[stdout]| 2026-11-10 19:09:51 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:50094
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 6 -- type 'help' for more info","t":5.753}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":5.753}
+openvpn[stdout]| 2026-11-10 19:09:51 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 19:09:51 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 19:09:51 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 19:09:51 MANAGEMENT: CMD 'hold release'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":6.155}
+{"event":"credentials_sent","static_challenge":false,"t":6.155,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 19:09:51 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 19:09:51 MANAGEMENT: CMD 'password [...]'
+openvpn[stdout]| 2026-11-10 19:09:51 NOTE: the current --script-security setting may allow this configuration to call user-defined scripts
+openvpn[stdout]| 2026-11-10 19:09:51 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:09:51 UDP link local: (not bound)
+openvpn[stdout]| 2026-11-10 19:09:51 UDP link remote: [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:09:51 MANAGEMENT: >STATE:1794334191,WAIT,,,,,,
+{"detail":"","event":"state","local_ip":"","raw":"1794334191,WAIT,,,,,,","remote":"","state":"WAIT","t":6.17}
+openvpn[stdout]| 2026-11-10 19:09:51 MANAGEMENT: >STATE:1794334191,AUTH,,,,,,
+openvpn[stdout]| 2026-11-10 19:09:51 TLS: Initial packet from [AF_INET]127.0.0.1:11194, sid=0ca5e7ab a16a9f41
+openvpn[stdout]| 2026-11-10 19:09:51 WARNING: this configuration may cache passwords in memory -- use the auth-nocache option to prevent this
+{"detail":"","event":"state","local_ip":"","raw":"1794334191,AUTH,,,,,,","remote":"","state":"AUTH","t":6.189}
+openvpn[stdout]| 2026-11-10 19:09:51 VERIFY OK: depth=1, CN=Galleria Lab CA
+openvpn[stdout]| 2026-11-10 19:09:51 VERIFY KU OK
+openvpn[stdout]| 2026-11-10 19:09:51 Validating certificate extended key usage
+openvpn[stdout]| 2026-11-10 19:09:51 ++ Certificate has EKU (str) TLS Web Server Authentication, expects TLS Web Server Authentication
+openvpn[stdout]| 2026-11-10 19:09:51 VERIFY EKU OK
+openvpn[stdout]| 2026-11-10 19:09:51 VERIFY OK: depth=0, CN=server
+openvpn[stdout]| 2026-11-10 19:09:51 Control Channel: TLSv1.3, cipher TLSv1.3 TLS_AES_256_GCM_SHA384, peer certificate: 256 bits ECprime256v1, signature: ecdsa-with-SHA256, peer temporary key: 253 bits X25519, peer signing digest/type: ecdsa_secp256r1_sha256 ECDSA, key agreement: x25519
+openvpn[stdout]| 2026-11-10 19:09:51 [server] Peer Connection Initiated with [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:09:51 env_block: add PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem
+openvpn[stdout]| 2026-11-10 19:09:51 WARNING: Failed running command (--ipchange): returned error code 1
+openvpn[stdout]| 2026-11-10 19:09:51 TLS: move_session: dest=TM_ACTIVE src=TM_INITIAL reinit_src=1
+openvpn[stdout]| 2026-11-10 19:09:51 TLS: tls_multi_process: initial untrusted session promoted to trusted
+openvpn[stdout]| 2026-11-10 19:09:51 PUSH: Received control message: 'PUSH_REPLY,dhcp-option DNS 10.8.0.1,dhcp-option DOMAIN galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 60,ifconfig 10.8.0.2 255.255.255.0,peer-id 1,cipher AES-256-GCM,protocol-flags cc-exit tls-ekm dyn-tls-crypt,tun-mtu 1500'
+openvpn[stdout]| 2026-11-10 19:09:51 WARNING: You have specified redirect-gateway and redirect-private at the same time (or the same option multiple times). This is not well supported and may lead to unexpected results
+openvpn[stdout]| 2026-11-10 19:09:51 OPTIONS IMPORT: --ifconfig/up options modified
+openvpn[stdout]| 2026-11-10 19:09:51 OPTIONS IMPORT: route options modified
+openvpn[stdout]| 2026-11-10 19:09:51 OPTIONS IMPORT: route-related options modified
+openvpn[stdout]| 2026-11-10 19:09:51 OPTIONS IMPORT: --ip-win32 and/or --dhcp-option options modified
+openvpn[stdout]| 2026-11-10 19:09:51 OPTIONS IMPORT: tun-mtu set to 1500
+openvpn[stdout]| 2026-11-10 19:09:51 interactive service msg_channel=0
+openvpn[stdout]| 2026-11-10 19:09:51 ROUTE_GATEWAY 172.23.16.1/255.255.240.0 I=205 HWADDR=00:15:5d:c1:ab:e2
+openvpn[stdout]| 2026-11-10 19:09:51 ovpn-dco device [OpenVPN Data Channel Offload] opened
+openvpn[stdout]| 2026-11-10 19:09:51 MANAGEMENT: >STATE:1794334191,ASSIGN_IP,,10.8.0.2,,,,
+{"detail":"","event":"state","local_ip":"10.8.0.2","raw":"1794334191,ASSIGN_IP,,10.8.0.2,,,,","remote":"","state":"ASSIGN_IP","t":6.298}
+openvpn[stdout]| 2026-11-10 19:09:51 NETSH: C:\Windows\system32\netsh.exe interface ip set address 213 static 10.8.0.2 255.255.255.0 store=active
+openvpn[stdout]| 2026-11-10 19:09:51 NETSH: C:\Windows\system32\netsh.exe interface ip delete dns 213 all
+openvpn[stdout]| 2026-11-10 19:09:52 NETSH: C:\Windows\system32\netsh.exe interface ip set dns 213 static 10.8.0.1 validate=no
+openvpn[stdout]| 2026-11-10 19:09:52 NETSH: C:\Windows\system32\netsh.exe interface ip delete wins 213 all
+openvpn[stdout]| 2026-11-10 19:09:52 PowerShell: C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command Set-DnsClient -InterfaceIndex 213 -ConnectionSpecificSuffix 'galleria.test'
+openvpn[stdout]| 2026-11-10 19:09:54 IPv4 MTU set to 1500 on interface 213 using SetIpInterfaceEntry()
+openvpn[stdout]| 2026-11-10 19:09:54 C:/Windows/System32/cmd.exe /c echo x > C:\gl\PWNED-up.txt OpenVPN Data Channel Offload 1500 0 10.8.0.2 255.255.255.0 init
+openvpn[stdout]| 2026-11-10 19:09:54 env_block: add PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem
+{"event":"fatal","message":"WARNING: Failed running command (--up/--down): returned error code 1","t":9.373}
+openvpn[stdout]| 2026-11-10 19:09:54 MANAGEMENT: Client disconnected
+openvpn[stdout]| 2026-11-10 19:09:54 WARNING: Failed running command (--up/--down): returned error code 1
+openvpn[stdout]| 2026-11-10 19:09:54 Exiting due to fatal error
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":9.382}
+{"after_secs":2,"event":"retry","next_attempt":3,"reason":"connection failed","t":9.383}
+{"event":"attempt","n":3,"of":3,"t":11.383}
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-6740-1b4819d2ccf47223"],"event":"openvpn_spawned","pid":5020,"stdin":"pipe: management password","t":11.384}
+openvpn[stdout]| 2026-11-10 19:09:56 Note: --cipher is not set. OpenVPN versions before 2.5 defaulted to BF-CBC as fallback when cipher negotiation failed in this case. If you need this fallback please add '--data-ciphers-fallback BF-CBC' to your configuration and/or add BF-CBC to --data-ciphers. E.g. --data-ciphers DEFAULT:BF-CBC
+openvpn[stdout]| 2026-11-10 19:09:56 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 19:09:56 Windows version: 10.0.26100,amd64
+openvpn[stdout]| 2026-11-10 19:09:56 library versions: OpenSSL 3.6.5 29 Sep 2026, LZO 2.10
+openvpn[stdout]| 2026-11-10 19:09:56 DCO version: 2.8.14
+openvpn[stderr]| Enter Management Password:
+openvpn[stdout]| 2026-11-10 19:09:56 MANAGEMENT: TCP Socket listening on [AF_INET]127.0.0.1:50087
+openvpn[stdout]| 2026-11-10 19:09:56 Need hold release from management interface, waiting...
+{"endpoint":"tcp 127.0.0.1:50087 (openvpn listens)","event":"mgmt_connected","t":11.897}
+openvpn[stdout]| 2026-11-10 19:09:57 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:50098
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 6 -- type 'help' for more info","t":11.897}
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":11.897}
+openvpn[stdout]| 2026-11-10 19:09:57 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 19:09:57 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 19:09:57 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 19:09:57 MANAGEMENT: CMD 'hold release'
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":12.3}
+{"event":"credentials_sent","static_challenge":false,"t":12.3,"type":"Auth"}
+openvpn[stdout]| 2026-11-10 19:09:57 MANAGEMENT: CMD 'username "Auth" "alice"'
+openvpn[stdout]| 2026-11-10 19:09:57 MANAGEMENT: CMD 'password [...]'
+openvpn[stdout]| 2026-11-10 19:09:57 NOTE: the current --script-security setting may allow this configuration to call user-defined scripts
+openvpn[stdout]| 2026-11-10 19:09:57 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:09:57 UDP link local: (not bound)
+openvpn[stdout]| 2026-11-10 19:09:57 UDP link remote: [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:09:57 MANAGEMENT: >STATE:1794334197,WAIT,,,,,,
+{"detail":"","event":"state","local_ip":"","raw":"1794334197,WAIT,,,,,,","remote":"","state":"WAIT","t":12.316}
+openvpn[stdout]| 2026-11-10 19:09:57 MANAGEMENT: >STATE:1794334197,AUTH,,,,,,
+openvpn[stdout]| 2026-11-10 19:09:57 TLS: Initial packet from [AF_INET]127.0.0.1:11194, sid=f44012cb 4a2becd4
+openvpn[stdout]| 2026-11-10 19:09:57 WARNING: this configuration may cache passwords in memory -- use the auth-nocache option to prevent this
+{"detail":"","event":"state","local_ip":"","raw":"1794334197,AUTH,,,,,,","remote":"","state":"AUTH","t":12.335}
+openvpn[stdout]| 2026-11-10 19:09:57 VERIFY OK: depth=1, CN=Galleria Lab CA
+openvpn[stdout]| 2026-11-10 19:09:57 VERIFY KU OK
+openvpn[stdout]| 2026-11-10 19:09:57 Validating certificate extended key usage
+openvpn[stdout]| 2026-11-10 19:09:57 ++ Certificate has EKU (str) TLS Web Server Authentication, expects TLS Web Server Authentication
+openvpn[stdout]| 2026-11-10 19:09:57 VERIFY EKU OK
+openvpn[stdout]| 2026-11-10 19:09:57 VERIFY OK: depth=0, CN=server
+openvpn[stdout]| 2026-11-10 19:09:57 Control Channel: TLSv1.3, cipher TLSv1.3 TLS_AES_256_GCM_SHA384, peer certificate: 256 bits ECprime256v1, signature: ecdsa-with-SHA256, peer temporary key: 253 bits X25519, peer signing digest/type: ecdsa_secp256r1_sha256 ECDSA, key agreement: x25519
+openvpn[stdout]| 2026-11-10 19:09:57 [server] Peer Connection Initiated with [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 19:09:57 env_block: add PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem
+openvpn[stdout]| 2026-11-10 19:09:57 WARNING: Failed running command (--ipchange): returned error code 1
+openvpn[stdout]| 2026-11-10 19:09:57 TLS: move_session: dest=TM_ACTIVE src=TM_INITIAL reinit_src=1
+openvpn[stdout]| 2026-11-10 19:09:57 TLS: tls_multi_process: initial untrusted session promoted to trusted
+openvpn[stdout]| 2026-11-10 19:09:57 PUSH: Received control message: 'PUSH_REPLY,dhcp-option DNS 10.8.0.1,dhcp-option DOMAIN galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 60,ifconfig 10.8.0.2 255.255.255.0,peer-id 0,cipher AES-256-GCM,protocol-flags cc-exit tls-ekm dyn-tls-crypt,tun-mtu 1500'
+openvpn[stdout]| 2026-11-10 19:09:57 WARNING: You have specified redirect-gateway and redirect-private at the same time (or the same option multiple times). This is not well supported and may lead to unexpected results
+openvpn[stdout]| 2026-11-10 19:09:57 OPTIONS IMPORT: --ifconfig/up options modified
+openvpn[stdout]| 2026-11-10 19:09:57 OPTIONS IMPORT: route options modified
+openvpn[stdout]| 2026-11-10 19:09:57 OPTIONS IMPORT: route-related options modified
+openvpn[stdout]| 2026-11-10 19:09:57 OPTIONS IMPORT: --ip-win32 and/or --dhcp-option options modified
+openvpn[stdout]| 2026-11-10 19:09:57 OPTIONS IMPORT: tun-mtu set to 1500
+openvpn[stdout]| 2026-11-10 19:09:57 interactive service msg_channel=0
+openvpn[stdout]| 2026-11-10 19:09:57 ROUTE_GATEWAY 172.23.16.1/255.255.240.0 I=205 HWADDR=00:15:5d:c1:ab:e2
+openvpn[stdout]| 2026-11-10 19:09:57 ovpn-dco device [OpenVPN Data Channel Offload] opened
+openvpn[stdout]| 2026-11-10 19:09:57 MANAGEMENT: >STATE:1794334197,ASSIGN_IP,,10.8.0.2,,,,
+{"detail":"","event":"state","local_ip":"10.8.0.2","raw":"1794334197,ASSIGN_IP,,10.8.0.2,,,,","remote":"","state":"ASSIGN_IP","t":12.436}
+openvpn[stdout]| 2026-11-10 19:09:57 NETSH: C:\Windows\system32\netsh.exe interface ip set address 213 static 10.8.0.2 255.255.255.0 store=active
+openvpn[stdout]| 2026-11-10 19:09:58 NETSH: C:\Windows\system32\netsh.exe interface ip delete dns 213 all
+openvpn[stdout]| 2026-11-10 19:09:58 NETSH: C:\Windows\system32\netsh.exe interface ip set dns 213 static 10.8.0.1 validate=no
+openvpn[stdout]| 2026-11-10 19:09:58 NETSH: C:\Windows\system32\netsh.exe interface ip delete wins 213 all
+openvpn[stdout]| 2026-11-10 19:09:58 PowerShell: C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command Set-DnsClient -InterfaceIndex 213 -ConnectionSpecificSuffix 'galleria.test'
+openvpn[stdout]| 2026-11-10 19:10:01 IPv4 MTU set to 1500 on interface 213 using SetIpInterfaceEntry()
+openvpn[stdout]| 2026-11-10 19:10:01 C:/Windows/System32/cmd.exe /c echo x > C:\gl\PWNED-up.txt OpenVPN Data Channel Offload 1500 0 10.8.0.2 255.255.255.0 init
+openvpn[stdout]| 2026-11-10 19:10:01 env_block: add PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem
+{"event":"fatal","message":"WARNING: Failed running command (--up/--down): returned error code 1","t":15.693}
+openvpn[stdout]| 2026-11-10 19:10:01 MANAGEMENT: Client disconnected
+openvpn[stdout]| 2026-11-10 19:10:01 WARNING: Failed running command (--up/--down): returned error code 1
+openvpn[stdout]| 2026-11-10 19:10:01 Exiting due to fatal error
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":15.703}
+{"event":"error","kind":"gave_up","message":"Server non raggiungibile dopo 3 tentativi: connection failed","retry":false,"t":15.703}
+{"code":4,"event":"exit","t":15.703}

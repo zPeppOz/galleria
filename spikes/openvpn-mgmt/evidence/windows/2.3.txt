@@ -1,0 +1,102 @@
+
+=== 2.3 management interface su Windows: TCP 127.0.0.1, porta casuale, password di sessione con pw-file stdin ===
+2026-11-10T17:49:39Z
+OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+
+--- A) sessione normale: il demone (SYSTEM, sessione 0) e' collegato alla management interface ---
+connesso
+porta scelta dal demone: 49752; password di sessione: 64 caratteri esadecimali (256 bit), rivelata solo per questa prova
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-7756-d800361ef7509542"],"event":"openvpn_spawned","pid":7964,"stdin":"pipe: management password","t":0.021}
+openvpn[stderr]| Enter Management Password:
+openvpn[stdout]| 2026-11-10 18:49:40 MANAGEMENT: TCP Socket listening on [AF_INET]127.0.0.1:49752
+openvpn[stdout]| 2026-11-10 18:49:41 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:49753
+
+--- righe di comando (Get-CimInstance Win32_Process) ---
+pid=7756 ppid=4820 session=0 owner=SYSTEM cmdline=C:\gl\d639299297597687471\galleriad-spike.exe  connect 
+pid=7964 ppid=7756 session=0 owner=SYSTEM cmdline="C:\Program Files\OpenVPN\bin\openvpn.exe" --config \\.\pipe\galleria-cfg-7756-d800361ef7509542
+la password compare in una riga di comando: False
+
+PS> netstat -ano | Select-String ':49752 '
+
+  TCP    127.0.0.1:49752        0.0.0.0:0              LISTENING       7964
+  TCP    127.0.0.1:49752        127.0.0.1:49753        ESTABLISHED     7964
+  TCP    127.0.0.1:49753        127.0.0.1:49752        ESTABLISHED     7756
+
+
+
+
+--- secondo client mentre il demone e' collegato: senza password ---
+mgmtprobe: tcp connect ok after 0.002s
+mgmtprobe: greeting: no data (Impossibile stabilire la connessione. Risposta non corretta della parte connessa dopo l'intervallo di tempo oppure mancata risposta dall'host collegato. (os error 10060))
+mgmtprobe: after password: no data (Impossibile stabilire la connessione. Risposta non corretta della parte connessa dopo l'intervallo di tempo oppure mancata risposta dall'host collegato. (os error 10060))
+mgmtprobe: after `state`: no data (Impossibile stabilire la connessione. Risposta non corretta della parte connessa dopo l'intervallo di tempo oppure mancata risposta dall'host collegato. (os error 10060))
+--- secondo client mentre il demone e' collegato: con la password giusta ---
+mgmtprobe: connect to 127.0.0.1:49752 failed: Impossibile stabilire la connessione. Rifiuto persistente del computer di destinazione. (os error 10061)
+--- secondo client da un utente locale senza privilegi ---
+[come utente gltest, exit ]
+mgmtprobe: connect to 127.0.0.1:49752 failed: Impossibile stabilire la connessione. Rifiuto persistente del computer di destinazione. (os error 10061)
+
+ricerca di [password della management interface] in C:\ProgramData, C:\Windows\Temp, C:\Users, C:\Program Files\OpenVPN, C:\Windows\System32\config\systemprofile: 0 file
+[daemon {"code":0,"event":"exit","t":53.602}]
+--- il demone ha continuato a ricevere eventi dopo i tentativi (ultimi byte) ---
+{"event":"bytecount","in":"14719","out":"16270","t":48.377}
+{"event":"bytecount","in":"14719","out":"16270","t":49.461}
+
+--- B) porta non ancora presa dal demone (collegamento ritardato di 25 s per la prova): chi arriva prima deve dare la password ---
+--- senza password (admin) ---
+mgmtprobe: tcp connect ok after 0.002s
+mgmtprobe: greeting: "ENTER PASSWORD:"
+mgmtprobe: after password: "ENTER PASSWORD:"
+mgmtprobe: after `state`: "ENTER PASSWORD:"
+--- password sbagliata (admin) ---
+mgmtprobe: tcp connect ok after 0.002s
+mgmtprobe: greeting: "ENTER PASSWORD:"
+mgmtprobe: after password: "ENTER PASSWORD:"
+mgmtprobe: after `state`: "ENTER PASSWORD:"
+--- password sbagliata (utente senza privilegi) ---
+[come utente gltest, exit ]
+mgmtprobe: tcp connect ok after 0.002s
+mgmtprobe: greeting: "ENTER PASSWORD:"
+mgmtprobe: after password: "ENTER PASSWORD:"
+mgmtprobe: after `state`: "ENTER PASSWORD:"
+poi il demone si collega con la password giusta: connesso
+[daemon {"code":0,"event":"exit","t":38.068}]
+openvpn[stdout]| 2026-11-10 18:50:34 MANAGEMENT: TCP Socket listening on [AF_INET]127.0.0.1:49771
+openvpn[stdout]| 2026-11-10 18:50:36 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:49772
+openvpn[stdout]| 2026-11-10 18:50:36 MANAGEMENT: Client disconnected
+openvpn[stdout]| 2026-11-10 18:50:36 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:49773
+openvpn[stdout]| 2026-11-10 18:50:36 MANAGEMENT: Client disconnected
+openvpn[stdout]| 2026-11-10 18:50:36 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:49774
+openvpn[stdout]| 2026-11-10 18:50:36 MANAGEMENT: Client disconnected
+openvpn[stdout]| 2026-11-10 18:50:59 MANAGEMENT: Client connected from [AF_INET]127.0.0.1:49776
+{"endpoint":"tcp 127.0.0.1:49771 (openvpn listens)","event":"mgmt_connected","t":25.022}
+openvpn[stdout]| 2026-11-10 18:50:59 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 18:50:59 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 18:50:59 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 18:50:59 MANAGEMENT: CMD 'hold release'
+openvpn[stdout]| 2026-11-10 18:50:59 MANAGEMENT: CMD 'username "Auth" "alice"'
+
+--- C) management-client: e' OpenVPN a collegarsi al demone (che ascolta su una porta casuale) ---
+connesso
+PS> netstat -ano | Select-String ':49788 '
+
+  TCP    127.0.0.1:49788        0.0.0.0:0              LISTENING       4692
+  TCP    127.0.0.1:49788        127.0.0.1:49789        ESTABLISHED     4692
+  TCP    127.0.0.1:49789        127.0.0.1:49788        ESTABLISHED     4696
+
+
+
+
+pid=4692 ppid=2224 session=0 owner=SYSTEM cmdline=C:\gl\d639299297597687471\galleriad-spike.exe  connect 
+pid=4696 ppid=4692 session=0 owner=SYSTEM cmdline="C:\Program Files\OpenVPN\bin\openvpn.exe" --config \\.\pipe\galleria-cfg-4692-486e16992629fdbe
+[daemon {"code":0,"event":"exit","t":35.803}]
+{"config_via":"Pipe","daemon_directives":["management 127.0.0.1 49788 stdin","management-client","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"C:/gl/d639299297597687471/galleriad-spike.exe netcfg galleria-netcfg-4692-8299c26fa25f418d\"","down \"C:/gl/d639299297597687471/galleriad-spike.exe netcfg galleria-netcfg-4692-8
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-4692-486e16992629fdbe"],"event":"openvpn_spawned","pid":4696,"stdin":"pipe: management password","t":0.021}
+openvpn[stderr]| Enter Management Password:
+openvpn[stdout]| 2026-11-10 18:51:13 MANAGEMENT: Connected to management server at [AF_INET]127.0.0.1:49788
+{"endpoint":"tcp 127.0.0.1:49788 (management-client: openvpn connects to the daemon)","event":"mgmt_connected","t":0.073}
+{"event":"mgmt_info","info":"OpenVPN Management Interface Version 6 -- type 'help' for more info","t":0.073}
+openvpn[stdout]| 2026-11-10 18:51:13 MANAGEMENT: CMD 'version 3'
+openvpn[stdout]| 2026-11-10 18:51:13 MANAGEMENT: CMD 'state on'
+openvpn[stdout]| 2026-11-10 18:51:13 MANAGEMENT: CMD 'bytecount 1'
+openvpn[stdout]| 2026-11-10 18:51:13 MANAGEMENT: CMD 'hold release'

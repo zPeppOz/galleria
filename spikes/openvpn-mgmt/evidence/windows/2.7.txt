@@ -1,0 +1,479 @@
+
+=== 2.7 DNS e rotte spinte dal server su Windows: cosa arriva al demone, cosa applica OpenVPN da solo ===
+2026-11-10T17:56:27Z
+OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+
+--- prima ---
+PS> Get-NetAdapter | Format-Table Name, InterfaceDescription, Status, ifIndex -AutoSize
+
+Name                         InterfaceDescription              Status       ifIndex
+----                         --------------------              ------       -------
+OpenVPN TAP-Windows6         TAP-Windows Adapter V9            Disconnected     209
+Ethernet                     Microsoft Hyper-V Network Adapter Up               205
+OpenVPN Data Channel Offload OpenVPN Data Channel Offload      Disconnected     213
+
+
+
+
+PS> Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses | Format-Table InterfaceAlias, ServerAddresses -AutoSize
+
+InterfaceAlias ServerAddresses
+-------------- ---------------
+Ethernet       {172.23.16.1}  
+
+
+
+
+PS> Get-DnsClient | Where-Object ConnectionSpecificSuffix | Format-Table InterfaceAlias, ConnectionSpecificSuffix -AutoSize
+
+InterfaceAlias ConnectionSpecificSuffix
+-------------- ------------------------
+Ethernet       mshome.net              
+
+
+
+
+PS> Get-DnsClientNrptRule | Format-List Namespace, NameServers, Comment; 'regole NRPT: ' + @(Get-DnsClientNrptRule).Count
+regole NRPT: 0
+
+
+PS> Get-NetRoute -AddressFamily IPv4 | Where-Object { $_.DestinationPrefix -in '0.0.0.0/0','0.0.0.0/1','128.0.0.0/1','192.0.2.0/24','127.0.0.1/32' } | Format-Table ifIndex, InterfaceAlias, DestinationPrefix, NextHop, RouteMetric -AutoSize
+
+ifIndex InterfaceAlias              DestinationPrefix NextHop     RouteMetric
+------- --------------              ----------------- -------     -----------
+    200 Loopback Pseudo-Interface 1 127.0.0.1/32      0.0.0.0             256
+    205 Ethernet                    0.0.0.0/0         172.23.16.1           0
+
+
+
+
+=================== 2.7-dhcpopt ===================
+connesso
+PS> Get-NetAdapter | Format-Table Name, InterfaceDescription, Status, ifIndex -AutoSize
+
+Name                         InterfaceDescription              Status       ifIndex
+----                         --------------------              ------       -------
+OpenVPN TAP-Windows6         TAP-Windows Adapter V9            Disconnected     209
+Ethernet                     Microsoft Hyper-V Network Adapter Up               205
+OpenVPN Data Channel Offload OpenVPN Data Channel Offload      Up               213
+
+
+
+
+PS> Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses | Format-Table InterfaceAlias, ServerAddresses -AutoSize
+
+InterfaceAlias               ServerAddresses
+--------------               ---------------
+Ethernet                     {172.23.16.1}  
+OpenVPN Data Channel Offload {10.8.0.1}     
+
+
+
+
+PS> Get-DnsClient | Where-Object ConnectionSpecificSuffix | Format-Table InterfaceAlias, ConnectionSpecificSuffix -AutoSize
+
+InterfaceAlias               ConnectionSpecificSuffix
+--------------               ------------------------
+Ethernet                     mshome.net              
+OpenVPN Data Channel Offload galleria.test           
+
+
+
+
+PS> Get-DnsClientNrptRule | Format-List Namespace, NameServers, Comment; 'regole NRPT: ' + @(Get-DnsClientNrptRule).Count
+regole NRPT: 0
+
+
+PS> Get-NetRoute -AddressFamily IPv4 | Where-Object { $_.DestinationPrefix -in '0.0.0.0/0','0.0.0.0/1','128.0.0.0/1','192.0.2.0/24','127.0.0.1/32' } | Format-Table ifIndex, InterfaceAlias, DestinationPrefix, NextHop, RouteMetric -AutoSize
+
+ifIndex InterfaceAlias               DestinationPrefix NextHop     RouteMetric
+------- --------------               ----------------- -------     -----------
+    213 OpenVPN Data Channel Offload 192.0.2.0/24      10.8.0.1            175
+    213 OpenVPN Data Channel Offload 128.0.0.0/1       10.8.0.1              0
+    200 Loopback Pseudo-Interface 1  127.0.0.1/32      0.0.0.0             256
+    213 OpenVPN Data Channel Offload 0.0.0.0/1         10.8.0.1              0
+    205 Ethernet                     0.0.0.0/0         172.23.16.1           0
+
+
+
+
+PS> Resolve-DnsName intranet.galleria.test -Type A -DnsOnly -ErrorAction Continue | Format-Table Name, Type, IPAddress -AutoSize
+
+Name                   Type IPAddress
+----                   ---- ---------
+intranet.galleria.test    A 10.8.0.1 
+
+
+
+
+PS> ping -n 2 10.8.0.1; ping -n 2 10.9.0.1
+
+Esecuzione di Ping 10.8.0.1 con 32 byte di dati:
+Risposta da 10.8.0.1: byte=32 durata=13ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=21ms TTL=64
+
+Statistiche Ping per 10.8.0.1:
+    Pacchetti: Trasmessi = 2, Ricevuti = 2, 
+    Persi = 0 (0% persi),
+Tempo approssimativo percorsi andata/ritorno in millisecondi:
+    Minimo = 13ms, Massimo =  21ms, Medio =  17ms
+
+Esecuzione di Ping 10.9.0.1 con 32 byte di dati:
+Richiesta scaduta.
+Richiesta scaduta.
+
+Statistiche Ping per 10.9.0.1:
+    Pacchetti: Trasmessi = 2, Ricevuti = 0, 
+    Persi = 2 (100% persi),
+
+
+[daemon {"code":0,"event":"exit","t":33.698}]
+--- cosa ha ricevuto il demone dal programma fisso (--up / --down) ---
+script_type=up dns_channels= parsed={"dev":"OpenVPN Data Channel Offload","dns_servers":[],"domains":[],"redirect_gateway":false}
+    dev=OpenVPN Data Channel Offload
+    ifconfig_local=10.8.0.2
+    ifconfig_netmask=255.255.255.0
+    route_gateway_1=10.8.0.1
+    route_net_gateway=172.23.16.1
+    route_netmask_1=255.255.255.0
+    route_network_1=192.0.2.0
+    route_redirect_gateway_ipv4=1
+    route_vpn_gateway=10.8.0.1
+script_type=down dns_channels= parsed={"dev":"OpenVPN Data Channel Offload","dns_servers":[],"domains":[],"redirect_gateway":true}
+    dev=OpenVPN Data Channel Offload
+    ifconfig_local=10.8.0.2
+    ifconfig_netmask=255.255.255.0
+    redirect_gateway=1
+    route_gateway_1=10.8.0.1
+    route_net_gateway=172.23.16.1
+    route_netmask_1=255.255.255.0
+    route_network_1=192.0.2.0
+    route_redirect_gateway_ipv4=1
+    route_vpn_gateway=10.8.0.1
+--- cosa ha fatto OpenVPN da solo (log) ---
+openvpn[stdout]| 2026-11-10 18:56:33 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 18:56:35 PUSH: Received control message: 'PUSH_REPLY,dhcp-option DNS 10.8.0.1,dhcp-option DOMAIN galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 60,ifconf
+openvpn[stdout]| 2026-11-10 18:56:35 WARNING: You have specified redirect-gateway and redirect-private at the same time (or the same option multiple times). This is not well supported and may lead to unexpected results
+openvpn[stdout]| 2026-11-10 18:56:35 OPTIONS IMPORT: route options modified
+openvpn[stdout]| 2026-11-10 18:56:35 OPTIONS IMPORT: route-related options modified
+openvpn[stdout]| 2026-11-10 18:56:35 interactive service msg_channel=0
+openvpn[stdout]| 2026-11-10 18:56:35 ROUTE_GATEWAY 172.23.16.1/255.255.240.0 I=205 HWADDR=00:15:5d:c1:ab:e2
+openvpn[stdout]| 2026-11-10 18:56:35 NETSH: C:\Windows\system32\netsh.exe interface ip set address 213 static 10.8.0.2 255.255.255.0 store=active
+openvpn[stdout]| 2026-11-10 18:56:35 NETSH: C:\Windows\system32\netsh.exe interface ip delete dns 213 all
+openvpn[stdout]| 2026-11-10 18:56:35 NETSH: C:\Windows\system32\netsh.exe interface ip set dns 213 static 10.8.0.1 validate=no
+openvpn[stdout]| 2026-11-10 18:56:35 NETSH: C:\Windows\system32\netsh.exe interface ip delete wins 213 all
+openvpn[stdout]| 2026-11-10 18:56:35 PowerShell: C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command Set-DnsClient -InterfaceIndex 213 -ConnectionSpecificSuffix 'galleria.test'
+openvpn[stdout]| 2026-11-10 18:56:38 IPv4 MTU set to 1500 on interface 213 using SetIpInterfaceEntry()
+openvpn[stdout]| 2026-11-10 18:56:38 env_block: add PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem
+openvpn[stdout]| 2026-11-10 18:56:38 C:\Windows\system32\route.exe ADD 0.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 18:56:38 ROUTE: CreateIpForwardEntry succeeded with dwForwardMetric1=25 and dwForwardType=4
+openvpn[stdout]| 2026-11-10 18:56:38 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 18:56:38 C:\Windows\system32\route.exe ADD 128.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 18:56:38 ROUTE: CreateIpForwardEntry succeeded with dwForwardMetric1=25 and dwForwardType=4
+openvpn[stdout]| 2026-11-10 18:56:38 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 18:56:38 MANAGEMENT: >STATE:1794333398,ADD_ROUTES,,,,,,
+openvpn[stdout]| 2026-11-10 18:56:38 C:\Windows\system32\route.exe ADD 192.0.2.0 MASK 255.255.255.0 10.8.0.1 METRIC 200
+openvpn[stdout]| 2026-11-10 18:56:38 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 18:57:03 C:\Windows\system32\route.exe DELETE 192.0.2.0 MASK 255.255.255.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 18:57:03 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 18:57:03 C:\Windows\system32\route.exe DELETE 0.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 18:57:03 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 18:57:03 C:\Windows\system32\route.exe DELETE 128.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 18:57:03 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 18:57:03 PowerShell: C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command Set-DnsClient -InterfaceIndex 213 -ConnectionSpecificSuffix ''
+
+=================== 2.7-dnsopt ===================
+connesso
+PS> Get-NetAdapter | Format-Table Name, InterfaceDescription, Status, ifIndex -AutoSize
+
+Name                         InterfaceDescription              Status       ifIndex
+----                         --------------------              ------       -------
+OpenVPN TAP-Windows6         TAP-Windows Adapter V9            Disconnected     209
+Ethernet                     Microsoft Hyper-V Network Adapter Up               205
+OpenVPN Data Channel Offload OpenVPN Data Channel Offload      Up               213
+
+
+
+
+PS> Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses | Format-Table InterfaceAlias, ServerAddresses -AutoSize
+
+InterfaceAlias ServerAddresses
+-------------- ---------------
+Ethernet       {172.23.16.1}  
+
+
+
+
+PS> Get-DnsClient | Where-Object ConnectionSpecificSuffix | Format-Table InterfaceAlias, ConnectionSpecificSuffix -AutoSize
+
+InterfaceAlias ConnectionSpecificSuffix
+-------------- ------------------------
+Ethernet       mshome.net              
+
+
+
+
+PS> Get-DnsClientNrptRule | Format-List Namespace, NameServers, Comment; 'regole NRPT: ' + @(Get-DnsClientNrptRule).Count
+regole NRPT: 0
+
+
+PS> Get-NetRoute -AddressFamily IPv4 | Where-Object { $_.DestinationPrefix -in '0.0.0.0/0','0.0.0.0/1','128.0.0.0/1','192.0.2.0/24','127.0.0.1/32' } | Format-Table ifIndex, InterfaceAlias, DestinationPrefix, NextHop, RouteMetric -AutoSize
+
+ifIndex InterfaceAlias               DestinationPrefix NextHop     RouteMetric
+------- --------------               ----------------- -------     -----------
+    213 OpenVPN Data Channel Offload 192.0.2.0/24      10.9.0.1            175
+    213 OpenVPN Data Channel Offload 128.0.0.0/1       10.9.0.1              0
+    200 Loopback Pseudo-Interface 1  127.0.0.1/32      0.0.0.0             256
+    213 OpenVPN Data Channel Offload 0.0.0.0/1         10.9.0.1              0
+    205 Ethernet                     0.0.0.0/0         172.23.16.1           0
+
+
+
+
+PS> Resolve-DnsName intranet.galleria.test -Type A -DnsOnly -ErrorAction Continue | Format-Table Name, Type, IPAddress -AutoSize
+
+
+PS> ping -n 2 10.8.0.1; ping -n 2 10.9.0.1
+
+Esecuzione di Ping 10.8.0.1 con 32 byte di dati:
+PING: trasmissione non riuscita. Errore generale. 
+PING: trasmissione non riuscita. Errore generale. 
+
+Statistiche Ping per 10.8.0.1:
+    Pacchetti: Trasmessi = 2, Ricevuti = 0, 
+    Persi = 2 (100% persi),
+
+Esecuzione di Ping 10.9.0.1 con 32 byte di dati:
+PING: trasmissione non riuscita. Errore generale. 
+PING: trasmissione non riuscita. Errore generale. 
+
+Statistiche Ping per 10.9.0.1:
+    Pacchetti: Trasmessi = 2, Ricevuti = 0, 
+    Persi = 2 (100% persi),
+
+
+[daemon {"code":0,"event":"exit","t":26.715}]
+--- cosa ha ricevuto il demone dal programma fisso (--up / --down) ---
+script_type=up dns_channels= parsed={"dev":"OpenVPN Data Channel Offload","dns_servers":[],"domains":[],"redirect_gateway":false}
+    dev=OpenVPN Data Channel Offload
+    ifconfig_local=10.9.0.2
+    ifconfig_netmask=255.255.255.0
+    route_gateway_1=10.9.0.1
+    route_net_gateway=172.23.16.1
+    route_netmask_1=255.255.255.0
+    route_network_1=192.0.2.0
+    route_redirect_gateway_ipv4=1
+    route_vpn_gateway=10.9.0.1
+script_type=down dns_channels= parsed={"dev":"OpenVPN Data Channel Offload","dns_servers":[],"domains":[],"redirect_gateway":true}
+    dev=OpenVPN Data Channel Offload
+    ifconfig_local=10.9.0.2
+    ifconfig_netmask=255.255.255.0
+    redirect_gateway=1
+    route_gateway_1=10.9.0.1
+    route_net_gateway=172.23.16.1
+    route_netmask_1=255.255.255.0
+    route_network_1=192.0.2.0
+    route_redirect_gateway_ipv4=1
+    route_vpn_gateway=10.9.0.1
+--- cosa ha fatto OpenVPN da solo (log) ---
+openvpn[stdout]| 2026-11-10 18:57:07 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11195
+openvpn[stdout]| 2026-11-10 18:57:08 PUSH: Received control message: 'PUSH_REPLY,dns server 0 address 10.9.0.1,dns search-domains galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.9.0.1,topology subnet,ping 10,ping-restart 60,i
+openvpn[stdout]| 2026-11-10 18:57:08 WARNING: You have specified redirect-gateway and redirect-private at the same time (or the same option multiple times). This is not well supported and may lead to unexpected results
+openvpn[stdout]| 2026-11-10 18:57:08 OPTIONS IMPORT: route options modified
+openvpn[stdout]| 2026-11-10 18:57:08 OPTIONS IMPORT: route-related options modified
+openvpn[stdout]| 2026-11-10 18:57:08 interactive service msg_channel=0
+openvpn[stdout]| 2026-11-10 18:57:08 ROUTE_GATEWAY 172.23.16.1/255.255.240.0 I=205 HWADDR=00:15:5d:c1:ab:e2
+openvpn[stdout]| 2026-11-10 18:57:08 NETSH: C:\Windows\system32\netsh.exe interface ip set address 213 static 10.9.0.2 255.255.255.0 store=active
+openvpn[stdout]| 2026-11-10 18:57:08 NETSH: C:\Windows\system32\netsh.exe interface ip delete dns 213 all
+openvpn[stdout]| 2026-11-10 18:57:08 NETSH: C:\Windows\system32\netsh.exe interface ip delete wins 213 all
+openvpn[stdout]| 2026-11-10 18:57:08 IPv4 MTU set to 1500 on interface 213 using SetIpInterfaceEntry()
+openvpn[stdout]| 2026-11-10 18:57:08 DNS: could not talk to service: Handle non valido.   [6]
+openvpn[stdout]| 2026-11-10 18:57:08 env_block: add PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem
+openvpn[stdout]| 2026-11-10 18:57:08 C:\Windows\system32\route.exe ADD 0.0.0.0 MASK 128.0.0.0 10.9.0.1
+openvpn[stdout]| 2026-11-10 18:57:08 ROUTE: CreateIpForwardEntry succeeded with dwForwardMetric1=25 and dwForwardType=4
+openvpn[stdout]| 2026-11-10 18:57:08 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 18:57:08 C:\Windows\system32\route.exe ADD 128.0.0.0 MASK 128.0.0.0 10.9.0.1
+openvpn[stdout]| 2026-11-10 18:57:08 ROUTE: CreateIpForwardEntry succeeded with dwForwardMetric1=25 and dwForwardType=4
+openvpn[stdout]| 2026-11-10 18:57:08 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 18:57:08 MANAGEMENT: >STATE:1794333428,ADD_ROUTES,,,,,,
+openvpn[stdout]| 2026-11-10 18:57:08 C:\Windows\system32\route.exe ADD 192.0.2.0 MASK 255.255.255.0 10.9.0.1 METRIC 200
+openvpn[stdout]| 2026-11-10 18:57:08 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 18:57:33 DNS: could not talk to service: Handle non valido.   [6]
+openvpn[stdout]| 2026-11-10 18:57:33 C:\Windows\system32\route.exe DELETE 192.0.2.0 MASK 255.255.255.0 10.9.0.1
+openvpn[stdout]| 2026-11-10 18:57:33 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 18:57:33 C:\Windows\system32\route.exe DELETE 0.0.0.0 MASK 128.0.0.0 10.9.0.1
+openvpn[stdout]| 2026-11-10 18:57:33 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 18:57:33 C:\Windows\system32\route.exe DELETE 128.0.0.0 MASK 128.0.0.0 10.9.0.1
+openvpn[stdout]| 2026-11-10 18:57:33 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 18:57:33 NETSH: C:\Windows\system32\netsh.exe interface ipv4 delete address 213 10.9.0.2 store=active
+
+=================== 2.7-dhcpopt-noup ===================
+connesso
+PS> Get-NetAdapter | Format-Table Name, InterfaceDescription, Status, ifIndex -AutoSize
+
+Name                         InterfaceDescription              Status       ifIndex
+----                         --------------------              ------       -------
+OpenVPN TAP-Windows6         TAP-Windows Adapter V9            Disconnected     209
+Ethernet                     Microsoft Hyper-V Network Adapter Up               205
+OpenVPN Data Channel Offload OpenVPN Data Channel Offload      Up               213
+
+
+
+
+PS> Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses | Format-Table InterfaceAlias, ServerAddresses -AutoSize
+
+InterfaceAlias               ServerAddresses
+--------------               ---------------
+Ethernet                     {172.23.16.1}  
+OpenVPN Data Channel Offload {10.8.0.1}     
+
+
+
+
+PS> Get-DnsClient | Where-Object ConnectionSpecificSuffix | Format-Table InterfaceAlias, ConnectionSpecificSuffix -AutoSize
+
+InterfaceAlias               ConnectionSpecificSuffix
+--------------               ------------------------
+Ethernet                     mshome.net              
+OpenVPN Data Channel Offload galleria.test           
+
+
+
+
+PS> Get-DnsClientNrptRule | Format-List Namespace, NameServers, Comment; 'regole NRPT: ' + @(Get-DnsClientNrptRule).Count
+regole NRPT: 0
+
+
+PS> Get-NetRoute -AddressFamily IPv4 | Where-Object { $_.DestinationPrefix -in '0.0.0.0/0','0.0.0.0/1','128.0.0.0/1','192.0.2.0/24','127.0.0.1/32' } | Format-Table ifIndex, InterfaceAlias, DestinationPrefix, NextHop, RouteMetric -AutoSize
+
+ifIndex InterfaceAlias               DestinationPrefix NextHop     RouteMetric
+------- --------------               ----------------- -------     -----------
+    213 OpenVPN Data Channel Offload 192.0.2.0/24      10.8.0.1            175
+    213 OpenVPN Data Channel Offload 128.0.0.0/1       10.8.0.1              0
+    200 Loopback Pseudo-Interface 1  127.0.0.1/32      0.0.0.0             256
+    213 OpenVPN Data Channel Offload 0.0.0.0/1         10.8.0.1              0
+    205 Ethernet                     0.0.0.0/0         172.23.16.1           0
+
+
+
+
+PS> Resolve-DnsName intranet.galleria.test -Type A -DnsOnly -ErrorAction Continue | Format-Table Name, Type, IPAddress -AutoSize
+
+Name                   Type IPAddress
+----                   ---- ---------
+intranet.galleria.test    A 10.8.0.1 
+
+
+
+
+PS> ping -n 2 10.8.0.1; ping -n 2 10.9.0.1
+
+Esecuzione di Ping 10.8.0.1 con 32 byte di dati:
+Risposta da 10.8.0.1: byte=32 durata=13ms TTL=64
+Risposta da 10.8.0.1: byte=32 durata=20ms TTL=64
+
+Statistiche Ping per 10.8.0.1:
+    Pacchetti: Trasmessi = 2, Ricevuti = 2, 
+    Persi = 0 (0% persi),
+Tempo approssimativo percorsi andata/ritorno in millisecondi:
+    Minimo = 13ms, Massimo =  20ms, Medio =  16ms
+
+Esecuzione di Ping 10.9.0.1 con 32 byte di dati:
+Richiesta scaduta.
+Richiesta scaduta.
+
+Statistiche Ping per 10.9.0.1:
+    Pacchetti: Trasmessi = 2, Ricevuti = 0, 
+    Persi = 2 (100% persi),
+
+
+[daemon {"code":0,"event":"exit","t":28.44}]
+--- cosa ha ricevuto il demone dal programma fisso (--up / --down) ---
+--- cosa ha fatto OpenVPN da solo (log) ---
+openvpn[stdout]| 2026-11-10 18:57:36 TCP/UDP: Preserving recently used remote address: [AF_INET]127.0.0.1:11194
+openvpn[stdout]| 2026-11-10 18:57:37 PUSH: Received control message: 'PUSH_REPLY,dhcp-option DNS 10.8.0.1,dhcp-option DOMAIN galleria.test,route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 60,ifconf
+openvpn[stdout]| 2026-11-10 18:57:37 WARNING: You have specified redirect-gateway and redirect-private at the same time (or the same option multiple times). This is not well supported and may lead to unexpected results
+openvpn[stdout]| 2026-11-10 18:57:37 OPTIONS IMPORT: route options modified
+openvpn[stdout]| 2026-11-10 18:57:37 OPTIONS IMPORT: route-related options modified
+openvpn[stdout]| 2026-11-10 18:57:37 interactive service msg_channel=0
+openvpn[stdout]| 2026-11-10 18:57:37 ROUTE_GATEWAY 172.23.16.1/255.255.240.0 I=205 HWADDR=00:15:5d:c1:ab:e2
+openvpn[stdout]| 2026-11-10 18:57:37 NETSH: C:\Windows\system32\netsh.exe interface ip set address 213 static 10.8.0.2 255.255.255.0 store=active
+openvpn[stdout]| 2026-11-10 18:57:37 NETSH: C:\Windows\system32\netsh.exe interface ip delete dns 213 all
+openvpn[stdout]| 2026-11-10 18:57:37 NETSH: C:\Windows\system32\netsh.exe interface ip set dns 213 static 10.8.0.1 validate=no
+openvpn[stdout]| 2026-11-10 18:57:38 NETSH: C:\Windows\system32\netsh.exe interface ip delete wins 213 all
+openvpn[stdout]| 2026-11-10 18:57:38 PowerShell: C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command Set-DnsClient -InterfaceIndex 213 -ConnectionSpecificSuffix 'galleria.test'
+openvpn[stdout]| 2026-11-10 18:57:40 IPv4 MTU set to 1500 on interface 213 using SetIpInterfaceEntry()
+openvpn[stdout]| 2026-11-10 18:57:40 C:\Windows\system32\route.exe ADD 0.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 18:57:40 ROUTE: CreateIpForwardEntry succeeded with dwForwardMetric1=25 and dwForwardType=4
+openvpn[stdout]| 2026-11-10 18:57:40 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 18:57:40 C:\Windows\system32\route.exe ADD 128.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 18:57:40 ROUTE: CreateIpForwardEntry succeeded with dwForwardMetric1=25 and dwForwardType=4
+openvpn[stdout]| 2026-11-10 18:57:40 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 18:57:40 MANAGEMENT: >STATE:1794333460,ADD_ROUTES,,,,,,
+openvpn[stdout]| 2026-11-10 18:57:40 C:\Windows\system32\route.exe ADD 192.0.2.0 MASK 255.255.255.0 10.8.0.1 METRIC 200
+openvpn[stdout]| 2026-11-10 18:57:40 Route addition via ipapi [adaptive] succeeded
+openvpn[stdout]| 2026-11-10 18:58:01 C:\Windows\system32\route.exe DELETE 192.0.2.0 MASK 255.255.255.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 18:58:01 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 18:58:01 C:\Windows\system32\route.exe DELETE 0.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 18:58:01 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 18:58:01 C:\Windows\system32\route.exe DELETE 128.0.0.0 MASK 128.0.0.0 10.8.0.1
+openvpn[stdout]| 2026-11-10 18:58:01 Route deletion via IPAPI succeeded [adaptive]
+openvpn[stdout]| 2026-11-10 18:58:01 PowerShell: C:\Windows\system32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command Set-DnsClient -InterfaceIndex 213 -ConnectionSpecificSuffix ''
+openvpn[stdout]| 2026-11-10 18:58:03 NETSH: C:\Windows\system32\netsh.exe interface ipv4 delete dns 213 all
+
+--- dopo l'ultima disconnessione ---
+PS> Get-NetAdapter | Format-Table Name, InterfaceDescription, Status, ifIndex -AutoSize
+
+Name                         InterfaceDescription              Status       ifIndex
+----                         --------------------              ------       -------
+OpenVPN TAP-Windows6         TAP-Windows Adapter V9            Disconnected     209
+Ethernet                     Microsoft Hyper-V Network Adapter Up               205
+OpenVPN Data Channel Offload OpenVPN Data Channel Offload      Disconnected     213
+
+
+
+
+PS> Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object ServerAddresses | Format-Table InterfaceAlias, ServerAddresses -AutoSize
+
+InterfaceAlias ServerAddresses
+-------------- ---------------
+Ethernet       {172.23.16.1}  
+
+
+
+
+PS> Get-DnsClient | Where-Object ConnectionSpecificSuffix | Format-Table InterfaceAlias, ConnectionSpecificSuffix -AutoSize
+
+InterfaceAlias ConnectionSpecificSuffix
+-------------- ------------------------
+Ethernet       mshome.net              
+
+
+
+
+PS> Get-DnsClientNrptRule | Format-List Namespace, NameServers, Comment; 'regole NRPT: ' + @(Get-DnsClientNrptRule).Count
+regole NRPT: 0
+
+
+PS> Get-NetRoute -AddressFamily IPv4 | Where-Object { $_.DestinationPrefix -in '0.0.0.0/0','0.0.0.0/1','128.0.0.0/1','192.0.2.0/24','127.0.0.1/32' } | Format-Table ifIndex, InterfaceAlias, DestinationPrefix, NextHop, RouteMetric -AutoSize
+
+ifIndex InterfaceAlias              DestinationPrefix NextHop     RouteMetric
+------- --------------              ----------------- -------     -----------
+    200 Loopback Pseudo-Interface 1 127.0.0.1/32      0.0.0.0             256
+    205 Ethernet                    0.0.0.0/0         172.23.16.1           0
+
+
+
+
+
+--- query arrivate al dnsmasq dei server ---
+Nov 10 17:57:43 dnsmasq[12]: config error is REFUSED (EDE: not ready)
+Nov 10 17:57:46 dnsmasq[12]: query[A] wpad.galleria.test from 10.8.0.2
+Nov 10 17:57:46 dnsmasq[12]: config error is REFUSED (EDE: not ready)
+Nov 10 17:57:46 dnsmasq[12]: query[A] wpad.galleria.test from 10.8.0.2
+Nov 10 17:57:46 dnsmasq[12]: config error is REFUSED (EDE: not ready)
+Nov 10 17:06:53 dnsmasq[12]: started, version 2.91 cachesize 150
+Nov 10 17:06:53 dnsmasq[12]: compile time options: IPv6 GNU-getopt DBus no-UBus i18n IDN2 DHCP DHCPv6 no-Lua TFTP conntrack ipset nftset auth DNSSEC loop-detect inotify dumpfile
+Nov 10 17:06:53 dnsmasq[12]: warning: interface tun0 does not currently exist
+Nov 10 17:06:53 dnsmasq[12]: warning: no upstream servers configured
+Nov 10 17:06:53 dnsmasq[12]: cleared cache

@@ -1,0 +1,9 @@
+{"event":"openvpn_version","t":0.016,"version":"OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026"}
+{"directive":"verb","event":"profile_directive_removed","line":10,"reason":"blocked directive (M2)","t":0.019}
+{"config_via":"Stdin","daemon_directives":["management 127.0.0.1 49824 stdin","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"C:/gl/d639299299378985367/galleriad-spike.exe netcfg galleria-netcfg-3068-9aa39920095d017e\"","down \"C:/gl/d639299299378985367/galleriad-spike.exe netcfg galleria-netcfg-3068-9aa39920095d017e\""],"event":"generated_config","key_mode":"Inline","profile_directives":["client","dev tun","proto udp","remote 127.0.0.1 11194","redirect-gateway local","nobind","remote-cert-tls server","auth-user-pass","key-direction 1","<ca> [inline, content omitted]","<cert> [inline, content omitted]","<key> [inline, content omitted]","<tls-auth> [inline, content omitted]"],"t":0.019}
+{"event":"attempt","n":1,"of":1,"t":0.021}
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","stdin"],"event":"openvpn_spawned","pid":2172,"stdin":"pipe: management password","t":0.022}
+openvpn[stdout]| Options error: Unrecognized option or missing or extra parameter(s) in stdin:78: b04484f2a4a3b4ec4b9ed394877be0dc392a54200d4d21711d8186a091c875a5 (2.7.9)
+openvpn[stdout]| Use --help for more information.
+{"event":"error","kind":"gave_up","message":"Server non raggiungibile dopo 1 tentativi: openvpn exited before management was up (exit code: 1)","retry":false,"t":2.066}
+{"code":4,"event":"exit","t":2.066}

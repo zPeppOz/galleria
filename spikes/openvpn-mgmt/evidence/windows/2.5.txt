@@ -1,0 +1,28 @@
+
+=== 2.5 credenziali senza file su Windows: OTP con static-challenge, passphrase della chiave privata ===
+2026-11-10T18:09:13Z
+OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+
+--- 2.5-otp ---
+connesso
+[daemon {"code":0,"event":"exit","t":12.358}]
+{"config_via":"Pipe","daemon_directives":["management 127.0.0.1 50071 stdin","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"C:/gl/d639299309422988386/galleriad-spike.exe netcfg galleria-netcfg-7352-03b
+{"event":"mgmt_password","line":"Need 'Auth' username/password SC:1,Enter OTP","t":0.93}
+{"event":"credentials_sent","static_challenge":true,"t":0.93,"type":"Auth"}
+{"event":"connected","ip":"10.8.0.2","server":"127.0.0.1","t":4.224}
+
+--- 2.5-keypass ---
+connesso
+[daemon {"code":0,"event":"exit","t":12.164}]
+{"config_via":"Pipe","daemon_directives":["management 127.0.0.1 50079 stdin","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"C:/gl/d639299309422988386/galleriad-spike.exe netcfg galleria-netcfg-2708-2e6
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":0.938}
+{"event":"credentials_sent","static_challenge":false,"t":0.938,"type":"Auth"}
+{"event":"mgmt_password","line":"Need 'Private Key' password","t":0.948}
+{"event":"credentials_sent","t":0.948,"type":"Private Key"}
+{"event":"connected","ip":"10.8.0.2","server":"127.0.0.1","t":4.168}
+
+
+--- log del server (verify.sh) ---
+verify.sh: user=alice ok (password)
+verify.sh: user=bob ok (password + totp 541451)
+verify.sh: user=alice ok (password)

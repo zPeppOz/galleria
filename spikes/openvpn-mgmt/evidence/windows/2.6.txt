@@ -1,0 +1,97 @@
+
+=== 2.6 chiavi inline senza file in chiaro su disco, Windows ===
+2026-11-10T17:52:33Z
+OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+
+--- a) configurazione via named pipe (--config \\.\pipe\...), password della management su stdin ---
+connesso
+pid=2452 ppid=2096 session=0 owner=SYSTEM cmdline=C:\gl\d639299299378985367\galleriad-spike.exe  connect 
+pid=1284 ppid=2452 session=0 owner=SYSTEM cmdline="C:\Program Files\OpenVPN\bin\openvpn.exe" --config \\.\pipe\galleria-cfg-2452-42ddfe51c4b5cc60
+
+ricerca di [una riga della chiave privata del client] in C:\ProgramData, C:\Windows\Temp, C:\Users, C:\Program Files\OpenVPN, C:\Windows\System32\config\systemprofile: 0 file
+ricerca di [una riga di ta.key] in C:\ProgramData, C:\Windows\Temp, C:\Users, C:\Program Files\OpenVPN, C:\Windows\System32\config\systemprofile: 1 file
+  TROVATO: C:\Program Files\OpenVPN\bin\openvpn.exe
+PS> [IO.Directory]::GetFiles('\\.\pipe\') | Where-Object { $_ -match 'galleria' }
+\\.\pipe\galleria-netcfg-2452-f80d14fa55361222
+
+
+[daemon {"code":0,"event":"exit","t":32.527}]
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","\\\\.\\pipe\\galleria-cfg-2452-42ddfe51c4b5cc60"],"event":"openvpn_spawned","pid":1284,"stdin":"pipe: management password","t":0.021}
+{"endpoint":"tcp 127.0.0.1:49811 (openvpn listens)","event":"mgmt_connected","t":0.524}
+{"event":"connected","ip":"10.8.0.2","server":"127.0.0.1","t":4.392}
+
+--- a2) esperimento: --config stdin (configurazione e password della management sullo stesso stdin) ---
+[daemon {"code":4,"event":"exit","t":2.066}]
+{"config_via":"Stdin","daemon_directives":["management 127.0.0.1 49824 stdin","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"C:/gl/d639299299378985367/galleriad-spike.exe netcfg galleria-netcfg-3068-9a
+{"argv":["C:\\Program Files\\OpenVPN\\bin\\openvpn.exe","--config","stdin"],"event":"openvpn_spawned","pid":2172,"stdin":"pipe: management password","t":0.022}
+openvpn[stdout]| Options error: Unrecognized option or missing or extra parameter(s) in stdin:78: b04484f2a4a3b4ec4b9ed394877be0dc392a54200d4d21711d8186a091c875a5 (2.7.9)
+{"event":"error","kind":"gave_up","message":"Server non raggiungibile dopo 1 tentativi: openvpn exited before management was up (exit code: 1)","retry":false,"t":2.066}
+
+--- b) management-external-key: la chiave privata resta nel demone ---
+connesso
+[daemon {"code":0,"event":"exit","t":14.804}]
+{"directive":"<key>","event":"profile_directive_removed","line":37,"reason":"key kept in daemon memory (external key)","t":0.018}
+{"config_via":"Pipe","daemon_directives":["management 127.0.0.1 49826 stdin","management-hold","management-query-passwords","auth-retry none","connect-retry-max 1","server-poll-timeout 5","verb 3","script-security 2","up \"C:/gl/d639299299378985367/galleriad-spike.exe netcfg galleria-netcfg-4536-b5d
+{"algorithm":"ECDSA","data_len":32,"event":"pk_sign_request","t":0.986}
+{"event":"pk_sign_done","t":0.987}
+{"event":"connected","ip":"10.8.0.2","server":"127.0.0.1","t":5.607}
+
+--- c) ripiego: file temporaneo con ACL solo SYSTEM e Administrators, cancellato al primo HOLD ---
+connesso
+PS> Get-ChildItem C:\ProgramData\galleria-spike -Recurse -Force -ErrorAction SilentlyContinue | Format-Table FullName, Length -AutoSize
+
+FullName                            Length
+--------                            ------
+C:\ProgramData\galleria-spike\s4848       
+
+
+
+
+[daemon {"code":0,"event":"exit","t":29.535}]
+tempfile_written t=0.064 C:\ProgramData\galleria-spike\s4848\config.ovpn
+C:\ProgramData\galleria-spike\s4848\config.ovpn BUILTIN\Administrators:(F)
+                                                NT AUTHORITY\SYSTEM:(F)
+                                                DIRITTI PROPRIETARIO:(Rc)
+                                                NT SERVICE\Appinfo:(F)
+                                                NT SERVICE\AppMgmt:(F)
+                                                NT SERVICE\BDESVC:(F)
+                                                NT SERVICE\BITS:(F)
+                                                NT SERVICE\dmwappushservice:(F)
+                                                NT SERVICE\DsmSvc:(F)
+                                                NT SERVICE\IKEEXT:(F)
+                                                NT SERVICE\iphlpsvc:(F)
+                                                NT SERVICE\LanmanServer:(F)
+                                                NT SERVICE\MSiSCSI:(F)
+                                                NT SERVICE\MsKeyboardFilter:(F)
+                                                NT SERVICE\NaturalAuthentication:(F)
+                                                NT SERVICE\NcaSvc:(F)
+                                                NT SERVICE\NetSetupSvc:(F)
+                                                NT SERVICE\PushToInstall:(F)
+                                                NT SERVICE\RasAuto:(F)
+                                                NT SERVICE\Schedule:(F)
+                                                NT SERVICE\seclogon:(F)
+                                                NT SERVICE\SharedAccess:(F)
+                                                NT SERVICE\ShellHWDetection:(F)
+                                                NT SERVICE\Themes:(F)
+                                                NT SERVICE\TroubleshootingSvc:(F)
+                                                NT SERVICE\UserManager:(F)
+                                                NT SERVICE\UsoSvc:(F)
+                                                NT SERVICE\wercplsupport:(F)
+                                                NT SERVICE\Winmgmt:(F)
+                                                NT SERVICE\wisvc:(F)
+                                                NT SERVICE\wlidsvc:(F)
+                                                NT SERVICE\WManSvc:(F)
+                                                NT SERVICE\WpnService:(F)
+                                                NT SERVICE\wuauserv:(F)
+                                                NT SERVICE\XblGameSave:(F)
+                                                NT SERVICE\XboxGipSvc:(F)
+                                                NT SERVICE\XboxNetApiSvc:(F)
+
+Elaborazione completata per 1 file. Elaborazione non riuscita per 0 file
+{"event":"hold","line":">HOLD:Waiting for hold release:0","t":0.579}
+{"event":"tempfile_removed","path":"C:\\ProgramData\\galleria-spike\\s4848\\config.ovpn","t":0.579}
+{"event":"connected","ip":"10.8.0.2","server":"127.0.0.1","t":20.452}
+PS> Test-Path C:\ProgramData\galleria-spike\s*
+False
+
+

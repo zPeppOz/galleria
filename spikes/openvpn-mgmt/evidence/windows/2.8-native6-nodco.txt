@@ -1,0 +1,132 @@
+
+=== 2.8 IPv6 con profilo 'tutto nel tunnel' solo IPv4 su Windows, modalita' native6-nodco ===
+2026-11-10T18:16:33Z
+OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+
+Scheda fisica: IPv6 globale finto 2001:db8:5::10/64, gateway 2001:db8:5::1 con vicino statico: i pacchetti IPv6 globali
+escono davvero dalla scheda (nessuno risponde). Il sito dual-stack: 198.51.100.1 (solo dal tunnel) e 2001:db8:99::1.
+
+connesso
+PS> Get-NetRoute -AddressFamily IPv6 | Where-Object { $_.DestinationPrefix -notlike 'fe80*' -and $_.DestinationPrefix -notlike 'ff00*' -and $_.DestinationPrefix -ne '::1/128' } | Format-Table ifIndex, InterfaceAlias, DestinationPrefix, NextHop, RouteMetric -AutoSize
+
+ifIndex InterfaceAlias       DestinationPrefix     NextHop       RouteMetric
+------- --------------       -----------------     -------       -----------
+    209 OpenVPN TAP-Windows6 fd15:53b6:dead::2/128 ::                    256
+    209 OpenVPN TAP-Windows6 fd15:53b6:dead::/64   fe80::8                 0
+    209 OpenVPN TAP-Windows6 fc00::/7              fe80::8               256
+    209 OpenVPN TAP-Windows6 3000::/4              fe80::8               256
+    205 Ethernet             2001:db8:5::10/128    ::                    256
+    205 Ethernet             2001:db8:5::/64       ::                    256
+    209 OpenVPN TAP-Windows6 2000::/4              fe80::8               256
+    209 OpenVPN TAP-Windows6 ::/3                  fe80::8               256
+    205 Ethernet             ::/0                  2001:db8:5::1         256
+
+
+
+
+PS> Get-NetIPAddress -AddressFamily IPv6 | Where-Object { $_.IPAddress -notlike 'fe80*' -and $_.IPAddress -ne '::1' } | Format-Table InterfaceAlias, IPAddress, PrefixLength -AutoSize
+
+InterfaceAlias       IPAddress         PrefixLength
+--------------       ---------         ------------
+Ethernet             2001:db8:5::10              64
+OpenVPN TAP-Windows6 fd15:53b6:dead::2          128
+
+
+
+
+--- schede viste da pktmon ---
+    2 00-FF-A5-C9-F6-68 TAP-Windows Adapter V9       
+    1                   OpenVPN Data Channel Offload 
+   47 00-15-5D-C1-AB-E2 Microsoft NetVsc Nic         
+
+Parametri registratore:
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.242891s total=0.274697s exit=0
+
+
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.232721s total=0.252937s exit=0
+
+
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.245768s total=0.263404s exit=0
+
+
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.233537s total=0.252127s exit=0
+
+
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.244937s total=0.262281s exit=0
+
+
+PS> curl.exe -s -o NUL -m 10 -w 'remote=%{remote_ip} connect=%{time_connect}s total=%{time_total}s exit=%{exitcode}\n' http://dual.galleria.test/
+remote=198.51.100.1 connect=0.232893s total=0.252503s exit=0
+
+
+--- connessioni TCP IPv6 verso indirizzi globali viste durante la cattura (campionate) ---
+2a01:8d0:107:401::53e0:45d9:80 stato=SynSent locale=2001:db8:5::10 processo=svchost (2024)
+2a01:8d0:107:401::53e0:45e2:80 stato=SynSent locale=2001:db8:5::10 processo=svchost (2024)
+2a01:8d0:107:401::53e0:45e2:80 stato=SynSent locale=fd15:53b6:dead::2 processo=svchost (2024)
+
+--- client senza Happy Eyeballs sul nome (prova gli indirizzi nell'ordine dato dal sistema, timeout 10 s per indirizzo) ---
+seqprobe: dual.galleria.test -> [198.51.100.1:80, [2001:db8:99::1]:80]
+seqprobe: connected to 198.51.100.1:80 after 0.052s (this address 0.038s); reply: "hello from dual-stack target"
+--- stesso client direttamente sull'indirizzo IPv6: quanto ci mette a fallire ---
+seqprobe: 2001:db8:99::1 -> [[2001:db8:99::1]:80]
+seqprobe: [2001:db8:99::1]:80 failed after 10.012s: connection timed out
+seqprobe: no address worked, total 10.014s
+
+PS> ping -6 -n 2 -w 1000 2001:db8:99::1
+
+Esecuzione di Ping 2001:db8:99::1 con 32 byte di dati:
+Rete di destinazione non raggiungibile.
+Rete di destinazione non raggiungibile.
+
+Statistiche Ping per 2001:db8:99::1:
+    Pacchetti: Trasmessi = 2, Ricevuti = 0, 
+    Persi = 2 (100% persi),
+
+
+Scaricamento log in corso...
+cattura durata 61 s
+Pacchetti formattati:   437
+File formattato:      C:\sbx\out\ev\2.8-native6-nodco.pcapng
+[daemon {"code":0,"event":"exit","t":92.268}]
+--- log di OpenVPN su IPv6 e DCO ---
+openvpn[stdout]| 2026-11-10 19:16:34 OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+openvpn[stdout]| 2026-11-10 19:16:34 DCO version: 2.8.14
+openvpn[stdout]| 2026-11-10 19:16:35 GDG6: remote_host_ipv6=n/a
+openvpn[stdout]| 2026-11-10 19:16:35 GDG6: II=205 DP=::/0 NH=2001:db8:5::1
+openvpn[stdout]| 2026-11-10 19:16:35 GDG6: II=205 DP=::/0 NH=2001:db8:5::1
+openvpn[stdout]| 2026-11-10 19:16:35 TAP-Windows Driver Version 9.27 
+openvpn[stdout]| 2026-11-10 19:16:35 Set TAP-Windows TUN subnet mode network/local/netmask = 10.8.0.0/10.8.0.2/255.255.255.0 [SUCCEEDED]
+openvpn[stdout]| 2026-11-10 19:16:35 Notified TAP-Windows driver to set a DHCP IP/netmask of 10.8.0.2/255.255.255.0 on interface {A5C9F668-9580-41C6-9002-68DDCB13CA8B} [DHCP-serv: 10.8.0.0, lease-time: 31536000]
+openvpn[stdout]| 2026-11-10 19:16:35 tap-windows6 device [OpenVPN TAP-Windows6] opened
+openvpn[stdout]| 2026-11-10 19:16:35 MANAGEMENT: >STATE:1794334595,ASSIGN_IP,,10.8.0.2,,,,,fd15:53b6:dead::2
+openvpn[stdout]| 2026-11-10 19:16:35 NETSH: C:\Windows\system32\netsh.exe interface ipv6 set address 209 fd15:53b6:dead::2/128 store=active
+openvpn[stdout]| 2026-11-10 19:16:35 add_route_ipv6(fd15:53b6:dead::/64 -> fd15:53b6:dead::2 metric 0) IF 209
+openvpn[stdout]| 2026-11-10 19:16:35 IPv6 route added using ipapi
+openvpn[stdout]| 2026-11-10 19:16:35 NETSH: C:\Windows\system32\netsh.exe interface ipv6 delete dns 209 all
+openvpn[stdout]| 2026-11-10 19:16:35 IPv6 MTU set to 1500 on interface 209 using SetIpInterfaceEntry()
+openvpn[stdout]| 2026-11-10 19:16:35 C:/gl/d639299313918403884/galleriad-spike.exe netcfg galleria-netcfg-7544-e8a333f13ec9f84e OpenVPN TAP-Windows6 1500 0 10.8.0.2 255.255.255.0 init
+openvpn[stdout]| 2026-11-10 19:16:40 add_route_ipv6(::/3 -> fd15:53b6:dead::1 metric -1) IF 209
+openvpn[stdout]| 2026-11-10 19:16:40 IPv6 route added using ipapi
+--- pacchetti IPv6 globali nella cattura di 60 s (stesso filtro dello spike Linux), per destinazione ---
+totale: 64
+verso il sito di prova 2001:db8:99::1: 12
+per sorgente > destinazione:
+      4 2001:db8:5::10 > 2a01:8d0:107:401::53e0:45cb
+      5 2001:db8:5::10 > 2a01:8d0:107:401::53e0:45d9
+      9 2001:db8:5::10 > 2a01:8d0:107:401::53e0:45e2
+     23 fd15:53b6:dead::1 > fd15:53b6:dead::2:
+     10 fd15:53b6:dead::2 > 2001:db8:99::1
+      2 fd15:53b6:dead::2 > 2001:db8:99::1:
+      2 fd15:53b6:dead::2 > 2a01:8d0:107:401::53e0:45cb
+      4 fd15:53b6:dead::2 > 2a01:8d0:107:401::53e0:45d9
+      5 fd15:53b6:dead::2 > 2a01:8d0:107:401::53e0:45e2
+--- richieste viste dal sito (sorgente) ---
+::ffff:172.30.0.10 "GET / HTTP/1.1" 200 -
+::ffff:172.30.0.10 "GET / HTTP/1.1" 200 -
+::ffff:172.30.0.10 "GET / HTTP/1.1" 200 -
+::ffff:172.30.0.10 "GET / HTTP/1.0" 200 -

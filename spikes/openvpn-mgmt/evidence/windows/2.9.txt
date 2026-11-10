@@ -1,0 +1,62 @@
+
+=== 2.9 errori su Windows: password sbagliata, OTP sbagliato, server irraggiungibile ===
+2026-11-10T18:10:45Z
+OpenVPN 2.7.9 [git:v2.7.9/7b60c2aa34992639] Windows [SSL (OpenSSL)] [LZO] [LZ4] [PKCS11] [AEAD] [DCO] built on Nov  5 2026
+
+--- password sbagliata ---
+[daemon {"code":2,"event":"exit","t":1.042}]
+{"event":"attempt","n":1,"of":3,"t":0.02}
+{"event":"mgmt_password","line":"Need 'Auth' username/password","t":0.941}
+openvpn[stdout]| 2026-11-10 19:10:47 AUTH: Received control message: AUTH_FAILED
+{"event":"mgmt_password","line":"Verification Failed: 'Auth'","t":1.036}
+openvpn[stdout]| 2026-11-10 19:10:47 SIGTERM[soft,auth-failure] received, process exiting
+openvpn[stdout]| 2026-11-10 19:10:47 MANAGEMENT: >STATE:1794334247,EXITING,auth-failure,,,,,
+{"detail":"auth-failure","event":"state","local_ip":"","raw":"1794334247,EXITING,auth-failure,,,,,","remote":"","state":"EXITING","t":1.037}
+{"event":"error","kind":"auth_failed","message":"Accesso negato dal server: nome utente, password o codice OTP non validi.","retry":false,"t":1.041}
+{"code":2,"event":"exit","t":1.042}
+
+--- OTP sbagliato ---
+[daemon {"code":2,"event":"exit","t":1.035}]
+{"event":"attempt","n":1,"of":3,"t":0.02}
+{"event":"mgmt_password","line":"Need 'Auth' username/password SC:1,Enter OTP","t":0.936}
+openvpn[stdout]| 2026-11-10 19:10:49 AUTH: Received control message: AUTH_FAILED
+{"event":"mgmt_password","line":"Verification Failed: 'Auth'","t":1.03}
+{"event":"error","kind":"auth_failed","message":"Accesso negato dal server: nome utente, password o codice OTP non validi.","retry":false,"t":1.035}
+{"code":2,"event":"exit","t":1.035}
+
+--- server irraggiungibile (relay senza nessuno dietro: silenzio), max_attempts=4 ---
+[daemon {"code":4,"event":"exit","t":29.976}]
+durata 31 s
+{"event":"attempt","n":1,"of":4,"t":0.02}
+openvpn[stdout]| 2026-11-10 19:10:56 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 19:10:56 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 19:10:56 All connections have been connect-retry-max (1) times unsuccessful, exiting
+openvpn[stdout]| 2026-11-10 19:10:56 Exiting due to fatal error
+{"event":"fatal","message":"All connections have been connect-retry-max (1) times unsuccessful, exiting","t":5.741}
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":5.745}
+{"after_secs":1,"event":"retry","next_attempt":2,"reason":"connection failed","t":5.746}
+{"event":"attempt","n":2,"of":4,"t":6.746}
+openvpn[stdout]| 2026-11-10 19:11:02 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 19:11:02 SIGUSR1[soft,server_poll] received, process restarting
+{"event":"fatal","message":"All connections have been connect-retry-max (1) times unsuccessful, exiting","t":13.202}
+openvpn[stdout]| 2026-11-10 19:11:03 All connections have been connect-retry-max (1) times unsuccessful, exiting
+openvpn[stdout]| 2026-11-10 19:11:03 Exiting due to fatal error
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":13.207}
+{"after_secs":2,"event":"retry","next_attempt":3,"reason":"connection failed","t":13.207}
+{"event":"attempt","n":3,"of":4,"t":15.207}
+openvpn[stdout]| 2026-11-10 19:11:10 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 19:11:10 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 19:11:10 All connections have been connect-retry-max (1) times unsuccessful, exiting
+openvpn[stdout]| 2026-11-10 19:11:10 Exiting due to fatal error
+{"event":"fatal","message":"All connections have been connect-retry-max (1) times unsuccessful, exiting","t":20.234}
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":20.24}
+{"after_secs":4,"event":"retry","next_attempt":4,"reason":"connection failed","t":20.24}
+{"event":"attempt","n":4,"of":4,"t":24.241}
+openvpn[stdout]| 2026-11-10 19:11:19 Server poll timeout, restarting
+openvpn[stdout]| 2026-11-10 19:11:19 SIGUSR1[soft,server_poll] received, process restarting
+openvpn[stdout]| 2026-11-10 19:11:19 All connections have been connect-retry-max (1) times unsuccessful, exiting
+openvpn[stdout]| 2026-11-10 19:11:19 Exiting due to fatal error
+{"event":"fatal","message":"All connections have been connect-retry-max (1) times unsuccessful, exiting","t":29.971}
+{"event":"openvpn_exited","exit_reason":"","status":"Ok(ExitStatus(ExitStatus(1)))","t":29.976}
+{"event":"error","kind":"gave_up","message":"Server non raggiungibile dopo 4 tentativi: connection failed","retry":false,"t":29.976}
+{"code":4,"event":"exit","t":29.976}

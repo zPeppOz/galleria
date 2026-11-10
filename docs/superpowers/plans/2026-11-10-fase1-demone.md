@@ -11,7 +11,7 @@ pura; i backend stanno dietro un trait comune e parlano con il demone per canali
 un modulo di rete comune con giornale per la pulizia dopo un crash. Il demone non legge mai file dell'utente.
 
 **Stack:** Rust 1.96.0 (edizione 2024), tokio, serde/serde_json, toml, clap, thiserror/anyhow, ipnet, uuid, zeroize,
-`defguard_wireguard_rs` 0.12, rstest e proptest per i test; Docker per il laboratorio; GitHub Actions.
+`rustix` (feature `process`, per `PR_SET_DUMPABLE`), `libc` (solo in `galleriad/src/peer_groups.rs`), `defguard_wireguard_rs` 0.12, rstest e proptest per i test; Docker per il laboratorio; GitHub Actions.
 
 **Spec:** `docs/superpowers/specs/2026-11-10-fase1-demone-design.md` (da leggere per intero prima del T1; i rimandi
 "spec §n" puntano lì). Decisioni: `docs/01-analisi.md` (D1–D18: non si riaprono).
@@ -25,8 +25,16 @@ un modulo di rete comune con giornale per la pulizia dopo un crash. Il demone no
   `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` verdi.
 - Non si toccano: `spikes/`, `docs/00`–`05`, `design/`, `.github/workflows/spike-windows-build.yml`. Dal codice degli
   spike si copia e si adatta, non lo si importa.
-- `#![forbid(unsafe_code)]` in ogni crate. Unica eccezione ammessa: `galleriad/src/auth.rs`, se per `SO_PEERGROUPS`
-  serve `libc::getsockopt`; in quel caso un solo blocco con commento `// SAFETY:`.
+- `unsafe`: `#![forbid(unsafe_code)]` in ogni crate **tranne `galleriad`**. `forbid` non si può allentare con un
+  `allow` più interno, quindi `galleriad` usa `#![deny(unsafe_code)]` a livello di crate e un solo
+  `#[allow(unsafe_code)]`, sul modulo `galleriad/src/peer_groups.rs`, con un commento che dice perché: legge
+  `SO_PEERGROUPS` con `libc::getsockopt`, perché nessun crate lo espone in modo sicuro (verificato il 2026-11-10 su
+  `rustix` 1.1.6 e `nix` 0.31.3; `SO_PEERCRED` invece si legge con `UnixStream::peer_cred()` di tokio). Il modulo
+  contiene quella sola funzione, ogni blocco `unsafe` ha il suo `// SAFETY:`, e nessun altro `allow(unsafe_code)`
+  è ammesso nel workspace. Se alla data del T4 un crate già in `Cargo.lock` espone `SO_PEERGROUPS` in modo sicuro,
+  si usa quello e `galleriad` torna a `forbid`.
+- Nessun segreto negli argomenti di un processo, mai: né di `openvpn`, né della CLI, né nei comandi dei test
+  (un `sh -c "echo segreto | …"` mette il segreto in argv: i test scrivono sullo stdin del processo figlio).
 - Niente `unwrap()`/`expect()` fuori dai test. `thiserror` nelle librerie, `anyhow` nei binari.
 - Dipendenze nuove solo con licenza ammessa da `deny.toml` (MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC,
   Unicode-3.0, Zlib, MPL-2.0, LGPL-2.1-or-later, GPL-3.0-or-later).
@@ -39,7 +47,7 @@ un modulo di rete comune con giornale per la pulizia dopo un crash. Il demone no
 - I test end-to-end sono `#[ignore]` nel crate `galleria-e2e` e girano solo dentro il laboratorio
   (`lab/run.sh <26|27|79> [filtro]`). Il laboratorio non tocca rotte, DNS o pacchetti dell'host; a fine lavoro `lab/down.sh`.
 - Se un punto **[S]** della spec §12 risulta falso: si applica la colonna "Se è falsa". Se tocca una decisione D
-  (per esempio S4 o S11), ci si ferma e si riporta; non si corregge l'analisi.
+  (per esempio S4), ci si ferma e si riporta; non si corregge l'analisi.
 - API di librerie esterne (`defguard_wireguard_rs`, `tokio`, `clap`): verificare firme e campi sulla documentazione
   della versione fissata in `Cargo.lock` prima di scrivere il codice; i nomi di questo piano valgono per il **nostro** codice.
 
@@ -64,8 +72,8 @@ Cargo.toml  rust-toolchain.toml  deny.toml  scripts/check-boundaries.sh        T
 .github/workflows/ci.yml                                                       T1, T7, T12
 crates/galleria-ipc/src/{lib,wire,types,methods,error,codec,secret}.rs         T1, T2    client.rs  T4
 crates/galleria-backend/src/{lib,net,fake}.rs                                  T3
-crates/galleriad/src/{lib,machine,manager}.rs                                  T3
-crates/galleriad/src/{main,config,auth,server,dispatch}.rs                     T4
+crates/galleriad/src/{lib,machine,manager,session_dir}.rs                      T3
+crates/galleriad/src/{main,config,auth,peer_groups,server,dispatch}.rs         T4
 crates/galleriad/src/{logbuf,redact}.rs                                        T5
 crates/galleria-net/src/{lib,plan,runner,journal,manager}.rs                   T6
 packaging/linux/{galleriad.service,galleria.sysusers,90-galleria.conf,install.sh}   T7
@@ -82,7 +90,7 @@ docs/06-esito-fase1.md                                                         T
 ```
 
 Ordine: T1–T7 danno un demone vero sotto systemd con un backend finto; T8–T9 WireGuard end-to-end; T10–T14 OpenVPN;
-T15–T16 profili e CLI. Stima totale: circa 81 ore di agente (1–2 settimane part-time, come `01-analisi.md` §10).
+T15–T16 profili e CLI. Stima totale: circa 84 ore di agente (1–2 settimane part-time, come `01-analisi.md` §10).
 
 ---
 
@@ -110,15 +118,23 @@ fn protocol_constants_match_the_spec() {
 - [ ] **3.** Definisci le costanti. Scrivi `deny.toml` (licenze dei vincoli globali, `[advisories]` attivo, `[bans] multiple-versions = "warn"`).
 - [ ] **4.** `scripts/check-boundaries.sh`: esce 1 se `cargo tree -p galleriad -e normal` contiene `galleria-profile`;
   esce 0 con un messaggio se il crate `galleriad` non esiste ancora.
-- [ ] **5.** `ci.yml`: trigger `push` e `pull_request`, `permissions: contents: read`. Job `check` su `ubuntu-latest`:
-  toolchain da `rust-toolchain.toml` (componenti `rustfmt`, `clippy`), cache cargo, poi nell'ordine `cargo fmt --all --check`,
-  `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `cargo deny check`,
-  `scripts/check-boundaries.sh`. Job `coverage` (`continue-on-error: true`): `cargo llvm-cov --workspace --summary-only`.
-- [ ] **6. Verifica:** i cinque comandi del job `check` in locale, tutti con uscita 0 (`cargo install cargo-deny --locked` se manca).
+- [ ] **5.** `ci.yml`: trigger `push` e `pull_request`, `permissions: contents: read`. Ogni job **installa gli
+  strumenti che usa**: il runner `ubuntu-latest` ha `rustup` e `cargo`, ma non `cargo-deny` né `cargo-llvm-cov`.
+  Job `check` su `ubuntu-latest`: toolchain da `rust-toolchain.toml` (componenti `rustfmt`, `clippy`,
+  `llvm-tools-preview`), cache cargo, un passo `taiki-e/install-action` con `tool: cargo-deny`, poi nell'ordine
+  `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`,
+  `cargo deny check`, `scripts/check-boundaries.sh`. Job `coverage` (`continue-on-error: true`): stessa toolchain,
+  `taiki-e/install-action` con `tool: cargo-llvm-cov`, poi `cargo llvm-cov --workspace --summary-only`.
+  Le azioni di terze parti si fissano a un commit SHA (con la versione in un commento), non a un tag mobile.
+- [ ] **6. Verifica:** i cinque comandi del job `check` in locale, tutti con uscita 0 (`cargo install cargo-deny --locked`
+  se manca), e `cargo llvm-cov --workspace --summary-only` (`cargo install cargo-llvm-cov --locked` se manca). Poi
+  rileggi `ci.yml` un comando alla volta: per ogni `cargo <sottocomando>` che non fa parte di cargo deve esserci,
+  **prima** nello stesso job, il passo che lo installa.
 - [ ] **7. Commit:** `add rust workspace and ci`
 
-**Fatto quando:** i comandi del job `check` passano in locale e `ci.yml` supera `actionlint` (o, se non è installato,
-una lettura contro la sintassi dei workflow). Il job gira su GitHub al primo push autorizzato.
+**Fatto quando:** i comandi dei job `check` e `coverage` passano in locale, nessun job usa uno strumento che non ha
+installato, e `ci.yml` supera `actionlint` (o, se non è installato, una lettura contro la sintassi dei workflow).
+Il job gira su GitHub al primo push autorizzato e deve poter essere verde già con questo solo commit.
 
 ---
 
@@ -148,7 +164,7 @@ pub struct SessionError { pub code: SessionErrorCode, pub message: String }
 pub enum Protocol { Wireguard, Openvpn }
 pub enum State { Disconnected, Connecting, NeedsInput, Connected, Reconnecting, Disconnecting, Error }
 pub struct Status { /* campi della spec §4.4 */ }
-pub struct NetInfo; pub enum Ipv6BlockInfo { None, Native, Unreachable }
+pub struct NetInfo; pub enum Ipv6BlockInfo { None, Unreachable }
 pub struct Stats { pub rx_bytes: u64, pub tx_bytes: u64, pub last_handshake: Option<String> }
 pub struct InputRequest { pub request: u64, pub kind: InputKind, pub prompt: String, pub echo: bool, pub expires_in_secs: u64 }
 pub enum InputKind { Credentials, Otp, KeyPassphrase }
@@ -184,7 +200,7 @@ pub async fn read_frame<R: tokio::io::AsyncBufRead + Unpin>(r: &mut R, max: usiz
 | Test | Asserzione |
 |---|---|
 | `hello_request_matches_golden_json` | il JSON della spec §4.2 → `Call::Hello` con `protocol == 1`, `client.name == "galleria-cli"` |
-| `status_golden_json_deserializes` | il JSON della spec §4.4 → `state == Connected`, `net.ipv6_block == Native`, `stats.rx_bytes == 48_213_000` |
+| `status_golden_json_deserializes` | il JSON della spec §4.4 → `state == Connected`, `net.ipv6_block == Unreachable`, `stats.rx_bytes == 48_213_000` |
 | `backend_params_are_tagged_by_protocol` | i due JSON della spec §4.5 → `Wireguard(..)` e `Openvpn(..)` |
 | `connect_rejects_unknown_field` | `parse_call("connect", …+{"evil":1})` → `Err`, `code == -32602` |
 | `unknown_method_is_method_not_found` | `parse_call("reboot", {})` → `code == -32601` |
@@ -207,8 +223,8 @@ pub async fn read_frame<R: tokio::io::AsyncBufRead + Unpin>(r: &mut R, max: usiz
 
 ### Task 3: interfaccia dei backend, macchina a stati, sessione unica
 
-**Stima:** 6 h. **File:** crea `crates/galleria-backend/{Cargo.toml,src/lib.rs,src/net.rs,src/fake.rs}`,
-`crates/galleriad/{Cargo.toml,src/lib.rs,src/machine.rs,src/manager.rs}`.
+**Stima:** 7 h. **File:** crea `crates/galleria-backend/{Cargo.toml,src/lib.rs,src/net.rs,src/fake.rs}`,
+`crates/galleriad/{Cargo.toml,src/lib.rs,src/machine.rs,src/manager.rs,src/session_dir.rs}`.
 
 **Interfacce — usa:** tipi del T2. **Produce:**
 
@@ -228,7 +244,7 @@ pub enum Phase { Disconnected, Connecting { attempt: u32 }, NeedsInput { attempt
                  Reconnecting { attempt: u32 }, Disconnecting { then_connect: bool }, Error(SessionError) }
 pub enum ExitKind { Stopped, Auth, Transport, Fatal(SessionErrorCode) }
 pub enum Input { Connect { replace: bool }, Disconnect, InputRequired, InputProvided, InputTimeout, Up,
-                 NetFailed(SessionErrorCode), Exited(ExitKind), RetryTimer }
+                 Restarting, NetFailed(SessionErrorCode), Exited(ExitKind), RetryTimer }
 pub enum Effect { SpawnBackend, StopBackend, TeardownNet, ForwardInput, StartRetryTimer(std::time::Duration),
                   StartInputTimer(std::time::Duration), Reject(ErrorCode), Publish }
 pub struct RetryPolicy { pub initial_attempts: u32, pub reconnect_attempts: u32, pub base: std::time::Duration,
@@ -253,7 +269,18 @@ impl ManagerHandle {
 }
 pub fn spawn_manager(factory: BackendFactory, net: std::sync::Arc<dyn NetControl>, policy: RetryPolicy,
                      runtime_dir: std::path::PathBuf) -> ManagerHandle;
+// galleriad/session_dir.rs — spec §7.4
+/// Crea `<runtime_dir>/s/<uuid v4>/` con modo 0700. Il nome è casuale e mai riusato: se esiste già è un errore.
+pub fn create_session_dir(runtime_dir: &std::path::Path) -> std::io::Result<std::path::PathBuf>;
+/// Svuota `<runtime_dir>/s/` senza seguire i collegamenti simbolici e la ricrea 0700. Da chiamare all'avvio.
+pub fn purge_session_dirs(runtime_dir: &std::path::Path) -> std::io::Result<()>;
 ```
+
+Il `Manager` chiama `create_session_dir` prima di ogni `spawn` (una cartella per tentativo, passata al backend in
+`SessionContext.session_dir`) e la rimuove quando il backend è uscito. Eventi del backend (spec §6.1): `NetUp` →
+se c'è già una rete applicata `teardown`, poi `apply`, poi risposta immediata; `NetDown` → `teardown` e risposta
+immediata, in qualunque fase (anche in `disconnecting`, mentre si aspetta l'uscita del backend); `Restarting` →
+`Input::Restarting`; `Up` → `Input::Up` solo se l'ultimo `NetUp` è stato accettato.
 
 - [ ] **1. Test che falliscono.** `machine.rs`: un caso `rstest` **per ogni riga** della tabella della spec §5.2
   (`step_follows_the_spec_table`), più:
@@ -269,10 +296,19 @@ fn backoff_sequence_is_1_2_4_8_16_30_30() {
 fn auth_failure_never_retries_from_any_phase() { /* per ogni Phase attiva: Exited(Auth) → Error(auth_failed), nessun StartRetryTimer */ }
 #[test]
 fn drop_with_reconnect_disabled_goes_to_backend_exited() { /* Connected + Exited(Transport), reconnect_enabled=false */ }
+#[test]
+fn internal_restart_goes_to_reconnecting_without_respawn() {
+    /* Connected + Restarting → Reconnecting { attempt: 1 }; effetti: TeardownNet e Publish, nessuno SpawnBackend,
+       StopBackend o StartRetryTimer. Poi Reconnecting + Up → Connected. In ogni altra fase Restarting non cambia fase. */
+}
 ```
 
-  `net.rs`: `full_tunnel_detects_default_and_two_halves`, `ipv6_default_detects_all_three_forms`,
-  `split_routes_are_not_full_tunnel`. `manager.rs` (tokio con tempo in pausa, `FakeBackend`, `NetControl` che registra):
+  `net.rs`: `full_tunnel_detects_default_and_two_halves`, `ipv6_default_detects_every_covering_form` (`::/0`;
+  `::/1` + `8000::/1`; `2000::/3`; `2000::/4` + `3000::/4`), `ipv6_default_is_false_for_partial_cover` (solo
+  `2000::/4`; solo `fd00::/8`; solo `2001:db8::/32`), `split_routes_are_not_full_tunnel`. `session_dir.rs`:
+  `session_dir_names_are_unique_and_0700` (1000 creazioni, nessun nome ripetuto, modo `0700`),
+  `existing_name_is_never_reused`, `purge_removes_orphans_and_does_not_follow_symlinks` (un collegamento verso
+  una cartella esterna: sparisce il collegamento, la cartella esterna resta intatta). `manager.rs` (tokio con tempo in pausa, `FakeBackend`, `NetControl` che registra):
 
 | Test | Asserzione |
 |---|---|
@@ -286,18 +322,24 @@ fn drop_with_reconnect_disabled_goes_to_backend_exited() { /* Connected + Exited
 | `needs_input_times_out_after_120s` | avanzando il tempo di 120 s ⇒ `error.code == InputTimeout` |
 | `transport_exits_retry_four_times_then_give_up` | 4 `spawn`, attese 1, 2, 4 s, poi `ServerUnreachable` |
 | `secrets_are_dropped_at_session_end` | dopo `disconnect` il manager non tiene più i `ConnectParams` |
+| `netup_is_answered_without_waiting_for_up` | il fake manda `NetUp` e poi aspetta la risposta **prima** di mandare `Up`: la risposta arriva (nessuno stallo) e lo stato è ancora `connecting` |
+| `up_before_accepted_netup_does_not_connect` | `Up` senza `NetUp` accettato → mai `connected` |
+| `internal_restart_reapplies_network` | script: `NetUp(A)`, `Up`, `Restarting`, `NetDown`, `NetUp(B)`, `Up` → stati `connected`, `reconnecting`, `connected`; registro: `apply(A)`, `teardown`, `apply(B)`; un solo `spawn`; dopo, `Status.net` è quello di B |
+| `second_netup_without_netdown_replaces_the_first` | `NetUp(A)`, `Up`, `Restarting`, `NetUp(B)` → mai due configurazioni applicate insieme: `teardown` prima di `apply(B)` |
+| `netdown_is_answered_during_disconnect` | `disconnect`, e il fake manda `NetDown` prima di uscire → risposta ricevuta, `disconnected` entro il limite |
+| `each_spawn_gets_a_fresh_session_dir` | due tentativi → due `session_dir` diverse; ognuna rimossa dopo l'uscita del suo backend |
 
 - [ ] **2.** `cargo test -p galleria-backend -p galleriad` → fallisce. **3.** Implementa: `step` è una `match` esaustiva
   su `(phase, input)`, senza ramo `_` per le fasi; il `Manager` è un ciclo `select!` su richieste, eventi del backend e timer.
 - [ ] **4.** Test verdi. **5. Commit:** `add backend interface, state machine and single-session manager`
 
-**Fatto quando:** tutte le righe della tabella §5.2 hanno un caso e la proprietà "mai due backend" passa con 256 sequenze.
+**Fatto quando:** tutte le righe della tabella §5.2 hanno un caso (riavvio interno compreso) e la proprietà "mai due backend" passa con 256 sequenze.
 
 ---
 
 ### Task 4: server IPC, autorizzazione, client
 
-**Stima:** 6 h. **File:** crea `crates/galleriad/src/{main,config,auth,server,dispatch}.rs`,
+**Stima:** 6 h. **File:** crea `crates/galleriad/src/{main,config,auth,peer_groups,server,dispatch}.rs`,
 `crates/galleriad/tests/ipc_server.rs`, `crates/galleria-ipc/src/client.rs` (feature `client`).
 
 **Interfacce — usa:** `ManagerHandle`, codec. **Produce:**
@@ -307,7 +349,9 @@ fn drop_with_reconnect_disabled_goes_to_backend_exited() { /* Connected + Exited
 pub struct PeerCreds { pub uid: u32, pub gid: u32, pub groups: Vec<u32>, pub pid: Option<i32> }
 pub struct AccessPolicy { pub allowed_gid: Option<u32> }
 pub fn authorize(creds: &PeerCreds, policy: &AccessPolicy) -> bool;
-pub fn peer_creds(stream: &tokio::net::UnixStream) -> std::io::Result<PeerCreds>;      // SO_PEERCRED + SO_PEERGROUPS
+pub fn peer_creds(stream: &tokio::net::UnixStream) -> std::io::Result<PeerCreds>;      // peer_cred() di tokio + peer_groups
+// peer_groups.rs — l'UNICO modulo con `#[allow(unsafe_code)]` (vincoli globali): una sola funzione
+pub fn peer_groups(fd: std::os::fd::BorrowedFd<'_>) -> std::io::Result<Vec<u32>>;       // SO_PEERGROUPS; riprova con un buffer più grande su ERANGE
 // config.rs
 pub struct DaemonConfig { pub socket: PathBuf, pub group: String, pub runtime_dir: PathBuf,
                           pub hello_timeout: Duration, pub max_clients: usize }
@@ -327,6 +371,9 @@ impl Client {
 
 `main.rs`: `galleriad run [--socket P] [--group G] [--runtime-dir D]`; per ora una fabbrica che risponde
 `backend_unavailable` e un `NetControl` vuoto (i veri arrivano in T6 e T8). `SIGTERM`/`SIGINT` → `disconnect`, uscita 0.
+All'avvio, prima di `serve`: `galleriad::harden_process()`, cioè
+`rustix::process::set_dumpable_behavior(DumpableBehavior::NotDumpable)` (spec §9; se fallisce, avviso nel log e si prosegue) e `purge_session_dirs(runtime_dir)` (spec §7.4; se fallisce il demone esce
+con errore). In `lib.rs`: `#![deny(unsafe_code)]` e `#[allow(unsafe_code)] mod peer_groups;` con il commento del perché.
 
 - [ ] **1. Test che falliscono.** `auth.rs` (puri):
 
@@ -363,13 +410,17 @@ fn authorize_follows_group_membership(#[case] uid: u32, #[case] gid: u32, #[case
 | `stale_socket_file_is_replaced` | file socket senza processo in ascolto → `serve` parte |
 | `second_instance_refuses_to_start` | con un `serve` vivo sullo stesso percorso → `Err`, il primo continua a rispondere |
 | `sigterm_disconnects_before_exit` | token di arresto ⇒ `teardown` registrato, socket rimosso |
+| `peer_groups_match_the_process_groups` (in `peer_groups.rs`) | su una `socketpair`, `peer_groups` restituisce gli stessi gid della riga `Groups:` di `/proc/self/status` |
+| `orphan_session_dirs_are_purged_before_listening` | con `<runtime_dir>/s/vecchia/mgmt.sock` già presente: quando il socket del demone esiste, `s/` è vuota |
+| `harden_process_makes_it_not_dumpable` (in `tests/hardening.rs`, un eseguibile di test a parte: il flag vale per tutto il processo) | dopo `galleriad::harden_process()`, la funzione che `main` chiama all'avvio, `rustix::process::dumpable_behavior()` è `NotDumpable` |
 
 - [ ] **2.** Fallisce. **3.** Implementa: un task per connessione; `peer_creds` + `authorize` subito dopo `accept`
   (chi non passa: chiusura senza scrivere nulla); `hello` obbligatorio per primo; notifiche da `ManagerHandle::events()`.
 - [ ] **4.** `cargo test -p galleriad -p galleria-ipc --all-features` → verde.
 - [ ] **5. Commit:** `add ipc server with peer authorization and async client`
 
-**Fatto quando:** i test passano senza privilegi e `scripts/check-boundaries.sh` esce 0.
+**Fatto quando:** i test passano senza privilegi, `scripts/check-boundaries.sh` esce 0 e
+`grep -rn 'allow(unsafe_code)' crates/` trova una sola riga, quella di `peer_groups`.
 
 ---
 
@@ -384,7 +435,7 @@ fn authorize_follows_group_membership(#[case] uid: u32, #[case] gid: u32, #[case
 pub const REDACTED: &str = "[redatto]";
 pub struct Redactor; impl Redactor {
     pub fn new() -> Self;
-    pub fn add_secret(&mut self, value: &str);          // ignora valori più corti di 4 caratteri; multilinea: una voce per riga
+    pub fn add_secret(&mut self, value: &str);          // nessuna lunghezza minima; ignora solo la stringa vuota; multilinea: una voce per riga non vuota
     pub fn clear(&mut self);
     pub fn redact<'a>(&self, line: &'a str) -> std::borrow::Cow<'a, str>;
 }
@@ -402,7 +453,9 @@ pub struct LogBuffer; impl LogBuffer {
 |---|---|
 | `redacts_registered_secret_anywhere` | `"pw=alice-secret ok"` → `"pw=[redatto] ok"` |
 | `redacts_every_line_of_a_multiline_secret` | ogni riga di un PEM registrato sparisce |
-| `ignores_secrets_shorter_than_four_chars` | registrare `"ab"` non altera `"cabina"` |
+| `redacts_secrets_of_any_length` (rstest: 1, 2, 3, 4, 64 caratteri) | registrato `"7"`: `"otp=7 ok"` → `"otp=[redatto] ok"`; registrato `"ab"`: `"pw=ab"` → `"pw=[redatto]"` (e `"cabina"` → `"c[redatto]ina"`: effetto collaterale accettato, spec §5.4) |
+| `empty_secret_is_ignored` | registrare `""` non altera nessuna riga e non blocca `redact` |
+| `longer_secrets_are_replaced_first` | registrati `"ab"` e `"abcd"`: `"x=abcd"` → `"x=[redatto]"`, senza resti del valore lungo |
 | `redacts_pem_bodies_structurally` | tra `-----BEGIN … PRIVATE KEY-----` e `-----END` anche se non registrato |
 | `redacts_management_credentials` | `password "Auth" "x1y2z3"` → `password "Auth" [redatto]`; idem `username` |
 | `buffer_drops_oldest_beyond_capacity` | capacità 3, 5 inserimenti → `seq` 3, 4, 5 |
@@ -417,7 +470,7 @@ pub struct LogBuffer; impl LogBuffer {
   `Secret` dei parametri; ogni `BackendEvent::Log` e ogni riga del demone passa da `redact` prima di buffer, journald ed eventi.
 - [ ] **4.** Verde. **5. Commit:** `add log buffer, secret redaction and event subscriptions`
 
-**Fatto quando:** i 12 test passano; M7 ha una prova unitaria.
+**Fatto quando:** i 14 test passano; M7 ha una prova unitaria, password corte comprese.
 
 ---
 
@@ -478,7 +531,9 @@ fn plan_for_wireguard_full_tunnel_with_dns() {
 | `ipv6_routes_use_dash_six` | `fd00::/8` → `ip -6 route add fd00::/8 dev glr-wg0` |
 | `backend_installed_routes_touch_only_dns` | `install_routes: None` → solo comandi `resolvectl` (+ `unreachable` se richiesto) |
 | `no_dns_means_no_resolvectl` | |
-| `native_block_adds_no_ipv6_routes` | `Ipv6Block::Native` → nessun `ip -6 route … unreachable` |
+| `no_block_adds_no_ipv6_routes` | `Ipv6Block::None` → nessun `ip -6 route … unreachable` |
+| `openvpn_block_is_unreachable_routes_without_other_routes` | `install_routes: None` + `Ipv6Block::Unreachable` → le due `ip -6 route replace unreachable` e i loro undo, nessun'altra rotta |
+| `apply_after_teardown_works_again` | `apply(A)`, `teardown`, `apply(B)` (riavvio interno, spec §6.3): giornale di B, nessun resto di A |
 | `apply_writes_journal_before_first_command` | il runner finto, alla prima chiamata, trova il file del giornale già scritto |
 | `apply_failure_rolls_back_what_ran` | terzo comando fallisce → eseguiti gli undo dei primi due, giornale rimosso, `Err` |
 | `resolvectl_failure_is_dns_unavailable` | |
@@ -529,11 +584,12 @@ src/bin/ipc-probe.rs,tests/t07_daemon.rs}`; modifica `.github/workflows/ci.yml`,
 | `group_member_gets_hello` | `runuser -u alice -- ipc-probe hello` → 0 |
 | `non_member_is_denied` (M1) | `runuser -u mallory -- ipc-probe hello` → 13 |
 | `unit_hardening_is_active` | `systemctl show galleriad -p ProtectHome -p NoNewPrivileges` → `yes` entrambi |
+| `core_dumps_are_disabled` | `systemctl show galleriad -p LimitCORE` → `LimitCORE=0`; in `/proc/<pid di galleriad>/limits` la riga `Max core file size` ha limite 0 |
 | `restart_recovers_and_listens_again` | `systemctl restart galleriad`; `hello` risponde entro 5 s |
 | `binfmt_units_are_masked` | `systemctl is-enabled systemd-binfmt.service` → `masked` |
 
 - [ ] **2.** `lab/run.sh 26 t07` → fallisce (laboratorio assente). **3.** Scrivi immagini, script, unit, helper.
-- [ ] **4.** `lab/run.sh 26 t07` → 8 superati; `docker ps -a --filter name=glab-` vuoto dopo l'uscita.
+- [ ] **4.** `lab/run.sh 26 t07` → 9 superati; `docker ps -a --filter name=glab-` vuoto dopo l'uscita.
 - [ ] **5.** Job `lab` in `ci.yml`: matrice `client: [26, 27, 79]`, passi `sudo modprobe wireguard`, `LAB_BUILD=host lab/run.sh ${{ matrix.client }}`.
 - [ ] **6. Commit:** `add docker lab, systemd unit and end-to-end harness`
 
@@ -584,7 +640,10 @@ pub fn backend_infos() -> Vec<BackendInfo>;
 | `unresolvable_endpoint_exits_transport` | endpoint `nonexistent.invalid:51820` → `Exited(Transport)`, `create` mai chiamato |
 | `ipv6_only_endpoint_is_accepted` | `[2001:db8::1]:51820` → `configure` riceve quell'indirizzo |
 | `fwmark_is_set_only_for_full_tunnel` | `DeviceConfig.fwmark == Some(51820)` solo con `0.0.0.0/0` |
-| `warns_after_10s_without_handshake` | tempo in pausa: un `Log` di livello `warn` dopo 10 s, nessuno se l'handshake c'è |
+| `warns_once_after_10s_without_handshake_and_without_keepalive` | tempo in pausa, peer senza `persistent_keepalive`: dopo 10 s da `Up` un solo `Log` di livello `warn` con testo `no handshake yet`; nessun `Exited`, nessun altro evento di stato (spec §6.2, Q7) |
+| `no_handshake_warning_when_keepalive_is_set` | `persistent_keepalive = 25` e nessun handshake → nessun avviso |
+| `no_handshake_warning_when_handshake_happened` | handshake entro 10 s → nessun avviso |
+| `up_does_not_wait_for_handshake` | `Up` subito dopo l'ok a `NetUp`, con `last_handshake == None` |
 | `stats_are_emitted_every_second` | |
 
 - [ ] **2.** Fallisce. **3.** Implementa backend e fabbrica. **4.** `cargo test -p galleria-backend-wireguard` → verde.
@@ -745,21 +804,30 @@ pub const MIN_VERSION: OpenVpnVersion = OpenVpnVersion { major: 2, minor: 6 };
 // config.rs
 pub struct ValidOpenVpn { /* Item già passati da check_strict + blocchi segreti */ }
 pub fn validate(p: &OpenVpnParams) -> Result<ValidOpenVpn, RpcError>;          // profile_rejected + data.directives
-pub fn profile_redirects_gateway(p: &ValidOpenVpn) -> bool;
+pub struct Redirect { pub ipv4: bool, pub ipv6: bool }                         // `redirect-gateway` e il suo flag `ipv6`
+pub fn profile_redirect(p: &ValidOpenVpn) -> Redirect;
+pub fn profile_ipv6_routes(p: &ValidOpenVpn) -> Vec<IpNet>;                    // dalle `route-ipv6` del profilo
 pub struct GenInput<'a> { pub profile: &'a ValidOpenVpn, pub version: OpenVpnVersion, pub mgmt_socket: &'a Path,
                           pub hook_socket: &'a Path, pub daemon_exe: &'a Path, pub options: &'a ConnectOptions }
-pub fn generate_config(input: &GenInput) -> String;
-pub const NATIVE_IPV6_LOCAL: &str = "ifconfig-ipv6 fd15:53b6:dead::2/64 fd15:53b6:dead::1";
+pub fn generate_config(input: &GenInput) -> String;                            // mai direttive IPv6 del demone (spec §7.3)
 // push.rs
-pub struct Pushed { pub redirect_gateway: bool, pub routes: Vec<IpNet>, pub ifconfig_ipv6: bool, pub dns_servers: Vec<IpAddr> }
+pub struct Pushed { pub redirect: Redirect, pub routes: Vec<IpNet>,            // `routes`: `route` e `route-ipv6`
+                    pub ifconfig_ipv6: bool, pub dns_servers: Vec<IpAddr> }
 pub fn parse_push_reply(text: &str) -> Option<Pushed>;
 // hookenv.rs
 pub const HOOK_ENV_PREFIXES: &[&str] = &["dev", "script_type", "foreign_option_", "ifconfig_", "route_", "redirect_gateway", "dns_", "tun_mtu"];
 pub struct HookEnv { pub script_type: String, pub dev: String, pub dns_servers: Vec<IpAddr>, pub search_domains: Vec<String>,
-                     pub routes: Vec<IpNet>, pub has_ipv6: bool }
+                     pub routes: Vec<IpNet>,                    // `route_network_N` e `route_ipv6_network_N`
+                     pub has_ipv6_address: bool }               // solo informativo: NON decide il blocco
 pub fn parse_hook_env(env: &BTreeMap<String, String>) -> Result<HookEnv, String>;
-pub fn net_config(env: &HookEnv, pushed: Option<&Pushed>, profile_redirects: bool, ipv6_block_enabled: bool) -> NetConfig;
+pub struct ProfileFacts { pub redirect: Redirect, pub ipv6_routes: Vec<IpNet> }
+pub fn net_config(env: &HookEnv, pushed: Option<&Pushed>, profile: &ProfileFacts, ipv6_block_enabled: bool) -> NetConfig;
 ```
+
+Regola di `net_config` per il blocco IPv6 (spec §7.3): `Unreachable` se `ipv6_block_enabled`, c'è un
+`redirect-gateway` IPv4 (profilo o spinto) e il tunnel **non** porta la rotta predefinita IPv6, cioè nessun
+`redirect-gateway` ha il flag `ipv6` e `carries_ipv6_default` è falso sull'unione delle rotte IPv6 di profilo,
+`PUSH_REPLY` e ambiente; altrimenti `None`. `has_ipv6_address` e `ifconfig_ipv6` non entrano nella decisione.
 
 - [ ] **1. Test che falliscono.** Le righe sono quelle vere delle prove dello spike 2 (`spikes/openvpn-mgmt/evidence/ovpn26/`):
 
@@ -785,7 +853,7 @@ fn reads_push_reply_from_real_log_line() {
 route 192.0.2.0 255.255.255.0,redirect-gateway def1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 60,\
 ifconfig 10.8.0.2 255.255.255.0,peer-id 1,cipher AES-256-GCM,protocol-flags cc-exit tls-ekm dyn-tls-crypt,tun-mtu 1500'";
     let p = parse_push_reply(line).unwrap();
-    assert!(p.redirect_gateway && !p.ifconfig_ipv6);
+    assert!(p.redirect.ipv4 && !p.redirect.ipv6 && !p.ifconfig_ipv6);
     assert_eq!(p.routes, ["192.0.2.0/24".parse().unwrap()]);
 }
 ```
@@ -804,12 +872,14 @@ ifconfig 10.8.0.2 255.255.255.0,peer-id 1,cipher AES-256-GCM,protocol-flags cc-e
 | `validate_rejects_unknown_secret_block` | `secret_blocks: {"ca": …}` → `invalid_config` |
 | `generated_config_has_daemon_directives_last` | contiene, dopo le righe del profilo, tutte le righe della spec §6.3 con `mgmt.sock`, `dev glr-ovpn0`, `up`/`down` verso `ovpn-hook` |
 | `dns_updown_disable_only_from_2_7` | assente con 2.6, presente con 2.7 |
-| `native_ipv6_lines_only_when_profile_redirects` | profilo con `redirect-gateway def1` e `ipv6_block` → `redirect-gateway ipv6`, `block-ipv6`, `NATIVE_IPV6_LOCAL`; senza `redirect-gateway` nel profilo → nessuna delle tre; con `ipv6_block: false` → nessuna |
+| `generated_config_never_adds_ipv6_directives` (rstest) | profilo con o senza `redirect-gateway def1`, `ipv6_block` acceso o spento: tra le righe aggiunte dal demone nessuna `redirect-gateway`, `block-ipv6`, `ifconfig-ipv6` |
+| `push_reply_reads_ipv6_redirect_and_routes` | `PUSH_REPLY,redirect-gateway def1 ipv6,route-ipv6 2001:db8:77::/48,ifconfig-ipv6 fd00:8::2/64 fd00:8::1,…` → `redirect.ipv6`, `routes` contiene `2001:db8:77::/48`, `ifconfig_ipv6` |
+| `profile_redirect_reads_the_ipv6_flag` | `redirect-gateway def1` → `{ipv4: true, ipv6: false}`; `redirect-gateway def1 ipv6` → entrambi; `redirect-gateway ipv6 !ipv4` → `{ipv4: false, ipv6: true}` |
 | `ignore_pushed_routes_adds_pull_filters` | `pull-filter ignore "route "` e `pull-filter ignore "redirect-gateway"` |
 | `secret_blocks_are_rendered_as_inline_blocks` | `<key>…</key>` in fondo |
-| `hook_env_reads_foreign_options` | ambiente vero dello spike (`foreign_option_1=dhcp-option DNS 10.8.0.1`, `foreign_option_2=dhcp-option DOMAIN galleria.test`, `route_network_1=192.0.2.0`, `route_netmask_1=255.255.255.0`, `dev=glr-ovpn0`, `script_type=up`) → DNS `10.8.0.1`, dominio `galleria.test`, rotta `192.0.2.0/24`, `has_ipv6 == false` |
-| `hook_env_detects_tunnel_ipv6` | con `ifconfig_ipv6_local` → `has_ipv6` |
-| `net_config_decides_ipv6_block` (rstest) | spinto + senza IPv6 + non nel profilo → `Unreachable`; nel profilo → `Native`; nessun redirect → `None`; spinto + IPv6 nel tunnel → `None`; opzione spenta → `None`. Sempre `install_routes == None` |
+| `hook_env_reads_foreign_options` | ambiente vero dello spike (`foreign_option_1=dhcp-option DNS 10.8.0.1`, `foreign_option_2=dhcp-option DOMAIN galleria.test`, `route_network_1=192.0.2.0`, `route_netmask_1=255.255.255.0`, `dev=glr-ovpn0`, `script_type=up`) → DNS `10.8.0.1`, dominio `galleria.test`, rotta `192.0.2.0/24`, `has_ipv6_address == false` |
+| `hook_env_reads_ipv6_address_and_routes` | con `ifconfig_ipv6_local` → `has_ipv6_address`; con `route_ipv6_network_1=2000::/4` e `route_ipv6_network_2=3000::/4` → entrambe in `routes` |
+| `net_config_decides_ipv6_block` (rstest) | redirect spinto, niente IPv6 → `Unreachable`; redirect nel profilo, niente IPv6 → `Unreachable`; **redirect + solo indirizzo IPv6 nel tunnel (`ifconfig_ipv6_local`, nessuna rotta predefinita IPv6) → `Unreachable`**; **redirect + indirizzo IPv6 + rotta IPv6 parziale (`2001:db8:77::/48`) → `Unreachable`**; redirect con flag `ipv6` spinto → `None`; redirect con flag `ipv6` nel profilo → `None`; redirect + `route_ipv6_network_N` che coprono `2000::/3` → `None`; redirect + `route-ipv6 ::/0` nel profilo → `None`; nessun redirect → `None`; opzione spenta → `None`. Sempre `install_routes == None` |
 
 - [ ] **2.** Fallisce. **3.** Implementa. **4.** `cargo test -p galleria-backend-openvpn` → verde.
 - [ ] **5. Commit:** `add openvpn management parser and config generation`
@@ -820,7 +890,7 @@ ifconfig 10.8.0.2 255.255.255.0,peer-id 1,cipher AES-256-GCM,protocol-flags cc-e
 
 ### Task 12: backend OpenVPN, processo e helper
 
-**Stima:** 8 h. **File:** crea `crates/galleria-backend-openvpn/src/{session,plat,hook}.rs`,
+**Stima:** 9 h. **File:** crea `crates/galleria-backend-openvpn/src/{session,plat,hook}.rs`,
 `crates/galleria-e2e/tests/t12_openvpn.rs`; modifica `crates/galleriad/src/{main,factory}.rs`, `.github/workflows/ci.yml`.
 
 **Interfacce — usa:** tutto il T11. **Produce:**
@@ -836,16 +906,35 @@ pub async fn drive<S: AsyncRead + AsyncWrite + Unpin>(mgmt: S, creds: Credential
     commands: mpsc::Receiver<BackendCommand>, hook: mpsc::Receiver<HookCall>) -> ExitReason;
 ```
 
-Cartella di sessione `<runtime_dir>/s/<session>/` `0700` con `mgmt.sock` e `hook.sock`, rimossa all'uscita.
+Cartella di sessione: quella ricevuta in `SessionContext.session_dir` (nome casuale, creata e rimossa dal demone,
+spec §7.4; il backend non costruisce percorsi dal numero di sessione), con dentro `mgmt.sock` e `hook.sock`.
 Arresto: `signal SIGTERM` sulla management, 10 s, poi `kill`. `stdout`/`stderr` di OpenVPN → `Log`.
+
+**Ordine tra `--up` e `CONNECTED` (spec §6.3).** OpenVPN chiama `--up` e ne aspetta l'uscita **prima** di mandare
+`>STATE:…,CONNECTED` (`spikes/openvpn-mgmt/evidence/ovpn26/2.7-dhcpopt.log`, righe 57–72: `ASSIGN_IP`, chiamata
+del programma `--up`, rotte, `CONNECTED`). `drive` quindi non aspetta mai `CONNECTED` per servire l'helper:
+
+1. chiamata dell'helper con `script_type=up` → `NetUp` subito, con ciò che si sa in quel momento (ambiente +
+   `PUSH_REPLY` ricordato) → alla risposta del demone, verdetto all'helper;
+2. `>STATE:…,CONNECTED` → `Up`, solo se il `NetUp` di questa connessione è stato accettato;
+3. `>STATE:…,RECONNECTING` dopo un `Up` → `Restarting`, e il `PUSH_REPLY` ricordato si scarta;
+4. chiamata dell'helper con `script_type=down` → `NetDown`; alla risposta l'helper esce 0. Poi si torna al punto 1.
+
+`drive` continua a leggere la management mentre aspetta la risposta a `NetUp`/`NetDown` (un `select!`, non un'attesa in fila).
 
 - [ ] **1. Test unitari che falliscono** (management simulata con `tokio::io::duplex`):
 
 | Test | Asserzione |
 |---|---|
 | `releases_hold_after_setup_commands` | scritti nell'ordine, uno per risposta: `version 3`, `state on`, `bytecount 1`, `log on`, `hold release` |
-| `up_is_sent_only_after_netup_is_accepted` | `CONNECTED` + chiamata dell'helper `up` → `NetUp`; `Up` solo dopo la risposta `Ok` |
+| `hook_up_is_answered_before_connected` | la management simulata manda `ASSIGN_IP` e **nient'altro** finché l'helper non ha il verdetto: chiamata `up` → `NetUp` → risposta `Ok` → verdetto positivo all'helper, senza nessun `CONNECTED` (nessuno stallo); in questo momento nessun `Up` è stato emesso |
+| `up_is_sent_at_connected_after_netup_is_accepted` | dopo il caso sopra, `>STATE:…,CONNECTED,SUCCESS,…` → `Up` con indirizzo e remoto |
+| `connected_without_accepted_netup_sends_no_up` | `CONNECTED` senza chiamata dell'helper → nessun `Up` |
 | `netup_refusal_makes_hook_fail` | risposta `Err` → verdetto negativo all'helper |
+| `internal_restart_emits_restarting_netdown_and_new_netup` | dopo `Up`: `>STATE:…,RECONNECTING,ping-restart,…` → `Restarting("ping-restart")`; helper `down` → `NetDown`, verdetto 0; `WAIT`/`AUTH` → `Progress`; nuovo `PUSH_REPLY` con un altro DNS + helper `up` → `NetUp` con il DNS **nuovo**; `CONNECTED` → `Up` |
+| `restart_forgets_the_previous_push_reply` | primo `PUSH_REPLY` con `redirect-gateway def1`, dopo il riavvio un `PUSH_REPLY` senza → il secondo `NetUp` ha `ipv6_block == None` |
+| `restart_events_are_tolerated_in_any_order` (rstest) | `down` prima di `RECONNECTING`, `RECONNECTING` prima di `down`, `RECONNECTING` senza `down`: sempre un `Restarting`, mai un panico, il nuovo `up` porta sempre un `NetUp` |
+| `hook_down_is_answered_while_stopping` | `Stop` → `signal SIGTERM`; helper `down` → `NetDown`, verdetto 0; poi `Exited(Stopped)` |
 | `answers_auth_with_credentials` | scrive `username "Auth" "alice"` e `password "Auth" "…"` |
 | `missing_otp_asks_for_input` | `SC:1,Enter OTP` senza OTP → `InputRequired { kind: Otp, prompt: "Enter OTP" }`; dopo `ProvideInput` risponde `SCRV1:…` |
 | `verification_failed_exits_auth_failed` | |
@@ -854,7 +943,7 @@ Arresto: `signal SIGTERM` sulla management, 10 s, poi `kill`. `stdout`/`stderr` 
 | `stop_sends_sigterm_signal` | scrive `signal SIGTERM`, `Exited(Stopped)` |
 | `push_reply_in_log_is_remembered_for_netup` | `>LOG` con `PUSH_REPLY,redirect-gateway def1` prima dell'helper → `NetUp.config.ipv6_block == Unreachable` |
 | `hook_forwards_only_allowed_env` | ambiente con `password=x` e `foreign_option_1=…` → al demone arriva solo la seconda |
-| `hook_exit_code_follows_verdict` | `ok` → 0; rifiuto → 1; demone irraggiungibile → 1 |
+| `hook_exit_code_follows_verdict` | `up`: `ok` → 0; rifiuto → 1; demone irraggiungibile → 1. `down`: sempre 0 |
 
 - [ ] **2.** Fallisce. **3.** Implementa sessione, `plat` (socket Unix, `--config /dev/stdin`), helper, `probe`, voce
   `openvpn` in `backend_infos()`. **4.** `cargo test -p galleria-backend-openvpn` → verde.
@@ -875,8 +964,9 @@ Arresto: `signal SIGTERM` sulla management, 10 s, poi `kill`. `stdout`/`stderr` 
 | `ovpn_cmdline_and_disk_have_no_secrets` | `/proc/<pid>/cmdline` == `openvpn --config /dev/stdin`; una riga della chiave privata cercata in `/run /tmp /var /etc` (escluso `lab/out` montato) → 0 file |
 | `mgmt_socket_is_denied_to_normal_user` (M5) | `runuser -u alice` che apre `mgmt.sock` → permesso negato |
 | `malicious_profile_is_rejected_and_nothing_runs` (M2) | `profile_rejected`; nessun `/tmp/PWNED-*`; nessun processo `openvpn` |
-| `ovpn_disconnect_leaves_no_residue` | `residue()` uguale a prima; cartella di sessione rimossa |
-| `kill9_daemon_kills_openvpn_and_cleans` | dopo `KILL` e riavvio: nessun `openvpn`, `residue()` uguale |
+| `ovpn_disconnect_leaves_no_residue` | `residue()` uguale a prima; cartella di sessione rimossa (`/run/galleria/s/` vuota) |
+| `session_dir_name_is_random_and_private` | durante la connessione `/run/galleria/s/` ha una sola voce, `0700 root`, con un nome che non è il numero di sessione; due connessioni di fila usano due nomi diversi |
+| `kill9_daemon_kills_openvpn_and_cleans` | dopo `KILL` e riavvio: nessun `openvpn`, `residue()` uguale, `/run/galleria/s/` vuota già alla prima risposta a `hello` (spec §7.4) |
 | `replace_wireguard_with_openvpn` (D5) | da `wg-split` connesso, `connect` OpenVPN con `replace` → `glr-wg0` assente, `glr-ovpn0` presente |
 | `ovpn_dco_state_and_bytecount` | solo se `GALLERIA_E2E_DCO=1`: nel log `DCO` attivo, stato e statistiche come sopra |
 
@@ -891,8 +981,8 @@ Arresto: `signal SIGTERM` sulla management, 10 s, poi `kill`. `stdout`/`stderr` 
 
 ### Task 13: OpenVPN — credenziali, errori, riconnessione
 
-**Stima:** 5 h. **File:** crea `crates/galleria-e2e/tests/t13_openvpn_auth.rs`; correzioni in `session.rs` / `manager.rs`
-con i loro test unitari.
+**Stima:** 6 h. **File:** crea `crates/galleria-e2e/tests/t13_openvpn_auth.rs`; correzioni in `session.rs` / `manager.rs`
+con i loro test unitari. Per provocare un riavvio interno senza far cadere il server: `kill -USR1 <pid di openvpn>`.
 
 - [ ] **1. Test end-to-end che falliscono:**
 
@@ -904,7 +994,9 @@ con i loro test unitari.
 | `wrong_otp_is_auth_failed` | |
 | `encrypted_key_asks_for_passphrase` | profilo `enckey`: `kind == KeyPassphrase`; con la passphrase → `connected` |
 | `unreachable_server_gives_up_after_four_attempts` | profilo `unreachable`: `attempt` 1→4, poi `error.code == ServerUnreachable`, in 20–45 s |
-| `blackholed_server_triggers_reconnect_and_recovery` (S13) | connesso; `ip route add blackhole 172.31.0.10/32` → `reconnecting`; tolta la rotta → `connected` entro 60 s |
+| `internal_restart_returns_to_reconnecting_then_connected` (S13) | connesso con `base.ovpn`; `kill -USR1` a `openvpn` → `event.state` `reconnecting` con la **stessa** `session` e lo stesso pid di `openvpn`; poi `connected` entro 30 s; nella sequenza degli stati non c'è mai un `connected` tra il segnale e la nuova `CONNECTED` |
+| `internal_restart_removes_and_reapplies_dns_and_ipv6_block` (M4) | stesso scenario: mentre lo stato è `reconnecting`, `resolvectl dns glr-ovpn0` non mostra più `10.8.0.1` (o l'interfaccia non esiste) e `ip -6 route` non ha `unreachable`; al primo `connected` successivo ci sono di nuovo entrambi; dopo `disconnect` `residue()` è uguale a prima |
+| `blackholed_server_triggers_reconnect_and_recovery` (S13) | connesso; `ip route add blackhole 172.31.0.10/32` → dopo `ping-restart` stato `reconnecting`, DNS e rotte `unreachable` tolti; il riavvio interno fallisce, il processo esce e il demone ne avvia uno nuovo (`attempt` cresce); tolta la rotta → `connected` entro 60 s con DNS riapplicati |
 | `reconnect_of_otp_profile_asks_for_a_new_otp` | stesso scenario con `bob` → `needs_input` (`Otp`), non riuso del vecchio codice |
 | `auth_nocache_survives_renegotiation` (S12) | profilo con `auth-nocache` e `reneg-sec 10`: ancora `connected` dopo 25 s, senza `needs_input` |
 | `disconnect_during_needs_input_cleans_up` | `disconnect` in `needs_input` → `disconnected`, nessun `openvpn` |
@@ -913,7 +1005,7 @@ con i loro test unitari.
 - [ ] **2.** `lab/run.sh 26 t13` → fallisce o rivela difetti. **3.** Correggi (test unitario per ogni correzione).
 - [ ] **4.** Verde su 26, 27, 79. **5. Commit:** `verify openvpn credentials, failures and reconnection`
 
-**Fatto quando:** gli 11 test passano sui tre client. Chiude S12 e S13; S16 resta **[S]** (solo il test unitario del T11).
+**Fatto quando:** i 13 test passano sui tre client. Chiude S12 e S13; S16 resta **[S]** (solo il test unitario del T11).
 
 ---
 
@@ -928,20 +1020,24 @@ con i loro test unitari.
 |---|---|
 | `control_without_block_leaks_ipv6` | `base.ovpn`, `ipv6_block: false` → `count_global_ipv6_on_eth0(15) > 0` |
 | `pushed_redirect_gets_unreachable_block` (S9) | `base.ovpn`: `net.ipv6_block == Unreachable`; 0 pacchetti; `sequential_client` → IPv4 in < 2 s |
-| `profile_redirect_gets_native_block` | `split.ovpn` + `redirect-gateway def1` nel profilo: `net.ipv6_block == Native`; 0 pacchetti; IPv4 in < 2 s |
+| `profile_redirect_gets_unreachable_block` | `split.ovpn` + `redirect-gateway def1` nel profilo: `net.ipv6_block == Unreachable`; 0 pacchetti; IPv4 in < 2 s; nella configurazione passata a OpenVPN (dal log `verb 3`) nessuna `block-ipv6` né `ifconfig-ipv6` |
 | `split_tunnel_leaves_ipv6_untouched` (S10) | `split.ovpn`: `net.ipv6_block == None`, `net.full_tunnel == false`; `curl -6 http://[2001:db8:99::1]/` → 200 dalla rete fisica |
-| `server_with_ipv6_keeps_ipv6_inside_the_tunnel` | `v6.ovpn`: `net.ipv6_block == None`; `ip -6 route get 2001:db8:99::1` → `dev glr-ovpn0`; `curl -6` → 200 |
-| `native_block_with_ipv6_server_is_recorded` (S11) | `v6.ovpn` + `redirect-gateway def1` nel profilo: asserisce solo "0 pacchetti IPv6 globali su `eth0` fuori dal tunnel"; scrive in `lab/out/s11-<v>.txt` se l'IPv6 dentro il tunnel funziona |
+| `server_with_ipv6_default_keeps_ipv6_inside_the_tunnel` (S11) | `v6.ovpn` (il server spinge `redirect-gateway def1 ipv6`): `net.ipv6_block == None`; `ip -6 route` senza `unreachable`; `ip -6 route get 2001:db8:99::1` → `dev glr-ovpn0`; `curl -6` → 200; 0 pacchetti IPv6 globali su `eth0` |
+| `ipv6_address_without_ipv6_default_keeps_the_block` | `v6.ovpn` + nel profilo `pull-filter ignore "redirect-gateway"` e `redirect-gateway def1`: il tunnel ha un indirizzo IPv6 (`ip -6 addr show glr-ovpn0` ne mostra uno globale o ULA) ma non la rotta predefinita IPv6 → `net.ipv6_block == Unreachable`; 0 pacchetti IPv6 globali su `eth0`; `sequential_client` → IPv4 in < 2 s; il ping all'indirizzo IPv6 del server **dentro** il tunnel funziona ancora |
+| `control_ipv6_address_without_block_leaks` | stesso profilo con `ipv6_block: false` → `count_global_ipv6_on_eth0(15) > 0`: è il caso che il blocco tolto troppo presto lasciava scoperto |
 | `unreachable_routes_are_gone_after_disconnect` | `ip -6 route` senza `unreachable` |
 | `unreachable_routes_are_gone_after_kill9` | idem dopo `KILL` e riavvio |
 
 - [ ] **2.** `lab/run.sh 26 t14` → fallisce o rivela difetti. **3.** Correggi. Se il `PUSH_REPLY` non arriva dalla
   management (S9 falso) leggi la stessa riga da `stdout` di OpenVPN, dove lo spike 2 l'ha già vista; se S10 è falso
-  (direttive IPv6 su un profilo che non è "tutto nel tunnel") è un difetto da correggere.
+  (blocco IPv6 su un profilo che non è "tutto nel tunnel") è un difetto da correggere. Per S11 annota, per ogni
+  versione, quale fonte dice che il tunnel porta la rotta predefinita IPv6 (flag `ipv6` nel `PUSH_REPLY`,
+  `route_ipv6_network_N` nell'ambiente di `--up`, o entrambe): se una delle due manca su una versione si usa
+  l'altra; se mancano entrambe il blocco resta (fallisce chiuso) e lo si scrive nell'esito.
 - [ ] **4.** Verde su 26, 27, 79. **5. Commit:** `verify openvpn ipv6 block on pushed, profile and split routes`
 
-**Fatto quando:** gli 8 test passano sui tre client e i file `s11-*.txt` esistono. Chiude S9, S10; S11 è **registrato**,
-non deciso (spec Q3).
+**Fatto quando:** i 9 test passano sui tre client. Chiude S9, S10, S11 (spec §7.3, Q3 decisa: un solo meccanismo,
+rotte `unreachable`, nessuna direttiva nativa).
 
 ---
 
@@ -955,7 +1051,8 @@ src/import_wg.rs,src/import_ovpn.rs}`.
 ```rust
 pub const SCHEMA_VERSION: u32 = 1;
 pub struct Profile { /* campi della spec §8.2 */ }  pub struct Settings;  pub enum ProtocolConfig { Openvpn(OpenVpnProfile), Wireguard(WireGuardProfile) }
-pub enum StoreError { NotFound, Ambiguous(Vec<(uuid::Uuid, String)>), NewerSchema { found: u32 }, Invalid(String), Io(std::io::Error) }
+pub enum StoreError { NotFound, Ambiguous(Vec<(uuid::Uuid, String)>), NewerSchema { found: u32 }, Invalid(String), Io(std::io::Error),
+                      InsecurePermissions { path: PathBuf, mode: u32 }, WrongOwner { path: PathBuf } }
 pub struct ProfileStore; impl ProfileStore {
     pub fn default_dir() -> PathBuf;                                    // $XDG_CONFIG_HOME/galleria o ~/.config/galleria
     pub fn open(dir: &Path) -> Result<Self, StoreError>;                // crea profiles/ e galleria.toml se mancano
@@ -967,6 +1064,7 @@ pub struct ProfileStore; impl ProfileStore {
 pub trait SecretStore { fn get(&self, id: &uuid::Uuid, key: &str) -> Result<Option<Secret>, StoreError>;
                         fn set(&self, id: &uuid::Uuid, key: &str, value: &Secret) -> Result<(), StoreError>;
                         fn delete_all(&self, id: &uuid::Uuid) -> Result<(), StoreError>; }
+/// File `secrets/<id>.toml` 0600 in una cartella 0700 (spec §8.3, Q6 decisa). I permessi si verificano a OGNI lettura.
 pub struct FileSecretStore; impl FileSecretStore { pub fn open(dir: &Path) -> Result<Self, StoreError>; }
 pub struct ImportWarning { pub line: usize, pub directive: String, pub kind: WarningKind }   // Dangerous | Unsupported | NoTlsClient
 pub struct Imported { pub profile: Profile, pub secrets: Vec<(String, Secret)>, pub warnings: Vec<ImportWarning> }
@@ -999,11 +1097,14 @@ pub fn to_connect_params(profile: &Profile, secrets: &dyn SecretStore, replace: 
 | `imported_openvpn_always_passes_strict` | `galleria_ovpn::check_strict` sul `config` importato → `Ok` |
 | `to_connect_params_reassembles_secrets` | `secret_blocks["key"]` valorizzato; opzioni da `[settings]` |
 | `secrets_file_is_0600_and_removed_with_profile` | |
+| `secrets_read_checks_permissions_every_time` (rstest: `0640`, `0604`, `0660`, `0644`) | dopo un `chmod` del file tra due letture, la seconda `get` → `InsecurePermissions { path, mode }` e nessun segreto restituito; riportato a `0600` → di nuovo `Ok`. Nessuna correzione automatica dei permessi |
+| `secrets_dir_with_group_or_other_bits_is_refused` | cartella `secrets/` a `0750` → `InsecurePermissions` sulla cartella |
+| `secrets_symlink_is_refused` | `secrets/<id>.toml` sostituito da un collegamento simbolico → errore, il bersaglio non viene letto |
 
 - [ ] **2.** Fallisce. **3.** Implementa. **4.** `cargo test -p galleria-profile` → verde; `scripts/check-boundaries.sh` → 0.
 - [ ] **5. Commit:** `add toml profile store, importers and file secret store`
 
-**Fatto quando:** i 20 test passano.
+**Fatto quando:** i 23 test passano.
 
 ---
 
@@ -1018,8 +1119,24 @@ src/prompt.rs}`, `crates/galleria-e2e/tests/t16_cli.rs`, `docs/06-esito-fase1.md
 |---|---|
 | `galleria import <file> [--name N]` | `.conf` o `.ovpn` (dall'estensione); stampa gli avvisi; salva profilo e segreti |
 | `galleria list` · `galleria delete <nome\|id>` | |
-| `galleria connect <nome\|id> [--replace] [--username U] [--password-stdin] [--otp CODICE] [--no-wait]` | manda `connect`; segue `event.state` fino a `connected` o `error`; in `needs_input` chiede al terminale senza eco |
+| `galleria connect <nome\|id> [--replace] [--username U] [--password-stdin] [--otp-stdin] [--no-wait]` | manda `connect`; segue `event.state` fino a `connected` o `error`; in `needs_input` chiede al terminale senza eco |
 | `galleria disconnect` · `galleria status [--json]` · `galleria logs [-f]` · `galleria version` | `version` mostra anche versione e backend del demone |
+
+**Nessun segreto in argv** (spec §8.3). Password, OTP e passphrase della chiave arrivano solo da prompt senza eco
+o da stdin; non esiste nessuna opzione che prenda un segreto come valore (`--otp CODICE`, `--password X` non
+esistono e clap li rifiuta). Con `--password-stdin` e `--otp-stdin` la CLI legge da stdin una riga per ciascuno,
+nell'ordine password poi OTP (una sola riga se è presente una sola delle due opzioni), togliendo il fine riga; con
+stdin non terminale e senza l'opzione che serve, un `needs_input` fa uscire con 3. `--username` resta un
+argomento: non è un segreto. Esempi:
+
+```sh
+galleria connect ufficio                                   # chiede al terminale, senza eco, ciò che manca
+galleria connect ufficio --username alice --password-stdin < /run/user/1000/pw     # password da un file 0600
+printf '%s\n%s\n' "$PW" "$OTP" | galleria connect ufficio --username bob --password-stdin --otp-stdin
+```
+
+(`printf` è un comando interno della shell: il segreto non compare negli argomenti di nessun processo. Mai
+`sh -c "echo $PW | …"` né `--otp 123456`.)
 
 Codici di uscita: 0 riuscito · 1 errore generico (anche `already_active`) · 2 `auth_failed` · 3 serve un dato e non
 c'è un terminale · 4 `server_unreachable` · 5 demone non raggiungibile, permesso negato o protocollo incompatibile.
@@ -1035,7 +1152,10 @@ italiano; `Lang` da `LC_ALL`/`LANG` (`it*` → italiano, altrimenti inglese).
 | `every_error_code_has_both_languages` | per ogni `ErrorCode` e `SessionErrorCode`: testo inglese e italiano non vuoti e diversi |
 | `permission_denied_message_names_the_group` | il testo per `PermissionDenied` contiene `galleria` e `usermod -aG` |
 | `incompatible_protocol_message_is_actionable` | contiene le versioni del demone e del client |
-| `non_tty_needs_input_exits_3` | con stdin non terminale e senza `--password-stdin` |
+| `non_tty_needs_input_exits_3` | con stdin non terminale e senza `--password-stdin`; idem per l'OTP senza `--otp-stdin` |
+| `secret_valued_options_do_not_exist` (rstest) | `connect x --otp 123456`, `connect x --password pw`, `connect x --key-passphrase pw` → errore di clap (uscita 2 di clap rimappata a 1), nessuna connessione tentata |
+| `stdin_secrets_are_read_in_order` | stdin `"pw\n123456\n"` con le due opzioni → password `pw`, OTP `123456`; con il solo `--otp-stdin` la prima riga è l'OTP; il fine riga (anche `\r\n`) è tolto |
+| `prompt_never_echoes` | il prompt usa la lettura senza eco per `Credentials` (password), `Otp` con `echo: false` e `KeyPassphrase` |
 | `status_json_is_the_ipc_status` | l'uscita di `status --json` si rilegge come `galleria_ipc::Status` |
 
 - [ ] **2.** Fallisce. **3.** Implementa. **4.** `cargo test -p galleria-cli` → verde.
@@ -1044,7 +1164,9 @@ italiano; `Lang` da `LC_ALL`/`LANG` (`it*` → italiano, altrimenti inglese).
 | Test | Asserzione |
 |---|---|
 | `cli_wireguard_roundtrip` | `import wg-split.conf` → `list` lo mostra → `connect` esce 0 → `status` dice `connected` → `ping` ok → `disconnect` → `residue()` pulito |
-| `cli_openvpn_with_password_stdin` | `import base.ovpn`; `echo alice-secret \| galleria connect base --username alice --password-stdin` → 0 |
+| `cli_openvpn_with_password_stdin` | `import base.ovpn`; `galleria connect base --username alice --password-stdin` con `alice-secret\n` scritto dal test sullo stdin del processo (niente shell, niente `echo`) → 0 |
+| `cli_otp_from_stdin` | profilo `otp`, utente `bob`: `--password-stdin --otp-stdin` con password e codice di `oathtool` su due righe di stdin → 0, stato `connected` |
+| `cli_secrets_never_appear_in_argv` (M7) | durante i due test qui sopra, `/proc/<pid di galleria>/cmdline` e `ps -eo args` non contengono né la password né l'OTP |
 | `cli_wrong_password_exits_2` | |
 | `cli_unreachable_exits_4` | |
 | `cli_connect_while_active_exits_1_and_replace_works` | |
@@ -1057,9 +1179,10 @@ italiano; `Lang` da `LC_ALL`/`LANG` (`it*` → italiano, altrimenti inglese).
 - [ ] **6.** `lab/run.sh 26 && lab/run.sh 27 && lab/run.sh 79` (tutti i test, senza filtro) → verdi.
 - [ ] **7.** Scrivi `docs/06-esito-fase1.md`, sul modello di `04` e `05`: criteri E1–E7 della spec con la prova;
   tabella S1–S16 chiusi/aperti; restrizioni systemd tolte; direttive aggiunte alla lista o rimaste sconosciute (T10);
-  esito di `s11-*.txt`; **lista di controllo manuale** per S15 (VM Ubuntu e Fedora desktop con NetworkManager:
+  per S11, quale fonte ha detto "rotta predefinita IPv6 nel tunnel" su ogni versione (T14); **lista di controllo manuale** per S15 (VM Ubuntu e Fedora desktop con NetworkManager:
   installazione con `install.sh`, `nmcli device` mostra `glr-*` come non gestite, DNS e blocco IPv6 come in
-  laboratorio) e per S14 se `lab-dco` non è riuscito; cosa serve da Peppe (questioni Q1–Q11 della spec ancora aperte).
+  laboratorio) e per S14 se `lab-dco` non è riuscito; cosa serve da Peppe (questioni della spec ancora aperte: Q1, Q2, Q4, Q5, Q8–Q11; Q3, Q6 e Q7 sono risolte) e
+  il promemoria che la parte Linux di D15 nell'analisi va aggiornata con la frase della spec §13, se non è già stato fatto.
 - [ ] **8. Commit:** `add galleria cli and record phase 1 outcome`
 
 **Fatto quando:** l'intero laboratorio è verde sui tre client, il job `check` passa, `docs/06-esito-fase1.md` esiste e
@@ -1075,13 +1198,14 @@ non dichiara chiuso nessun **[S]** senza una prova indicata.
 | §4 protocollo IPC | T2 (tipi, codec, versioni), T4 (server, `hello`, limiti), T5 (`subscribe`, `logs`) |
 | §5.1 autorizzazione | T4 (unitaria), T7 (end-to-end) |
 | §5.2 sessione unica e macchina a stati | T3 |
-| §5.3 avvio e arresto | T4, T6 (`recover`) |
+| §5.3 avvio e arresto | T4 (`PR_SET_DUMPABLE`, pulizia delle cartelle di sessione), T6 (`recover`) |
 | §5.4 log e segreti | T5, T13, T16 |
-| §6.1 interfaccia dei backend | T3 |
+| §6.1 interfaccia dei backend | T3 (compresi `NetDown`, `Restarting` e l'ordine `NetUp` → `Up`) |
 | §6.2 WireGuard | T8, T9 |
-| §6.3 OpenVPN | T10, T11, T12, T13 |
-| §7 modulo di rete | T6, T9, T14 |
+| §6.3 OpenVPN | T10, T11, T12 (ordine `--up`/`CONNECTED`, riavvio interno), T13 |
+| §7 modulo di rete | T6, T9, T14; §7.4 cartelle di sessione: T3, T4, T12 |
 | §8 profili e segreti | T15, T16 |
-| §9 unit systemd | T7 |
+| §9 unit systemd | T7 (`LimitCORE=0`), T4 (`PR_SET_DUMPABLE`) |
 | §10 test e CI | T1, T7, T12 |
 | §12 punti [S] | colonna "Task" della spec; riepilogo in T16 |
+| §13 decisioni Q3, Q6, Q7 | Q3: T2, T6, T11, T12, T14 · Q6: T15 · Q7: T8 |

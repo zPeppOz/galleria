@@ -18,7 +18,12 @@ jobs:
         run: cargo build --release
       - name: build the Tauri shell
         working-directory: spikes/wireguard-nt/app/src-tauri
-        run: cargo build --release
+        shell: pwsh
+        run: |
+          # frontendDist (../dist) non è nel repo: nella Sandbox lo creava app-warm.ps1.
+          New-Item -ItemType Directory -Force ../dist | Out-Null
+          Set-Content ../dist/index.html '<!doctype html><title>Galleria spike</title>'
+          cargo build --release
       - uses: actions/upload-artifact@v4
         with:
           name: spike-windows

@@ -5,11 +5,11 @@
 //!   galleriad-spike netcfg <socket>               (fixed --up/--down helper, run by openvpn)
 
 mod netcfg;
+mod plat;
+mod probe;
 mod sanitize;
 
 use std::io::{BufRead, BufReader, Read, Write};
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
-use std::os::unix::net::{UnixListener, UnixStream};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::sync::OnceLock;
@@ -50,6 +50,8 @@ pub enum Ipv6Mode {
 enum ConfigVia {
     #[default]
     Pipe,
+    /// experiment: `--config stdin` (on Windows the management password wants the same stdin)
+    Stdin,
     Tempfile,
 }
 
@@ -87,10 +89,22 @@ struct Request {
     unsafe_no_sanitize: bool,
     #[serde(default = "d_openvpn")]
     openvpn: String,
+    /// Windows: `management-client`, openvpn connects to the daemon instead of listening
+    #[serde(default)]
+    mgmt_client: bool,
+    /// test only (criterion 2.3): print the management password so the harness can look for it on disk
+    #[serde(default)]
+    reveal_mgmt_password: bool,
+    /// test only (criterion 2.3): wait before taking the management connection, so the harness can try the port first
+    #[serde(default)]
+    mgmt_connect_delay_secs: u64,
+    /// extra directives appended by the test harness after the daemon's own (never from the profile)
+    #[serde(default)]
+    test_extra: Vec<String>,
 }
 fn d_attempts() -> u32 { 3 }
 fn d_hold() -> u64 { 20 }
-fn d_openvpn() -> String { "/usr/sbin/openvpn".into() }
+fn d_openvpn() -> String { plat::DEFAULT_OPENVPN.into() }
 
 enum Outcome {
     Connected,
@@ -105,8 +119,10 @@ fn main() {
     match args.get(1).map(String::as_str) {
         Some("netcfg") => std::process::exit(netcfg::helper_main(args.get(2).map(String::as_str).unwrap_or(""))),
         Some("connect") => std::process::exit(connect()),
+        Some("seqprobe") => std::process::exit(probe::seqprobe(&args[2..])),
+        Some("mgmtprobe") => std::process::exit(probe::mgmtprobe(&args[2..])),
         _ => {
-            eprintln!("usage: galleriad-spike connect < request.json | netcfg <socket>");
+            eprintln!("usage: galleriad-spike connect < request.json | netcfg <socket> | seqprobe <host> <port> | mgmtprobe <port> [password]");
             std::process::exit(64);
         }
     }
@@ -140,17 +156,15 @@ fn connect() -> i32 {
         return 69;
     }
 
-    // session directory: /run/galleria is 0700 root (M5)
-    let base = "/run/galleria";
-    let _ = std::fs::DirBuilder::new().mode(0o700).create(base);
-    let _ = std::fs::set_permissions(base, std::fs::Permissions::from_mode(0o700));
-    let sess = format!("{base}/s{}", std::process::id());
-    std::fs::DirBuilder::new().mode(0o700).create(&sess).expect("session dir");
-    let mgmt = format!("{sess}/mgmt.sock");
-    let netsock = format!("{sess}/netcfg.sock");
-    let listener = UnixListener::bind(&netsock).expect("netcfg socket");
-    let ipv6 = req.ipv6;
-    std::thread::spawn(move || netcfg::serve(listener, ipv6));
+    let sess = plat::session_dir();
+    let mgmt = plat::new_mgmt(&sess, req.mgmt_client);
+    let netsock = plat::netcfg_endpoint(&sess);
+    plat::spawn_netcfg_server(&netsock, req.ipv6);
+    if req.reveal_mgmt_password {
+        if let Some(p) = plat::stdin_secret(&mgmt) {
+            emit("TEST_ONLY_mgmt_password", json!({"password": p}));
+        }
+    }
 
     // generated configuration
     let san = sanitize::sanitize(&req.profile, req.key_mode == KeyMode::External);
@@ -163,20 +177,20 @@ fn connect() -> i32 {
         emit("warning", json!({"message": "UNSAFE control run: profile not sanitized"}));
     }
     let me = std::env::current_exe().unwrap().to_string_lossy().to_string();
-    let mut ours = vec![
-        format!("management {mgmt} unix"),
-        "management-client-user root".into(),
-        "management-hold".into(),
+    let mut ours = plat::mgmt_directives(&mgmt);
+    ours.extend([
+        "management-hold".to_string(),
         "management-query-passwords".into(),
         "auth-retry none".into(),
         "connect-retry-max 1".into(),
         "server-poll-timeout 5".into(),
         "verb 3".into(),
-    ];
+    ]);
     if !req.unsafe_no_sanitize {
+        let helper = plat::helper_command(&me, &netsock);
         ours.push("script-security 2".into());
-        ours.push(format!("up \"{me} netcfg {netsock}\""));
-        ours.push(format!("down \"{me} netcfg {netsock}\""));
+        ours.push(format!("up \"{helper}\""));
+        ours.push(format!("down \"{helper}\""));
     }
     if (maj, min) >= (2, 7) {
         if let Some(d) = &req.dns_updown {
@@ -196,6 +210,7 @@ fn connect() -> i32 {
     if req.key_mode == KeyMode::External {
         ours.push("management-external-key".into());
     }
+    ours.extend(req.test_extra.iter().cloned());
     emit("generated_config", json!({"daemon_directives": ours,
         "profile_directives": directive_lines(&cfg),
         "config_via": format!("{:?}", req.config_via), "key_mode": format!("{:?}", req.key_mode)}));
@@ -250,7 +265,7 @@ fn connect() -> i32 {
             }
         }
     }
-    let _ = std::fs::remove_dir_all(&sess);
+    plat::cleanup(&sess);
     emit("exit", json!({"code": code}));
     code
 }
@@ -284,60 +299,96 @@ fn quote(s: &str) -> String {
     format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-fn run_once(req: &Request, cfg: &str, sess: &str, mgmt: &str, ext_key: Option<&p256::ecdsa::SigningKey>) -> Outcome {
-    let _ = std::fs::remove_file(mgmt);
-    let tmpcfg = format!("{sess}/config.ovpn");
-    let mut cmd = Command::new(&req.openvpn);
-    match req.config_via {
-        ConfigVia::Pipe => {
-            cmd.args(["--config", "/dev/stdin"]).stdin(Stdio::piped());
+/// Commands to the management interface go out one at a time: the next one leaves only after the
+/// reply (`SUCCESS:`/`ERROR:`) to the previous one, or after a short timeout for commands without
+/// reply. Found on Windows (TCP): with commands written back to back openvpn 2.7.9 processed
+/// `state on` twice and never saw `hold release` (evidence/windows/2.4-pipelined.log).
+struct CmdQueue {
+    w: Box<dyn Write + Send>,
+    q: std::collections::VecDeque<String>,
+    waiting: Option<Instant>,
+}
+
+impl CmdQueue {
+    fn pump(&mut self) {
+        if self.waiting.is_some_and(|t| t.elapsed() < Duration::from_millis(400)) {
+            return;
         }
-        ConfigVia::Tempfile => {
-            let mut f = std::fs::OpenOptions::new();
-            std::os::unix::fs::OpenOptionsExt::mode(&mut f, 0o600);
-            f.write(true).create_new(true).open(&tmpcfg).unwrap().write_all(cfg.as_bytes()).unwrap();
-            cmd.args(["--config", &tmpcfg]).stdin(Stdio::null());
+        if let Some(c) = self.q.pop_front() {
+            let _ = self.w.write_all(format!("{c}\n").as_bytes());
+            let _ = self.w.flush();
+            self.waiting = Some(Instant::now());
         }
     }
+}
+
+fn run_once(req: &Request, cfg: &str, sess: &str, mgmt: &plat::Mgmt, ext_key: Option<&p256::ecdsa::SigningKey>) -> Outcome {
+    plat::mgmt_prepare(mgmt);
+    let tmpcfg = plat::tempfile_path(sess);
+    let mut cmd = Command::new(&req.openvpn);
+    // what goes to the child's stdin: the configuration (Linux pipe), the management password (Windows), or both
+    let mut stdin_data = String::new();
+    let cfg_arg = match req.config_via {
+        ConfigVia::Pipe => {
+            let (arg, on_stdin) = plat::config_pipe(cfg);
+            if on_stdin {
+                stdin_data.push_str(cfg);
+            }
+            arg
+        }
+        ConfigVia::Stdin => {
+            stdin_data.push_str(cfg);
+            if cfg!(windows) { "stdin".to_string() } else { "/dev/stdin".to_string() }
+        }
+        ConfigVia::Tempfile => {
+            if let Err(e) = plat::write_private_file(&tmpcfg, cfg.as_bytes()) {
+                return Outcome::Failed(format!("temp config: {e}"));
+            }
+            emit("tempfile_written", json!({"path": tmpcfg, "access": plat::describe_access(&tmpcfg)}));
+            tmpcfg.clone()
+        }
+    };
+    let secret = plat::stdin_secret(mgmt);
+    if let Some(pw) = &secret {
+        stdin_data.push_str(pw);
+        stdin_data.push('\n');
+    }
+    cmd.args(["--config", &cfg_arg]);
+    cmd.stdin(if stdin_data.is_empty() { Stdio::null() } else { Stdio::piped() });
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => return Outcome::Failed(format!("spawn: {e}")),
     };
-    emit("openvpn_spawned", json!({"pid": child.id(), "argv": [&req.openvpn, "--config", if req.config_via == ConfigVia::Pipe { "/dev/stdin" } else { &tmpcfg }]}));
+    emit("openvpn_spawned", json!({"pid": child.id(), "argv": [&req.openvpn, "--config", &cfg_arg],
+        "stdin": if stdin_data.is_empty() { "null" } else if secret.is_some() { "pipe: management password" } else { "pipe: configuration" }}));
     if let Some(mut stdin) = child.stdin.take() {
-        let c = cfg.to_string();
         std::thread::spawn(move || {
-            let _ = stdin.write_all(c.as_bytes());
+            let _ = stdin.write_all(stdin_data.as_bytes());
         });
     }
     for (pipe, name) in [(child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>), "stdout"), (child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>), "stderr")] {
         if let Some(p) = pipe {
             std::thread::spawn(move || {
                 for l in BufReader::new(p).lines().map_while(Result::ok) {
-                    eprintln!("openvpn[{name}]| {l}");
+                    // same stream and lock as the events: no interleaving inside a line
+                    let mut out = std::io::stdout().lock();
+                    let _ = writeln!(out, "openvpn[{name}]| {l}");
                 }
             });
         }
     }
 
-    // connect to the management socket
-    let t0 = Instant::now();
-    let stream = loop {
-        if let Ok(s) = UnixStream::connect(mgmt) {
-            break s;
-        }
-        if let Ok(Some(st)) = child.try_wait() {
-            return Outcome::Failed(format!("openvpn exited before management was up ({st})"));
-        }
-        if t0.elapsed() > Duration::from_secs(10) {
-            let _ = child.kill();
-            return Outcome::Failed("management socket not available".into());
-        }
-        std::thread::sleep(Duration::from_millis(50));
+    if req.mgmt_connect_delay_secs > 0 {
+        emit("TEST_ONLY_mgmt_connect_delayed", json!({"secs": req.mgmt_connect_delay_secs, "endpoint": plat::mgmt_describe(mgmt)}));
+        std::thread::sleep(Duration::from_secs(req.mgmt_connect_delay_secs));
+    }
+    // connect to the management interface
+    let (stream, w) = match plat::mgmt_connect(mgmt, &mut child) {
+        Ok(rw) => rw,
+        Err(e) => return Outcome::Failed(e),
     };
-    emit("mgmt_connected", json!({"socket": mgmt}));
-    let mut w = stream.try_clone().unwrap();
+    emit("mgmt_connected", json!({"endpoint": plat::mgmt_describe(mgmt)}));
     let (tx, rx) = mpsc::channel::<String>();
     std::thread::spawn(move || {
         for l in BufReader::new(stream).lines().map_while(Result::ok) {
@@ -346,9 +397,8 @@ fn run_once(req: &Request, cfg: &str, sess: &str, mgmt: &str, ext_key: Option<&p
             }
         }
     });
-    let mut send = |w: &mut UnixStream, c: &str| {
-        let _ = w.write_all(format!("{c}\n").as_bytes());
-    };
+    let mut w = CmdQueue { w, q: Default::default(), waiting: None };
+    let send = |w: &mut CmdQueue, c: &str| w.q.push_back(c.to_string());
 
     let mut connected = false;
     let mut auth_failed: Option<String> = None;
@@ -358,7 +408,15 @@ fn run_once(req: &Request, cfg: &str, sess: &str, mgmt: &str, ext_key: Option<&p
     let mut stop_sent = false;
     let mut last_bytes = Instant::now() - Duration::from_secs(10);
     let mut tempfile_removed = false;
+    // the spike daemon never outlives its test: past this point it stops its own child and gives up
+    let watchdog = Instant::now() + Duration::from_secs(req.hold_secs + 90);
     loop {
+        if Instant::now() > watchdog {
+            emit("error", json!({"kind": "watchdog", "message": "no progress, stopping openvpn"}));
+            need_input = Some("watchdog: nessun progresso".into());
+            let _ = child.kill();
+            break;
+        }
         if let Some(d) = deadline {
             if !stop_sent && Instant::now() >= d {
                 emit("disconnect_requested", json!({}));
@@ -366,7 +424,8 @@ fn run_once(req: &Request, cfg: &str, sess: &str, mgmt: &str, ext_key: Option<&p
                 stop_sent = true;
             }
         }
-        let line = match rx.recv_timeout(Duration::from_millis(200)) {
+        w.pump();
+        let line = match rx.recv_timeout(Duration::from_millis(if w.q.is_empty() { 200 } else { 20 })) {
             Ok(l) => l,
             Err(mpsc::RecvTimeoutError::Timeout) => continue,
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
@@ -465,9 +524,7 @@ fn run_once(req: &Request, cfg: &str, sess: &str, mgmt: &str, ext_key: Option<&p
                     let sig: Result<p256::ecdsa::Signature, _> = k.sign_prehash(&digest);
                     match sig {
                         Ok(s) => {
-                            send(&mut w, "pk-sig");
-                            send(&mut w, &b.encode(s.to_der().as_bytes()));
-                            send(&mut w, "END");
+                            send(&mut w, &format!("pk-sig\n{}\nEND", b.encode(s.to_der().as_bytes())));
                             emit("pk_sign_done", json!({}));
                         }
                         Err(e) => emit("error", json!({"message": format!("sign: {e}")})),
@@ -478,8 +535,12 @@ fn run_once(req: &Request, cfg: &str, sess: &str, mgmt: &str, ext_key: Option<&p
         } else if let Some(rest) = line.strip_prefix(">FATAL:") {
             emit("fatal", json!({"message": rest}));
         } else if line.starts_with("ERROR:") {
+            w.waiting = None;
             emit("mgmt_error", json!({"line": line}));
-        } else if line.starts_with(">LOG:") || line.starts_with("SUCCESS:") || line.starts_with(">NEED-OK") {
+        } else if line.contains("SUCCESS:") {
+            // also matches the first line on TCP, "ENTER PASSWORD:SUCCESS: password is correct"
+            w.waiting = None;
+        } else if line.starts_with(">LOG:") || line.starts_with(">NEED-OK") {
             // ignored in the spike
         } else if line.starts_with('>') {
             emit("mgmt_other", json!({"line": line}));

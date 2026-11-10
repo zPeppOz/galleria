@@ -10,8 +10,11 @@ description = "Spike 2 (throwaway): drive openvpn 2.6/2.7 only through the manag
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
-libc = "0.2"
+getrandom = "0.2"
 p256 = { version = "0.13", features = ["ecdsa", "pkcs8", "pem"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_Pipes", "Win32_System_IO"] }
 
 [profile.release]
 strip = true

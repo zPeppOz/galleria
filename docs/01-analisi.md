@@ -248,7 +248,7 @@ soglie che fermino il progetto.
 | A5 | Storage profili: TOML (leggibile, versionabile) o SQLite | Nello | RISOLTA: TOML, un file per profilo (D13), ratificata da Aitano su delega di Peppe, 2026-11-10 |
 | A6 | Soglie del criterio di stop dopo il lancio | Peppe | RISOLTA: nessuna soglia di stop (Peppe, 2026-11-10) |
 | A7 | Lista dei difetti di Pritunl/Eddie (validazione) | Peppe | PARZIALE: Pritunl = UI spartana + WireGuard solo con server Pritunl (verificato su forum); Eddie e prova pratica non fatti |
-| A8 | Design system: riuso di xr1 design-system (verificarne la licenza per un progetto OSS) | Peppe | RISOLTA: si usa il design system XR1 (Peppe, 2026-11-10). Da fare: aggiungere una licenza compatibile con GPL-3.0 al repo XR1-Solution/design-system, che oggi non ne ha |
+| A8 | Design system: riuso di xr1 design-system (verificarne la licenza per un progetto OSS) | Peppe | RISOLTA: design system **nuovo e dedicato a Galleria**, nato nel repo con la licenza del progetto; quello di XR1 non si usa perché resta privato (Peppe, 2026-11-10) |
 | A9 | Interfaccia comune dei backend nel demone già dalla v0.1, e OpenConnect come libreria (`libopenconnect`) o come processo figlio | Nello | RISOLTA: interfaccia comune subito (D10), OpenConnect processo figlio (D11), ratificata da Aitano su delega di Peppe, 2026-11-10 |
 | A10 | Blocco IPv6 per i profili "tutto nel tunnel" già in v0.1 (§8) | Nello | RISOLTA: sì (D15), corretta dopo lo spike 2 e approvata da Peppe il 2026-11-10 |
 | A11 | Nessuna telemetria (§8) | Peppe | RISOLTA: nessuna telemetria (Peppe, 2026-11-10) |

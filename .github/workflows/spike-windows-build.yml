@@ -1,5 +1,7 @@
-# Spike 1, criterio 1.4: la scelta (crate `wireguard-nt`, binding a wireguard.h) deve compilare insieme all'app Tauri
-# Copiato in .github/workflows il 2026-11-10 (Aitano): parte a ogni push su spike/windows o a mano.
+# Spike 1, criteri 1.4 e 1.6 (parte CI): la scelta (crate `wireguard-nt`, binding a wireguard.h) deve compilare insieme
+# all'app Tauri su un runner Windows, e l'MSI con il servizio deve passare la validazione ICE di WiX, che nella Sandbox
+# era stata saltata (VBScript assente, errore 2738). Copiato in .github/workflows il 2026-11-10 (Aitano).
+# La chiave dell'updater nasce e muore nel job: e' usa e getta, NON e' la chiave di release.
 name: spike-windows-build
 on:
   push:
@@ -23,3 +25,42 @@ jobs:
           path: |
             spikes/wireguard-nt/galleriad/target/release/galleriad.exe
             spikes/wireguard-nt/app/src-tauri/target/release/galleria-spike-app.exe
+
+  msi:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: stage galleriad.exe and wireguard.dll (same inputs as the Sandbox build)
+        run: |
+          New-Item -ItemType Directory -Force C:\gl\stage | Out-Null
+          cargo build --release --manifest-path spikes/wireguard-nt/galleriad/Cargo.toml
+          Copy-Item spikes/wireguard-nt/galleriad/target/release/galleriad.exe C:\gl\stage\
+          Invoke-WebRequest https://download.wireguard.com/wireguard-nt/wireguard-nt-0.10.1.zip -OutFile wgnt.zip
+          $h = (Get-FileHash wgnt.zip -Algorithm SHA256).Hash
+          if ($h -ne '772C0B1463D8D2212716F43F06F4594D880DEA4F735165BD68E388FC41B81605') { throw "wireguard-nt zip: hash inatteso $h" }
+          Expand-Archive wgnt.zip wgnt
+          Copy-Item wgnt\wireguard-nt\bin\amd64\wireguard.dll C:\gl\stage\
+      - name: throwaway updater key and frontend placeholder
+        working-directory: spikes/wireguard-nt/app
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Set-Content dist/index.html '<!doctype html><title>Galleria spike</title>'
+          npx --yes @tauri-apps/cli@2 signer generate --ci -p spike-only -w "$env:RUNNER_TEMP\spike.key"
+          $pub = (Get-Content "$env:RUNNER_TEMP\spike.key.pub" -Raw).Trim()
+          (Get-Content src-tauri/tauri.conf.json -Raw).Replace('REPLACED_AT_BUILD_TIME', $pub) | Set-Content src-tauri/tauri.conf.json -NoNewline
+          "TAURI_SIGNING_PRIVATE_KEY=$((Get-Content "$env:RUNNER_TEMP\spike.key" -Raw).Trim())" >> $env:GITHUB_ENV
+          "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=spike-only" >> $env:GITHUB_ENV
+      - name: build the MSI with ICE validation (no -sval)
+        working-directory: spikes/wireguard-nt/app
+        run: npx --yes @tauri-apps/cli@2 build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spike-windows-msi
+          path: spikes/wireguard-nt/app/src-tauri/target/release/bundle/msi/*

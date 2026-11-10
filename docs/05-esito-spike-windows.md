@@ -240,7 +240,9 @@ Peppe ha delegato ad Aitano le decisioni tecniche aperte ("prendi tu le decision
   servizio interattivo solo come ripiego. Da verificare come primo criterio della fase 1.
 - **D18**: ACL della pipe a SYSTEM, Administrators e utenti INTERACTIVE.
 - **Ratificate** D10–D14, D16 e la matrice di test (A12) come proposte da Nello.
-Restano a Peppe: A6 (soglie di stop), A8 (design system), A11 (telemetria), la mail a SignPath e il push del branch.
+Poi Peppe: nessuna telemetria (A11), nessuna soglia di stop (A6), design system nuovo per Galleria (A8). SignPath si
+affronta al rilascio della v0.1 (form "Apply" sul sito; le condizioni chiedono un progetto già rilasciato). Branch
+pushato; il job di 1.4 è in `.github/workflows/` ed è esteso con l'MSI e la validazione ICE saltata nella Sandbox.
 
 ## 9. Cosa resta a Peppe
 

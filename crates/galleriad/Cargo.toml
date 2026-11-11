@@ -12,8 +12,15 @@ tokio.workspace = true
 galleria-backend.workspace = true
 uuid.workspace = true
 serde_json.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+libc.workspace = true
+rustix.workspace = true
+nix.workspace = true
+tokio-util.workspace = true
 
 [dev-dependencies]
+galleria-ipc = { workspace = true, features = ["client"] }
 rstest.workspace = true
 proptest.workspace = true
 tempfile.workspace = true

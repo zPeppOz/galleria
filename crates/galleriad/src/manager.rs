@@ -20,6 +20,7 @@ pub struct ManagerHandle {
     events: broadcast::Sender<Event>,
 }
 enum Command {
+    Recover(oneshot::Sender<Result<(), SessionError>>),
     Connect(
         Box<ConnectParams>,
         u32,
@@ -68,6 +69,15 @@ impl ManagerHandle {
             .await
             .map_err(|_| closed())?;
         rx.await.map_err(|_| closed())?
+    }
+    pub(crate) async fn recover(&self) -> Result<(), SessionError> {
+        let (tx, rx) = oneshot::channel();
+        self.commands
+            .send(Command::Recover(tx))
+            .await
+            .map_err(|_| SessionError::new(SessionErrorCode::BackendExited))?;
+        rx.await
+            .map_err(|_| SessionError::new(SessionErrorCode::BackendExited))?
     }
     pub fn events(&self) -> broadcast::Receiver<Event> {
         self.events.subscribe()
@@ -361,6 +371,16 @@ impl Manager {
     }
     async fn command(&mut self, command: Command) {
         match command {
+            Command::Recover(reply) => {
+                let result = if matches!(self.phase, Phase::Disconnected | Phase::Error(_))
+                    && self.active.is_none()
+                {
+                    self.net.recover()
+                } else {
+                    Err(SessionError::new(SessionErrorCode::NetSetupFailed))
+                };
+                let _ = reply.send(result);
+            }
             Command::Status(reply) => {
                 let _ = reply.send(self.status.clone());
             }

@@ -26,3 +26,6 @@ mod tests {
         assert_eq!(DEFAULT_SOCKET_PATH, "/run/galleria/galleriad.sock");
     }
 }
+
+#[cfg(feature = "client")]
+pub mod client;

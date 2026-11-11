@@ -19,11 +19,11 @@ pub async fn dispatch(
         Call::Disconnect => Ok(json!({"status":manager.disconnect(uid).await})),
         Call::ProvideInput(params) => {
             manager.provide_input(params).await?;
+            manager.audit(uid, "provide_input").await;
             Ok(json!({}))
         }
-        // Buffering, audit and subscription filtering are implemented by Task 5.
         Call::Subscribe(_) => Ok(json!({})),
-        Call::Logs(_) => return Err(ErrorCode::Internal.to_rpc("Log buffer unavailable")),
+        Call::Logs(params) => serde_json::to_value(manager.logs(params).await?),
     };
     result.map_err(|_| ErrorCode::Internal.to_rpc("Cannot encode response"))
 }

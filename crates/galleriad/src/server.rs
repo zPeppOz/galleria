@@ -150,6 +150,7 @@ async fn connection(
     }));
     let deadline = tokio::time::Instant::now() + hello_timeout;
     let mut hello = false;
+    let mut subscriptions = SubscribeParams::default();
     let mut events = manager.events();
     loop {
         let write_deadline = (!hello).then_some(deadline);
@@ -168,12 +169,15 @@ async fn connection(
            if incompatible&&let Some(data)=e.data.as_mut(){data["daemon_version"]=serde_json::json!(info.version);}
            send_frame(&mut write, response_err(Some(&request.id),&e), write_deadline).await?;if incompatible{break;}continue;
           }};
+          if let Call::Subscribe(params) = &call { subscriptions = params.clone(); }
           let is_hello=matches!(call,Call::Hello(_));let response=dispatch(call,&manager,&info,uid).await;
           match response{Ok(value)=>{send_frame(&mut write, response_ok(&request.id,value), write_deadline).await?;if is_hello{hello=true;}},Err(e)=>send_frame(&mut write, response_err(Some(&request.id),&e), write_deadline).await?,}
          },
          event=events.recv(),if hello=>match event{
           Ok(event @ Event::State(_))=>write.write_all(&notification(&event)).await?,
-          Ok(Event::Stats(_)|Event::Log(_))=>{}, // Task 5 adds subscription filtering.
+          Ok(event @ Event::Stats(_)) if subscriptions.stats => write.write_all(&notification(&event)).await?,
+          Ok(event @ Event::Log(_)) if subscriptions.logs => write.write_all(&notification(&event)).await?,
+          Ok(Event::Stats(_)|Event::Log(_))=>{},
           Err(broadcast::error::RecvError::Lagged(_))=>{write.write_all(&notification(&Event::State(manager.status().await))).await?;},
           Err(broadcast::error::RecvError::Closed)=>break,
          },

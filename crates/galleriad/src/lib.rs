@@ -3,10 +3,12 @@
 pub mod auth;
 pub mod config;
 pub mod dispatch;
+pub mod logbuf;
 pub mod machine;
 pub mod manager;
 #[allow(unsafe_code)]
 mod peer_groups;
+pub mod redact;
 pub mod server;
 pub mod session_dir;
 

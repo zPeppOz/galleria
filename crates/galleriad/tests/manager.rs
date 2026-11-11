@@ -476,3 +476,74 @@ async fn replace_during_input_timeout_starts_after_clean_exit() {
     wait_state(&handle, State::Connected).await;
     handle.disconnect(1).await;
 }
+
+#[tokio::test(start_paused = true)]
+async fn repeated_state_publications_redact_detail_only_once() {
+    let mut script = vec![FakeStep::Emit(FakeEvent::Progress("t".into()))];
+    script.extend(online());
+    for n in 0..3 {
+        script.extend([
+            FakeStep::Emit(FakeEvent::Restarting("restart".into())),
+            FakeStep::Emit(FakeEvent::NetDown),
+            FakeStep::Emit(FakeEvent::NetUp(config(if n == 2 {
+                "10.0.0.9"
+            } else {
+                "10.0.0.1"
+            }))),
+            up(),
+        ]);
+    }
+    let h = Harness::new(vec![script]);
+    let mut events = h.handle.events();
+    let mut p = params(false);
+    if let BackendParams::Wireguard(wg) = &mut p.backend {
+        wg.private_key = Secret::new("t");
+    }
+    h.handle.connect(p, 1).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Event::State(s) = events.recv().await.unwrap() {
+                if let Some(detail) = &s.detail {
+                    assert_eq!(detail, "[redatto]");
+                }
+                if s.state == State::Connected
+                    && s.net
+                        .as_ref()
+                        .is_some_and(|n| n.dns_servers[0].to_string() == "10.0.0.9")
+                {
+                    break;
+                }
+            }
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(h.handle.status().await.detail.as_deref(), Some("[redatto]"));
+    h.handle.disconnect(1).await;
+}
+#[tokio::test(start_paused = true)]
+async fn repeated_state_publications_redact_prompt_only_once() {
+    let h = Harness::new(vec![vec![
+        FakeStep::Emit(FakeEvent::InputRequired(InputRequest {
+            request: 9,
+            kind: InputKind::Otp,
+            prompt: "t".into(),
+            echo: false,
+            expires_in_secs: 120,
+        })),
+        FakeStep::Emit(FakeEvent::NetUp(config("10.0.0.1"))),
+    ]]);
+    let mut p = params(false);
+    if let BackendParams::Wireguard(wg) = &mut p.backend {
+        wg.private_key = Secret::new("t");
+    }
+    h.handle.connect(p, 1).await.unwrap();
+    let s = loop {
+        let s = h.handle.status().await;
+        if s.net.is_some() {
+            break s;
+        }
+    };
+    assert_eq!(s.input_request.unwrap().prompt, "[redatto]");
+    h.handle.disconnect(1).await;
+}

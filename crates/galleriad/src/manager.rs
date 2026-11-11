@@ -1,4 +1,4 @@
-use crate::{machine::*, session_dir::create_session_dir};
+use crate::{logbuf::LogBuffer, machine::*, redact::Redactor, session_dir::create_session_dir};
 use galleria_backend::{net::*, *};
 use galleria_ipc::*;
 use std::{path::PathBuf, sync::Arc, time::Duration};
@@ -21,6 +21,8 @@ pub struct ManagerHandle {
 }
 enum Command {
     Recover(oneshot::Sender<Result<(), SessionError>>),
+    Logs(LogsParams, oneshot::Sender<LogsResult>),
+    Audit(u32, &'static str),
     Connect(
         Box<ConnectParams>,
         u32,
@@ -79,6 +81,17 @@ impl ManagerHandle {
         rx.await
             .map_err(|_| SessionError::new(SessionErrorCode::BackendExited))?
     }
+    pub async fn logs(&self, params: LogsParams) -> Result<LogsResult, RpcError> {
+        let (tx, rx) = oneshot::channel();
+        self.commands
+            .send(Command::Logs(params, tx))
+            .await
+            .map_err(|_| closed())?;
+        rx.await.map_err(|_| closed())
+    }
+    pub(crate) async fn audit(&self, uid: u32, method: &'static str) {
+        let _ = self.commands.send(Command::Audit(uid, method)).await;
+    }
     pub fn events(&self) -> broadcast::Receiver<Event> {
         self.events.subscribe()
     }
@@ -94,6 +107,7 @@ struct Pending {
     params: Box<ConnectParams>,
     backend: Box<dyn Backend>,
     reply: oneshot::Sender<Result<ConnectResult, RpcError>>,
+    uid: u32,
 }
 struct Manager {
     factory: BackendFactory,
@@ -116,6 +130,8 @@ struct Manager {
     network_applied: bool,
     network_dirty: bool,
     counter: u64,
+    logs: LogBuffer,
+    redactor: Redactor,
 }
 pub fn spawn_manager(
     factory: BackendFactory,
@@ -147,6 +163,8 @@ pub fn spawn_manager(
         network_applied: false,
         network_dirty: false,
         counter: 0,
+        logs: LogBuffer::with_capacity(2000),
+        redactor: Redactor::new(),
     };
     tokio::spawn(manager.run(rx));
     ManagerHandle { commands, events }
@@ -183,7 +201,20 @@ impl Manager {
             self.status.input_request = None;
             self.input_timer = None;
         }
-        let _ = self.events.send(Event::State(self.status.clone()));
+        let status = self.status.clone();
+        let _ = self.events.send(Event::State(status));
+    }
+    fn log(&mut self, level: LogLevel, source: LogSource, message: &str) {
+        for line in message.lines() {
+            let entry = self
+                .logs
+                .push(level, source, self.redactor.redact(line).into_owned());
+            println!(
+                "{} {:?} {:?}: {}",
+                entry.ts, entry.level, entry.source, entry.message
+            );
+            let _ = self.events.send(Event::Log(entry));
+        }
     }
     fn teardown(&mut self) -> Result<(), SessionError> {
         let result = self.net.teardown();
@@ -229,6 +260,9 @@ impl Manager {
         params: Box<ConnectParams>,
         backend: Box<dyn Backend>,
     ) -> Result<ConnectResult, RpcError> {
+        self.logs.clear();
+        self.redactor.clear();
+        self.redactor.add_backend(&params.backend);
         self.counter += 1;
         self.status = Status {
             session: Some(self.counter),
@@ -334,8 +368,14 @@ impl Manager {
         }
     }
     async fn finish(&mut self) {
-        if let Some(active) = self.active.take() {
-            let _ = std::fs::remove_dir_all(active.dir);
+        if let Some(active) = self.active.take()
+            && std::fs::remove_dir_all(active.dir).is_err()
+        {
+            self.log(
+                LogLevel::Warn,
+                LogSource::Daemon,
+                "Cannot remove session directory",
+            );
         }
         self.stop_timer = None;
         // A terminal backend error does not make a clean replacement fail.
@@ -355,6 +395,11 @@ impl Manager {
             self.clear_session();
             if let Some(pending) = self.pending.take() {
                 let result = self.start_session(pending.params, pending.backend);
+                self.log(
+                    LogLevel::Info,
+                    LogSource::Daemon,
+                    &format!("uid {} connect", pending.uid),
+                );
                 let _ = pending.reply.send(result);
             } else {
                 self.phase = Phase::Disconnected;
@@ -375,6 +420,15 @@ impl Manager {
     }
     async fn command(&mut self, command: Command) {
         match command {
+            Command::Logs(params, reply) => {
+                let (entries, last) = self.logs.after(params.after, params.limit);
+                let _ = reply.send(LogsResult { entries, last });
+            }
+            Command::Audit(uid, method) => self.log(
+                LogLevel::Info,
+                LogSource::Daemon,
+                &format!("uid {uid} {method}"),
+            ),
             Command::Recover(reply) => {
                 let result = if matches!(self.phase, Phase::Disconnected | Phase::Error(_))
                     && self.active.is_none()
@@ -388,7 +442,7 @@ impl Manager {
             Command::Status(reply) => {
                 let _ = reply.send(self.status.clone());
             }
-            Command::Connect(params, _uid, reply) => {
+            Command::Connect(params, uid, reply) => {
                 let is_active = !matches!(self.phase, Phase::Disconnected | Phase::Error(_));
                 if is_active && (!params.replace || self.pending.is_some()) {
                     let mut e = ErrorCode::AlreadyActive.to_rpc("A session is already active");
@@ -406,6 +460,7 @@ impl Manager {
                     let _ = reply.send(Err(ErrorCode::Internal.to_rpc("Network cleanup failed")));
                     return;
                 }
+                self.redactor.add_backend(&params.backend);
                 let backend = match (self.factory)(&params.backend, &params.options) {
                     Ok(b) => b,
                     Err(e) => {
@@ -418,13 +473,24 @@ impl Manager {
                         params,
                         backend,
                         reply,
+                        uid,
                     });
+                    self.log(
+                        LogLevel::Info,
+                        LogSource::Daemon,
+                        &format!("uid {uid} connect replace"),
+                    );
                     self.transition(Input::Connect { replace: true }).await;
                     if self.active.is_none() {
                         self.finish().await;
                     }
                 } else {
                     let result = self.start_session(params, backend);
+                    self.log(
+                        LogLevel::Info,
+                        LogSource::Daemon,
+                        &format!("uid {uid} connect"),
+                    );
                     if result.is_err() {
                         self.phase =
                             Phase::Error(SessionError::new(SessionErrorCode::TunnelSetupFailed));
@@ -434,7 +500,12 @@ impl Manager {
                     let _ = reply.send(result);
                 }
             }
-            Command::Disconnect(_uid, reply) => {
+            Command::Disconnect(uid, reply) => {
+                self.log(
+                    LogLevel::Info,
+                    LogSource::Daemon,
+                    &format!("uid {uid} disconnect"),
+                );
                 if let Some(pending) = self.pending.take() {
                     let _ = pending
                         .reply
@@ -479,6 +550,7 @@ impl Manager {
                     let _ = reply.send(Err(code.to_rpc("Input not expected")));
                     return;
                 }
+                self.redactor.add_input(&params.values);
                 let result = if let Some(active) = &self.active {
                     active
                         .handle
@@ -567,6 +639,7 @@ impl Manager {
                 ) {
                     self.status.input_request = Some(InputRequest {
                         expires_in_secs: 120,
+                        prompt: self.redactor.redact(&request.prompt).into_owned(),
                         ..request
                     });
                     self.transition(Input::InputRequired).await;
@@ -577,7 +650,7 @@ impl Manager {
                     self.phase,
                     Phase::Connecting { .. } | Phase::Reconnecting { .. }
                 ) {
-                    self.status.detail = Some(detail);
+                    self.status.detail = Some(self.redactor.redact(&detail).into_owned());
                     self.publish();
                 }
             }
@@ -587,7 +660,14 @@ impl Manager {
                     let _ = self.events.send(Event::Stats(stats));
                 }
             }
-            BackendEvent::Log(_) => {} // Central redaction and log buffer arrive in Task 5.
+            BackendEvent::Log(line) => {
+                let source = match self.status.protocol {
+                    Some(Protocol::Wireguard) => LogSource::Wireguard,
+                    Some(Protocol::Openvpn) => LogSource::Openvpn,
+                    None => LogSource::Daemon,
+                };
+                self.log(line.level, source, &line.message);
+            }
             BackendEvent::Exited(reason) => {
                 self.exit = Some(match reason {
                     ExitReason::Stopped => ExitKind::Stopped,
@@ -601,7 +681,7 @@ impl Manager {
     async fn run(mut self, mut rx: mpsc::Receiver<Command>) {
         loop {
             tokio::select! {
-             command=rx.recv()=>match command{Some(command)=>self.command(command).await,None=>{let _=self.teardown();if let Some(active)=self.active.take(){active.handle.task.abort();let _=active.handle.task.await;let _=std::fs::remove_dir_all(active.dir);}break;}},
+             command=rx.recv()=>match command{Some(command)=>self.command(command).await,None=>{let _=self.teardown();if let Some(active)=self.active.take(){active.handle.task.abort();let _=active.handle.task.await;if std::fs::remove_dir_all(active.dir).is_err(){self.log(LogLevel::Warn,LogSource::Daemon,"Cannot remove session directory");}}break;}},
              event=self.backend_events.recv(),if self.active.is_some()=>{if let Some(event)=event{self.backend_event(event).await;}else{tokio::task::yield_now().await;}},
              _=async{match &mut self.active{Some(active)=>{let _=(&mut active.handle.task).await;},None=>std::future::pending().await}}=>{
               // The task may complete while Exited is still queued. Drain before interpreting its exit.
@@ -666,6 +746,8 @@ mod tests {
             network_applied: false,
             network_dirty: false,
             counter: 0,
+            logs: LogBuffer::with_capacity(2000),
+            redactor: Redactor::new(),
         };
         let params:ConnectParams=serde_json::from_value(serde_json::json!({"profile":{"id":"test","name":"test"},"replace":false,"backend":{"protocol":"openvpn","config":"client","secret_blocks":{},"username":null,"password":"synthetic","otp":"once","key_passphrase":null},"options":{"ipv6_block":true,"ignore_pushed_routes":false,"reconnect":{"enabled":true}}})).unwrap();
         let backend = factory(&params.backend, &params.options).unwrap();

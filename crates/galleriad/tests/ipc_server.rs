@@ -491,3 +491,227 @@ async fn unauthorized_client_is_closed_without_any_response() {
     );
     s.stop().await;
 }
+
+fn logging_script(message: String) -> Vec<galleria_backend::fake::FakeStep> {
+    use galleria_backend::{LogLine, fake::*};
+    let mut script = online();
+    script.extend([
+        FakeStep::Emit(FakeEvent::Log(LogLine {
+            level: LogLevel::Info,
+            message,
+        })),
+        FakeStep::Emit(FakeEvent::Stats(Stats {
+            rx_bytes: 123,
+            tx_bytes: 456,
+            last_handshake: None,
+        })),
+        FakeStep::Emit(FakeEvent::Progress("log barrier".into())),
+        // Progress is ignored in Connected; a log sentinel is observable by subscribers,
+        // while a later NetUp republishes state for every client after Log and Stats.
+        FakeStep::Emit(FakeEvent::NetUp(config("10.0.0.9"))),
+    ]);
+    script
+}
+async fn through_last_state(client: &mut Client) -> Vec<Event> {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        let mut events = vec![];
+        loop {
+            let event = client.next_event().await.expect("connection closed");
+            let done = matches!(&event, Event::State(s) if s.net.as_ref().is_some_and(|n| n.dns_servers[0].to_string() == "10.0.0.9"));
+            events.push(event);
+            if done { return events; }
+        }
+    }).await.unwrap()
+}
+#[tokio::test]
+async fn stats_and_logs_only_reach_subscribers() {
+    let s = Server::with_h(Harness::new(vec![logging_script("backend message".into())])).await;
+    let mut clients = Vec::new();
+    for (stats, logs) in [(false, false), (true, false), (false, true), (true, true)] {
+        let mut c = s.client().await;
+        if stats || logs {
+            let _: Value = c
+                .call("subscribe", &json!({"stats":stats,"logs":logs}))
+                .await
+                .unwrap();
+        } // The first client never subscribes: defaults must exclude stats and logs.
+        clients.push((c, stats, logs));
+    }
+    let _: ConnectResult = clients[0].0.call("connect", &params(false)).await.unwrap();
+    for (c, stats, logs) in &mut clients {
+        let events = through_last_state(c).await;
+        assert_eq!(
+            events
+                .iter()
+                .any(|e| matches!(e,Event::Stats(v) if v.rx_bytes == 123)),
+            *stats
+        );
+        assert_eq!(
+            events
+                .iter()
+                .any(|e| matches!(e,Event::Log(v) if v.message == "backend message")),
+            *logs
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e,Event::State(v) if v.state == State::Connected))
+        );
+    }
+    s.stop().await;
+}
+#[tokio::test]
+async fn secrets_from_connect_never_reach_any_client() {
+    use galleria_backend::{Backend, fake::FakeBackend};
+    use galleriad::{
+        machine::RetryPolicy,
+        manager::{BackendFactory, spawn_manager},
+    };
+    use std::sync::{Arc, atomic::AtomicUsize};
+    let mut h = Harness::new(vec![]);
+    let factory: BackendFactory = Arc::new(|backend, _| {
+        let password = match backend {
+            BackendParams::Wireguard(p) => p.private_key.expose(),
+            BackendParams::Openvpn(p) => p.password.as_ref().unwrap().expose(),
+        };
+        Ok(Box::new(FakeBackend::new(
+            logging_script(format!("pw={password} ok")),
+            Arc::new(AtomicUsize::new(0)),
+        )) as Box<dyn Backend>)
+    });
+    h.handle = spawn_manager(
+        factory,
+        h.net.clone(),
+        RetryPolicy::default(),
+        h.tmp.path().to_path_buf(),
+    );
+    let s = Server::with_h(h).await;
+    let mut clients = vec![s.client().await, s.client().await];
+    let _: Value = clients[1]
+        .call("subscribe", &json!({"stats":true,"logs":true}))
+        .await
+        .unwrap();
+    let mut p = params(false);
+    if let BackendParams::Wireguard(wg) = &mut p.backend {
+        wg.private_key = Secret::new("test-only-password");
+    }
+    let _: ConnectResult = clients[0].call("connect", &p).await.unwrap();
+    for c in &mut clients {
+        for event in through_last_state(c).await {
+            let frame = String::from_utf8(notification(&event)).unwrap();
+            assert!(!frame.contains("test-only-password"), "unfiltered event");
+        }
+        let logs: LogsResult = c
+            .call("logs", &json!({"after":null,"limit":1000}))
+            .await
+            .unwrap();
+        assert!(logs.entries.iter().any(|e| e.message == "pw=[redatto] ok"));
+        assert!(
+            !serde_json::to_string(&logs)
+                .unwrap()
+                .contains("test-only-password")
+        );
+    }
+    s.stop().await;
+}
+#[tokio::test]
+async fn buffer_is_cleared_on_new_session() {
+    let s = Server::with_h(Harness::new(vec![
+        logging_script("first-session-only".into()),
+        online(),
+    ]))
+    .await;
+    let mut c = s.client().await;
+    let _: ConnectResult = c.call("connect", &params(false)).await.unwrap();
+    through_last_state(&mut c).await;
+    let before: LogsResult = c
+        .call("logs", &json!({"after":null,"limit":1000}))
+        .await
+        .unwrap();
+    assert!(
+        before
+            .entries
+            .iter()
+            .any(|e| e.message == "first-session-only")
+    );
+    let _: ConnectResult = c.call("connect", &params(true)).await.unwrap();
+    let after: LogsResult = c
+        .call("logs", &json!({"after":null,"limit":1000}))
+        .await
+        .unwrap();
+    assert!(
+        !after
+            .entries
+            .iter()
+            .any(|e| e.message == "first-session-only")
+    );
+    assert!(after.last > before.last);
+    s.stop().await;
+}
+#[tokio::test]
+async fn audit_line_records_uid_and_method() {
+    let s = Server::start().await;
+    let mut c = s.client().await;
+    let _: ConnectResult = c.call("connect", &params(false)).await.unwrap();
+    let logs: LogsResult = c
+        .call("logs", &json!({"after":null,"limit":1000}))
+        .await
+        .unwrap();
+    let uid = nix::unistd::getuid().as_raw();
+    assert!(logs.entries.iter().any(|e| e.source == LogSource::Daemon
+        && e.message.contains(&format!("uid {uid}"))
+        && e.message.contains("connect")));
+    s.stop().await;
+}
+
+#[tokio::test]
+async fn credentials_from_provide_input_are_filtered_before_backend_logs_and_status() {
+    use galleria_backend::{LogLine, fake::*};
+    let h = Harness::new(vec![vec![
+        FakeStep::Emit(FakeEvent::InputRequired(InputRequest {
+            request: 5,
+            kind: InputKind::Otp,
+            prompt: "OTP".into(),
+            echo: false,
+            expires_in_secs: 120,
+        })),
+        FakeStep::WaitCommand,
+        FakeStep::Emit(FakeEvent::Log(LogLine {
+            level: LogLevel::Info,
+            message: "new-input-value".into(),
+        })),
+        FakeStep::Emit(FakeEvent::Progress("new-input-value".into())),
+        FakeStep::Emit(FakeEvent::NetUp(config("10.0.0.9"))),
+        up(),
+    ]]);
+    let s = Server::with_h(h).await;
+    let mut c = s.client().await;
+    let _: Value = c
+        .call("subscribe", &json!({"stats":false,"logs":true}))
+        .await
+        .unwrap();
+    let _: ConnectResult = c.call("connect", &params(false)).await.unwrap();
+    s.h.state(State::NeedsInput).await;
+    let _: Value = c
+        .call(
+            "provide_input",
+            &json!({"session":1,"request":5,"values":{"otp":"new-input-value"}}),
+        )
+        .await
+        .unwrap();
+    for event in through_last_state(&mut c).await {
+        assert!(
+            !String::from_utf8(notification(&event))
+                .unwrap()
+                .contains("new-input-value")
+        );
+    }
+    let logs: LogsResult = c
+        .call("logs", &json!({"after":null,"limit":1000}))
+        .await
+        .unwrap();
+    assert!(logs.entries.iter().any(|e| e.message == "[redatto]"));
+    let status: Status = c.call("status", &json!({})).await.unwrap();
+    assert_eq!(status.detail.as_deref(), Some("[redatto]"));
+    s.stop().await;
+}

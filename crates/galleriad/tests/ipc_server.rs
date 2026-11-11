@@ -433,3 +433,61 @@ async fn blocked_pre_hello_response_expires_and_releases_client_slot() {
     drop(peers);
     s.stop().await;
 }
+
+async fn missing_group_server() -> Server {
+    let h = Harness::new(vec![]);
+    let mut cfg = cfg(&h);
+    cfg.group = format!("galleria-no-group-{}", uuid::Uuid::new_v4());
+    cfg.hello_timeout = Duration::from_secs(60);
+    assert!(nix::unistd::Group::from_name(&cfg.group).unwrap().is_none());
+    let path = cfg.socket.clone();
+    let shutdown = CancellationToken::new();
+    let task = tokio::spawn(serve(cfg, h.handle.clone(), info(), shutdown.clone()));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !path.exists() {
+            assert!(!task.is_finished());
+            tokio::task::yield_now().await;
+        }
+        // Round trip to the manager runs after serve has configured the bound socket.
+        h.handle.status().await;
+    })
+    .await
+    .unwrap();
+    Server {
+        h,
+        path,
+        shutdown,
+        task,
+    }
+}
+#[tokio::test]
+async fn missing_group_socket_mode_is_0600() {
+    let s = missing_group_server().await;
+    assert_eq!(
+        std::fs::metadata(&s.path).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    s.stop().await;
+}
+#[tokio::test]
+async fn unauthorized_client_is_closed_without_any_response() {
+    if nix::unistd::getuid().is_root() {
+        return;
+    }
+    let s = missing_group_server().await;
+    // Connect as the owning, non-root user: DAC allows access, server policy must reject it.
+    let peer = UnixStream::connect(&s.path).await.unwrap();
+    let mut reader = BufReader::new(peer);
+    // This deadline is shorter than hello_timeout: merely ignoring the client fails.
+    assert!(
+        tokio::time::timeout(
+            Duration::from_millis(500),
+            read_frame(&mut reader, MAX_MESSAGE_BYTES)
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .is_none()
+    );
+    s.stop().await;
+}

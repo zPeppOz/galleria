@@ -1,9 +1,12 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 mod support;
-use galleria_backend::{ExitReason, fake::*};
+use galleria_backend::{Backend, BackendCommand, BackendEvent, ExitReason, fake::*};
 use galleria_ipc::*;
+use galleriad::{machine::RetryPolicy, manager::*};
+use std::sync::{Arc, Mutex};
 use std::{sync::atomic::Ordering, time::Duration};
 use support::*;
+use tokio::sync::oneshot;
 #[tokio::test(start_paused = true)]
 async fn replace_waits_for_teardown_before_spawning() {
     let h = Harness::new(vec![online(), online()]);
@@ -26,7 +29,12 @@ async fn net_teardown_precedes_backend_stop() {
     h.state(State::Connected).await;
     h.handle.disconnect(1).await;
     let log = h.net.log.lock().unwrap();
-    assert!(log.iter().position(|s| s == "teardown") < log.iter().position(|s| s == "stop"));
+    let teardown = log
+        .iter()
+        .position(|s| s == "teardown")
+        .expect("teardown missing");
+    let stop = log.iter().position(|s| s == "stop").expect("Stop missing");
+    assert!(teardown < stop, "{log:?}");
 }
 #[tokio::test(start_paused = true)]
 async fn connect_while_active_is_already_active() {
@@ -55,7 +63,9 @@ async fn netup_refusal_sets_net_setup_failed() {
 }
 #[tokio::test(start_paused = true)]
 async fn connected_only_after_net_applied() {
-    let h = Harness::new(vec![online()]);
+    let mut script = vec![up()];
+    script.extend(online());
+    let h = Harness::new(vec![script]);
     let mut events = h.handle.events();
     h.handle.connect(params(false), 1).await.unwrap();
     h.state(State::Connected).await;
@@ -64,7 +74,10 @@ async fn connected_only_after_net_applied() {
         if let Event::State(s) = e
             && s.state == State::Connected
         {
-            assert!(h.net.applied.load(Ordering::SeqCst));
+            assert!(
+                s.net.is_some(),
+                "connected published before NetUp was accepted"
+            );
             found = true;
         }
     }
@@ -169,37 +182,64 @@ async fn internal_restart_reapplies_network() {
             }
         })
         .collect::<Vec<_>>();
-    assert!(states.contains(&State::Reconnecting));
+    let phases: Vec<_> = states
+        .into_iter()
+        .filter(|s| matches!(s, State::Connected | State::Reconnecting))
+        .fold(Vec::new(), |mut phases, s| {
+            if phases.last() != Some(&s) {
+                phases.push(s);
+            }
+            phases
+        });
+    assert_eq!(
+        phases,
+        [State::Connected, State::Reconnecting, State::Connected]
+    );
+    let log = h.net.log.lock().unwrap().clone();
+    let a = log.iter().position(|s| s == "apply(10.0.0.1)").unwrap();
+    let down = log.iter().position(|s| s == "teardown").unwrap();
+    let b = log.iter().position(|s| s == "apply(10.0.0.9)").unwrap();
+    assert!(a < down && down < b, "{log:?}");
     assert_eq!(h.spawns.load(Ordering::SeqCst), 1);
     h.handle.disconnect(1).await;
 }
 #[tokio::test(start_paused = true)]
 async fn second_netup_without_netdown_replaces_the_first() {
     let mut script = online();
-    script.extend([
-        FakeStep::Emit(FakeEvent::Restarting("restart".into())),
-        FakeStep::Emit(FakeEvent::NetUp(config("10.0.0.9"))),
-        up(),
-    ]);
+    script.extend([FakeStep::Emit(FakeEvent::NetUp(config("10.0.0.9"))), up()]);
     let h = Harness::new(vec![script]);
     h.handle.connect(params(false), 1).await.unwrap();
     for _ in 0..100 {
         tokio::task::yield_now().await;
     }
     let log = h.net.log.lock().unwrap().clone();
-    assert!(
-        log.iter().position(|s| s == "teardown").unwrap()
-            < log.iter().position(|s| s == "apply(10.0.0.9)").unwrap()
-    );
+    let a = log.iter().position(|s| s == "apply(10.0.0.1)").unwrap();
+    let down = log.iter().position(|s| s == "teardown").unwrap();
+    let b = log.iter().position(|s| s == "apply(10.0.0.9)").unwrap();
+    assert!(a < down && down < b, "{log:?}");
     h.handle.disconnect(1).await;
 }
 #[tokio::test(start_paused = true)]
 async fn netdown_is_answered_during_disconnect() {
-    let h = Harness::new(vec![online()]);
-    h.handle.connect(params(false), 1).await.unwrap();
-    h.state(State::Connected).await;
-    assert_eq!(h.handle.disconnect(1).await.state, State::Disconnected);
-    assert_eq!(h.live.load(Ordering::SeqCst), 0);
+    let (_tmp, handle, stopped, answered, finish) = stop_probe(false);
+    handle.connect(params(false), 1).await.unwrap();
+    wait_state(&handle, State::Connected).await;
+    let disconnect = tokio::spawn({
+        let handle = handle.clone();
+        async move { handle.disconnect(1).await }
+    });
+    stopped.await.unwrap();
+    assert_eq!(handle.status().await.state, State::Disconnecting);
+    assert!(
+        tokio::time::timeout(Duration::from_secs(1), answered)
+            .await
+            .unwrap()
+            .unwrap(),
+        "NetDown reply was dropped"
+    );
+    assert!(!disconnect.is_finished(), "backend must still be alive");
+    finish.send(()).unwrap();
+    assert_eq!(disconnect.await.unwrap().state, State::Disconnected);
 }
 #[tokio::test(start_paused = true)]
 async fn each_spawn_gets_a_fresh_session_dir() {
@@ -336,4 +376,103 @@ async fn failed_replacement_startup_releases_session_and_allows_next_connect() {
     h.handle.connect(params(false), 1).await.unwrap();
     h.state(State::Connected).await;
     h.handle.disconnect(1).await;
+}
+
+// The backend holds its exit after Stop, so no 15 s auto-advance can hide a lost reply.
+fn stop_probe(
+    input: bool,
+) -> (
+    tempfile::TempDir,
+    ManagerHandle,
+    oneshot::Receiver<()>,
+    oneshot::Receiver<bool>,
+    oneshot::Sender<()>,
+) {
+    let tmp = tempfile::tempdir().unwrap();
+    let (stopped_tx, stopped) = oneshot::channel();
+    let (answered_tx, answered) = oneshot::channel();
+    let (finish, finish_rx) = oneshot::channel();
+    let backend = TestBackend::new(move |ctx, mut commands| async move {
+        if input {
+            ctx.events
+                .send(BackendEvent::InputRequired(InputRequest {
+                    request: 7,
+                    kind: InputKind::Otp,
+                    prompt: "OTP".into(),
+                    echo: false,
+                    expires_in_secs: 120,
+                }))
+                .await
+                .unwrap();
+        } else {
+            let (reply, wait) = oneshot::channel();
+            ctx.events
+                .send(BackendEvent::NetUp {
+                    config: config("10.0.0.1"),
+                    reply,
+                })
+                .await
+                .unwrap();
+            wait.await.unwrap().unwrap();
+            ctx.events
+                .send(BackendEvent::Up(galleria_backend::TunnelInfo {
+                    local_addresses: vec![],
+                    remote: None,
+                }))
+                .await
+                .unwrap();
+        }
+        assert!(matches!(commands.recv().await, Some(BackendCommand::Stop)));
+        stopped_tx.send(()).unwrap();
+        let (reply, wait) = oneshot::channel();
+        ctx.events
+            .send(BackendEvent::NetDown { reply })
+            .await
+            .unwrap();
+        let _ = answered_tx.send(wait.await.is_ok());
+        finish_rx.await.unwrap();
+        ctx.events
+            .send(BackendEvent::Exited(ExitReason::Stopped))
+            .await
+            .unwrap();
+    });
+    let first = Mutex::new(Some(backend));
+    let factory: BackendFactory = Arc::new(move |_, _| {
+        Ok(match first.lock().unwrap().take() {
+            Some(backend) => Box::new(backend) as Box<dyn Backend>,
+            None => Box::new(FakeBackend::new(
+                online(),
+                Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            )),
+        })
+    });
+    let handle = spawn_manager(
+        factory,
+        Arc::new(Net::default()),
+        RetryPolicy::default(),
+        tmp.path().to_path_buf(),
+    );
+    (tmp, handle, stopped, answered, finish)
+}
+#[tokio::test(start_paused = true)]
+async fn replace_during_input_timeout_starts_after_clean_exit() {
+    let (_tmp, handle, stopped, answered, finish) = stop_probe(true);
+    handle.connect(params(false), 1).await.unwrap();
+    wait_state(&handle, State::NeedsInput).await;
+    tokio::time::advance(Duration::from_secs(120)).await;
+    stopped.await.unwrap();
+    assert!(answered.await.unwrap());
+    assert_eq!(handle.status().await.state, State::Disconnecting);
+    let replacement = tokio::spawn({
+        let handle = handle.clone();
+        async move { handle.connect(params(true), 1).await }
+    });
+    // A status command is a barrier behind the queued connect.
+    tokio::task::yield_now().await;
+    assert_eq!(handle.status().await.state, State::Disconnecting);
+    assert!(!replacement.is_finished());
+    finish.send(()).unwrap();
+    assert_eq!(replacement.await.unwrap().unwrap().session, 2);
+    wait_state(&handle, State::Connected).await;
+    handle.disconnect(1).await;
 }

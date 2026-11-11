@@ -168,3 +168,43 @@ pub async fn wait_state(handle: &ManagerHandle, state: State) -> Status {
     }
     panic!("state {:?}, wanted {:?}", handle.status().await, state)
 }
+
+// Test-only backend for controlling acknowledgments and the moment of actual exit.
+type BackendRun = Box<
+    dyn FnOnce(
+            SessionContext,
+            tokio::sync::mpsc::Receiver<BackendCommand>,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
+        + Send,
+>;
+pub struct TestBackend(BackendRun);
+impl TestBackend {
+    pub fn new<F, Fut>(run: F) -> Self
+    where
+        F: FnOnce(SessionContext, tokio::sync::mpsc::Receiver<BackendCommand>) -> Fut
+            + Send
+            + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
+    {
+        Self(Box::new(move |ctx, rx| Box::pin(run(ctx, rx))))
+    }
+}
+impl Backend for TestBackend {
+    fn protocol(&self) -> Protocol {
+        Protocol::Wireguard
+    }
+    fn capabilities(&self) -> Capabilities {
+        Capabilities {
+            handshake: true,
+            interactive_auth: true,
+            server_pushed_config: true,
+        }
+    }
+    fn spawn(self: Box<Self>, ctx: SessionContext) -> SessionHandle {
+        let (commands, rx) = tokio::sync::mpsc::channel(16);
+        SessionHandle {
+            commands,
+            task: tokio::spawn((self.0)(ctx, rx)),
+        }
+    }
+}

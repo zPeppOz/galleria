@@ -338,6 +338,10 @@ impl Manager {
             let _ = std::fs::remove_dir_all(active.dir);
         }
         self.stop_timer = None;
+        // A terminal backend error does not make a clean replacement fail.
+        if self.pending.is_some() && !self.network_dirty {
+            self.terminal = None;
+        }
         if let Some(error) = self.terminal.take() {
             self.phase = Phase::Error(error);
             self.clear_session();

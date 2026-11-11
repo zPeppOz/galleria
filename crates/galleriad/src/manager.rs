@@ -216,8 +216,17 @@ impl Manager {
             let _ = self.events.send(Event::Log(entry));
         }
     }
-    fn teardown(&mut self) -> Result<(), SessionError> {
-        let result = self.net.teardown();
+    async fn network_call(
+        &mut self,
+        operation: impl FnOnce(&dyn NetControl) -> Result<(), SessionError> + Send + 'static,
+    ) -> Result<(), SessionError> {
+        let net = self.net.clone();
+        tokio::task::spawn_blocking(move || operation(net.as_ref()))
+            .await
+            .unwrap_or_else(|_| Err(SessionError::new(SessionErrorCode::NetSetupFailed)))
+    }
+    async fn teardown(&mut self) -> Result<(), SessionError> {
+        let result = self.network_call(|net| net.teardown()).await;
         self.network_dirty = result.is_err();
         self.network_applied = false;
         self.status.net = None;
@@ -332,7 +341,7 @@ impl Manager {
         for effect in effects {
             match effect {
                 Effect::TeardownNet => {
-                    if let Err(error) = self.teardown() {
+                    if let Err(error) = self.teardown().await {
                         self.cleanup_failed(error);
                         return;
                     }
@@ -433,7 +442,7 @@ impl Manager {
                 let result = if matches!(self.phase, Phase::Disconnected | Phase::Error(_))
                     && self.active.is_none()
                 {
-                    self.net.recover()
+                    self.network_call(|net| net.recover()).await
                 } else {
                     Err(SessionError::new(SessionErrorCode::NetSetupFailed))
                 };
@@ -454,7 +463,7 @@ impl Manager {
                 }
                 if self.active.is_none()
                     && self.network_dirty
-                    && let Err(error) = self.teardown()
+                    && let Err(error) = self.teardown().await
                 {
                     self.cleanup_failed(error);
                     let _ = reply.send(Err(ErrorCode::Internal.to_rpc("Network cleanup failed")));
@@ -513,7 +522,7 @@ impl Manager {
                 }
                 if self.active.is_none()
                     && self.network_dirty
-                    && let Err(error) = self.teardown()
+                    && let Err(error) = self.teardown().await
                 {
                     self.cleanup_failed(error);
                     let _ = reply.send(self.status.clone());
@@ -570,7 +579,7 @@ impl Manager {
     async fn backend_event(&mut self, event: BackendEvent) {
         match event {
             BackendEvent::NetDown { reply } => {
-                let result = self.teardown();
+                let result = self.teardown().await;
                 let _ = reply.send(());
                 match result {
                     Ok(()) => self.publish(),
@@ -585,15 +594,19 @@ impl Manager {
                     let _ = reply.send(Err("Session is stopping".into()));
                     return;
                 }
-                let result = if self.network_applied || self.network_dirty {
-                    self.teardown()
+                let cleanup = if self.network_applied || self.network_dirty {
+                    self.teardown().await
                 } else {
                     Ok(())
-                }
-                .and_then(|()| {
-                    self.network_dirty = true;
-                    self.net.apply(&config)
-                });
+                };
+                let result = match cleanup {
+                    Ok(()) => {
+                        self.network_dirty = true;
+                        let cfg = config.clone();
+                        self.network_call(move |net| net.apply(&cfg)).await
+                    }
+                    Err(error) => Err(error),
+                };
                 match result {
                     Ok(()) => {
                         self.network_applied = true;
@@ -681,7 +694,7 @@ impl Manager {
     async fn run(mut self, mut rx: mpsc::Receiver<Command>) {
         loop {
             tokio::select! {
-             command=rx.recv()=>match command{Some(command)=>self.command(command).await,None=>{let _=self.teardown();if let Some(active)=self.active.take(){active.handle.task.abort();let _=active.handle.task.await;if std::fs::remove_dir_all(active.dir).is_err(){self.log(LogLevel::Warn,LogSource::Daemon,"Cannot remove session directory");}}break;}},
+             command=rx.recv()=>match command{Some(command)=>self.command(command).await,None=>{let _=self.teardown().await;if let Some(active)=self.active.take(){active.handle.task.abort();let _=active.handle.task.await;if std::fs::remove_dir_all(active.dir).is_err(){self.log(LogLevel::Warn,LogSource::Daemon,"Cannot remove session directory");}}break;}},
              event=self.backend_events.recv(),if self.active.is_some()=>{if let Some(event)=event{self.backend_event(event).await;}else{tokio::task::yield_now().await;}},
              _=async{match &mut self.active{Some(active)=>{let _=(&mut active.handle.task).await;},None=>std::future::pending().await}}=>{
               // The task may complete while Exited is still queued. Drain before interpreting its exit.

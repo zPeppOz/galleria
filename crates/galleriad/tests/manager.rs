@@ -113,10 +113,18 @@ async fn transport_exits_retry_four_times_then_give_up() {
         })
         .collect();
     let h = Harness::new(scripts);
+    let mut events = h.handle.events();
     h.handle.connect(params(false), 1).await.unwrap();
     for (n, delay) in [1, 2, 4].into_iter().enumerate() {
-        for _ in 0..100 {
-            tokio::task::yield_now().await;
+        // Publish follows teardown and arming the retry timer. Waiting for that
+        // event prevents advancing the virtual clock while blocking I/O is still pending.
+        loop {
+            if let Event::State(s) = events.recv().await.unwrap()
+                && s.state == State::Connecting
+                && s.attempt == (n + 2) as u32
+            {
+                break;
+            }
         }
         assert_eq!(h.spawns.load(Ordering::SeqCst), n + 1);
         tokio::time::advance(Duration::from_secs(delay)).await;
@@ -165,10 +173,7 @@ async fn internal_restart_reapplies_network() {
     let h = Harness::new(vec![script]);
     let mut events = h.handle.events();
     h.handle.connect(params(false), 1).await.unwrap();
-    for _ in 0..100 {
-        tokio::task::yield_now().await;
-    }
-    let s = h.state(State::Connected).await;
+    let s = network_at(&h, "10.0.0.9").await;
     assert_eq!(
         s.net.unwrap().dns_servers[0],
         "10.0.0.9".parse::<std::net::IpAddr>().unwrap()
@@ -209,9 +214,7 @@ async fn second_netup_without_netdown_replaces_the_first() {
     script.extend([FakeStep::Emit(FakeEvent::NetUp(config("10.0.0.9"))), up()]);
     let h = Harness::new(vec![script]);
     h.handle.connect(params(false), 1).await.unwrap();
-    for _ in 0..100 {
-        tokio::task::yield_now().await;
-    }
+    network_at(&h, "10.0.0.9").await;
     let log = h.net.log.lock().unwrap().clone();
     let a = log.iter().position(|s| s == "apply(10.0.0.1)").unwrap();
     let down = log.iter().position(|s| s == "teardown").unwrap();
@@ -475,6 +478,22 @@ async fn replace_during_input_timeout_starts_after_clean_exit() {
     assert_eq!(replacement.await.unwrap().unwrap().session, 2);
     wait_state(&handle, State::Connected).await;
     handle.disconnect(1).await;
+}
+
+async fn network_at(h: &Harness, ip: &str) -> Status {
+    let expected = ip.parse::<std::net::IpAddr>().unwrap();
+    for _ in 0..300 {
+        let status = h.handle.status().await;
+        if status
+            .net
+            .as_ref()
+            .is_some_and(|n| n.dns_servers.contains(&expected))
+        {
+            return status;
+        }
+        tokio::task::yield_now().await;
+    }
+    panic!("network {ip} not applied");
 }
 
 #[tokio::test(start_paused = true)]

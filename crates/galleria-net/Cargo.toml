@@ -1,0 +1,21 @@
+[package]
+name = "galleria-net"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+galleria-backend.workspace = true
+ipnet.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tempfile.workspace = true
+
+[dev-dependencies]
+rstest.workspace = true
+
+[lints]
+workspace = true

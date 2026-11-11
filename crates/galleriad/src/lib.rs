@@ -6,6 +6,7 @@ pub mod dispatch;
 pub mod logbuf;
 pub mod machine;
 pub mod manager;
+pub mod network;
 #[allow(unsafe_code)]
 mod peer_groups;
 pub mod redact;

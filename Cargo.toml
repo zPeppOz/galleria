@@ -12,6 +12,7 @@ rust-version = "1.96"
 [workspace.dependencies]
 galleria-ipc = { path = "crates/galleria-ipc" }
 galleria-backend = { path = "crates/galleria-backend" }
+galleria-net = { path = "crates/galleria-net" }
 ipnet = "2"
 uuid = { version = "1", features = ["v4"] }
 rstest = "0.26"

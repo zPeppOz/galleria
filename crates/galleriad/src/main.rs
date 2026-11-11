@@ -1,11 +1,11 @@
 #![deny(unsafe_code)]
 use clap::{Parser, Subcommand};
-use galleria_backend::net::NetConfig;
-use galleria_ipc::{ErrorCode, SessionError};
+use galleria_ipc::ErrorCode;
+use galleria_net::{NetManager, SystemRunner};
 use galleriad::{
     config::DaemonConfig,
     machine::RetryPolicy,
-    manager::{BackendFactory, NetControl, spawn_manager},
+    manager::{BackendFactory, spawn_manager},
     server::{DaemonInfo, serve},
 };
 use std::{path::PathBuf, sync::Arc};
@@ -26,18 +26,6 @@ enum Command {
         #[arg(long)]
         runtime_dir: Option<PathBuf>,
     },
-}
-struct NoNet;
-impl NetControl for NoNet {
-    fn recover(&self) -> Result<(), SessionError> {
-        Ok(())
-    }
-    fn apply(&self, _: &NetConfig) -> Result<(), SessionError> {
-        Ok(())
-    }
-    fn teardown(&self) -> Result<(), SessionError> {
-        Ok(())
-    }
 }
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -62,9 +50,13 @@ async fn main() -> anyhow::Result<()> {
     galleriad::harden_process();
     let factory: BackendFactory =
         Arc::new(|_, _| Err(ErrorCode::BackendUnavailable.to_rpc("No backend available")));
+    let net = NetManager::new(
+        SystemRunner::locate()?,
+        cfg.runtime_dir.join("net-journal.json"),
+    );
     let manager = spawn_manager(
         factory,
-        Arc::new(NoNet),
+        Arc::new(net),
         RetryPolicy::default(),
         cfg.runtime_dir.clone(),
     );

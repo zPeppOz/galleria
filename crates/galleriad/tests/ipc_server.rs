@@ -715,3 +715,60 @@ async fn credentials_from_provide_input_are_filtered_before_backend_logs_and_sta
     assert_eq!(status.detail.as_deref(), Some("[redatto]"));
     s.stop().await;
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn daemon_recovers_before_listening() {
+    use galleria_net::{Cmd, CommandRunner, NetError, NetManager};
+    use galleriad::{machine::RetryPolicy, manager::*};
+    use std::sync::{Arc, Mutex};
+    struct Runner {
+        socket: PathBuf,
+        calls: Arc<Mutex<Vec<String>>>,
+        runtime_thread: std::thread::ThreadId,
+    }
+    impl CommandRunner for Runner {
+        fn run(&self, cmd: &Cmd) -> Result<(), NetError> {
+            assert!(
+                !self.socket.exists(),
+                "network recovery happened after bind"
+            );
+            assert_ne!(
+                std::thread::current().id(),
+                self.runtime_thread,
+                "network I/O blocks the async runtime"
+            );
+            self.calls.lock().unwrap().push(cmd.to_string());
+            Ok(())
+        }
+    }
+    let h = Harness::new(vec![]);
+    let cfg = cfg(&h);
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let net = NetManager::new(
+        Runner {
+            socket: cfg.socket.clone(),
+            calls: calls.clone(),
+            runtime_thread: std::thread::current().id(),
+        },
+        h.tmp.path().join("net-journal.json"),
+    );
+    let manager = spawn_manager(
+        Arc::new(|_, _| Err(ErrorCode::BackendUnavailable.to_rpc("test"))),
+        Arc::new(net),
+        RetryPolicy::default(),
+        cfg.runtime_dir.clone(),
+    );
+    let shutdown = CancellationToken::new();
+    let task = tokio::spawn(serve(cfg.clone(), manager, info(), shutdown.clone()));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !cfg.socket.exists() {
+            assert!(!task.is_finished());
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(calls.lock().unwrap().len(), 6);
+    shutdown.cancel();
+    task.await.unwrap().unwrap();
+}

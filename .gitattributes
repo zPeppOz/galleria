@@ -1,0 +1,2 @@
+# Preserve the Windows fixture and accept its intentional CRLF line endings.
+crates/galleria-ovpn/tests/fixtures/crlf.ovpn -text whitespace=cr-at-eol

@@ -134,3 +134,15 @@ pub fn generate_config(input: &GenInput) -> String {
     }
     s
 }
+
+pub fn profile_pull_filters(p: &ValidOpenVpn) -> Vec<(String, String)> {
+    p.items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Directive { name, args, .. } if name == "pull-filter" && args.len() == 2 => {
+                Some((args[0].clone(), args[1].clone()))
+            }
+            _ => None,
+        })
+        .collect()
+}

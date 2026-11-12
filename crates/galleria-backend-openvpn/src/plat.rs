@@ -148,7 +148,8 @@ pub(crate) async fn run(
         },
         backend.options.ipv6_block,
     )
-    .ignore_pushed_routes(backend.options.ignore_pushed_routes);
+    .ignore_pushed_routes(backend.options.ignore_pushed_routes)
+    .pull_filters(profile_pull_filters(&backend.cfg));
     let Some(stdout) = stdout else {
         let _ = child.kill().await;
         return error();

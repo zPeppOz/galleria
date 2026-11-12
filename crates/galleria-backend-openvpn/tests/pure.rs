@@ -447,3 +447,28 @@ fn pushed_routing_domains_are_rejected(#[case] key: &str, #[case] value: &str) {
         .collect();
     assert!(parse_hook_env(&env).is_err());
 }
+
+#[test]
+fn profile_pull_filters_apply_before_push_facts_are_computed() {
+    let profile = validate(&params(
+        "client\npull-filter ignore \"redirect-gateway\"\nredirect-gateway def1\n",
+    ))
+    .unwrap();
+    let push = parse_push_reply_filtered(
+        "PUSH_REPLY,redirect-gateway def1 ipv6,ifconfig-ipv6 2001:db8:88::2/64 2001:db8:88::1",
+        &profile_pull_filters(&profile),
+    )
+    .unwrap();
+    assert!(!push.redirect.ipv6);
+    assert!(!push.redirect.ipv4);
+    assert!(push.ifconfig_ipv6);
+    let accepted = parse_push_reply_filtered(
+        "PUSH_REPLY,redirect-gateway def1 ipv6",
+        &[
+            ("accept".into(), "redirect-gateway".into()),
+            ("ignore".into(), "redirect-gateway".into()),
+        ],
+    )
+    .unwrap();
+    assert!(accepted.redirect.ipv6);
+}

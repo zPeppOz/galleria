@@ -12,6 +12,7 @@ pub struct Credentials {
     profile: ProfileFacts,
     ipv6_block: bool,
     ignore_routes: bool,
+    pull_filters: Vec<(String, String)>,
 }
 impl Credentials {
     pub fn new(values: InputValues, profile: ProfileFacts, ipv6_block: bool) -> Self {
@@ -20,7 +21,12 @@ impl Credentials {
             profile,
             ipv6_block,
             ignore_routes: false,
+            pull_filters: vec![],
         }
+    }
+    pub fn pull_filters(mut self, filters: Vec<(String, String)>) -> Self {
+        self.pull_filters = filters;
+        self
     }
     pub fn ignore_pushed_routes(mut self, ignore: bool) -> Self {
         self.ignore_routes = ignore;
@@ -368,7 +374,7 @@ pub async fn drive_with_output<S: AsyncRead + AsyncWrite + Unpin, R: AsyncRead +
                         }
                     }
                     MgmtEvent::Log { flags, text } => {
-                        if let Some(p) = management_push.feed(&text, creds.ignore_routes) {
+                        if let Some(p) = management_push.feed(&text, creds.ignore_routes, &creds.pull_filters) {
                             pushed = Some(p);
                         }
                         let level = if flags.contains(['F', 'E']) { LogLevel::Error }
@@ -384,7 +390,7 @@ pub async fn drive_with_output<S: AsyncRead + AsyncWrite + Unpin, R: AsyncRead +
                 match line {
                     Ok(Some(text)) => {
                         let text = text.trim_end_matches(['\r', '\n']);
-                        if let Some(p) = output_push.feed(text, creds.ignore_routes) {
+                        if let Some(p) = output_push.feed(text, creds.ignore_routes, &creds.pull_filters) {
                             pushed = Some(p);
                         }
                         let _ = ctx.events.send(BackendEvent::Log(LogLine {
@@ -399,6 +405,12 @@ pub async fn drive_with_output<S: AsyncRead + AsyncWrite + Unpin, R: AsyncRead +
                     match parse_hook_env(&call.env) {
                         Ok(env) if env.script_type == "up" => {
                             let (reply, receive) = oneshot::channel();
+                            if env.has_ipv6_address {
+                                let profile = creds.profile.redirect.ipv6 || galleria_backend::net::carries_ipv6_default(&creds.profile.ipv6_routes);
+                                let push = pushed.as_ref().is_some_and(|p| p.redirect.ipv6 || galleria_backend::net::carries_ipv6_default(&p.routes));
+                                let env_default = galleria_backend::net::carries_ipv6_default(&env.routes);
+                                let _ = ctx.events.send(BackendEvent::Log(LogLine {level: LogLevel::Info, message: format!("IPv6 default sources at up: profile={profile} push={push} env={env_default}")})).await;
+                            }
                             let config = net_config(&env, pushed.as_ref(), &creds.profile, creds.ipv6_block);
                             if ctx.events.send(BackendEvent::NetUp { config, reply }).await.is_err() {
                                 return ExitReason::Stopped;

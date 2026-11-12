@@ -500,3 +500,25 @@ async fn internal_restart_releases_the_new_management_hold() {
     h.connect().await;
     h.finish().await;
 }
+
+#[tokio::test]
+async fn ipv6_hook_reports_the_default_route_sources() {
+    let mut h = Harness::new(values());
+    h.setup().await;
+    h.line(">LOG:0,I,PUSH_REPLY,redirect-gateway def1 ipv6")
+        .await;
+    assert!(matches!(h.event().await, BackendEvent::Log(_)));
+    let verdict = h
+        .hook_with("up", &[("ifconfig_ipv6_local", "2001:db8:88::2")])
+        .await;
+    let BackendEvent::Log(log) = h.event().await else {
+        panic!("missing IPv6 source evidence");
+    };
+    assert_eq!(
+        log.message,
+        "IPv6 default sources at up: profile=false push=true env=false"
+    );
+    assert_eq!(h.netup().await.ipv6_block, Ipv6Block::None);
+    assert!(verdict.await.unwrap());
+    h.finish().await;
+}

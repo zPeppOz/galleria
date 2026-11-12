@@ -18,6 +18,9 @@ pub(crate) fn route_v4(address: &str, mask: &str) -> Option<IpNet> {
     )
 }
 pub fn parse_push_reply(text: &str) -> Option<Pushed> {
+    parse_push_reply_filtered(text, &[])
+}
+pub fn parse_push_reply_filtered(text: &str, filters: &[(String, String)]) -> Option<Pushed> {
     let (_, s) = text.split_once("PUSH_REPLY")?;
     if !s.is_empty() && !s.starts_with(',') {
         return None;
@@ -30,6 +33,14 @@ pub fn parse_push_reply(text: &str) -> Option<Pushed> {
         let Some((name, args)) = words.split_first() else {
             continue;
         };
+        if name != "push-continuation"
+            && let Some((action, _)) = filters
+                .iter()
+                .find(|(_, prefix)| option.trim_start().starts_with(prefix))
+            && action != "accept"
+        {
+            continue;
+        }
         match name.as_str() {
             "push-continuation" => p.continuation = args.first().is_some_and(|a| a == "2"),
             "redirect-gateway" => {
@@ -71,8 +82,13 @@ impl PushAccumulator {
     pub fn clear(&mut self) {
         self.0 = None;
     }
-    pub fn feed(&mut self, text: &str, ignore_routes: bool) -> Option<Pushed> {
-        let mut part = parse_push_reply(text)?;
+    pub fn feed(
+        &mut self,
+        text: &str,
+        ignore_routes: bool,
+        filters: &[(String, String)],
+    ) -> Option<Pushed> {
+        let mut part = parse_push_reply_filtered(text, filters)?;
         let mut full = self.0.take().unwrap_or_default();
         full.redirect.ipv4 |= part.redirect.ipv4;
         full.redirect.ipv6 |= part.redirect.ipv6;

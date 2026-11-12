@@ -7,6 +7,57 @@ use std::sync::{Arc, Mutex};
 use std::{sync::atomic::Ordering, time::Duration};
 use support::*;
 use tokio::sync::oneshot;
+struct UnavailableResolved;
+impl galleria_net::CommandRunner for UnavailableResolved {
+    fn run(&self, cmd: &galleria_net::Cmd) -> Result<(), galleria_net::NetError> {
+        if cmd.program == galleria_net::Program::Resolvectl {
+            Err(galleria_net::NetError::Command {
+                cmd: cmd.to_string(),
+                stderr: "Failed to connect to bus: synthetic".into(),
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+#[tokio::test]
+async fn unavailable_resolved_reports_dns_error_and_accepts_next_connect() {
+    let tmp = tempfile::tempdir().unwrap();
+    let journal = tmp.path().join("net-journal.json");
+    let net = galleria_net::NetManager::new(UnavailableResolved, journal.clone());
+    let factory: BackendFactory = Arc::new(|_, _| {
+        Ok(Box::new(FakeBackend::new(
+            online(),
+            Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        )))
+    });
+    let manager = spawn_manager(
+        factory,
+        Arc::new(net),
+        RetryPolicy::default(),
+        tmp.path().into(),
+    );
+    for session in 1..=2 {
+        assert_eq!(
+            manager.connect(params(false), 1000).await.unwrap().session,
+            session
+        );
+        let status = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let status = manager.status().await;
+                if status.state == State::Error {
+                    break status;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(status.error.unwrap().code, SessionErrorCode::DnsUnavailable);
+        assert!(!journal.exists());
+    }
+    manager.disconnect(1000).await;
+}
 #[tokio::test(start_paused = true)]
 async fn replace_waits_for_teardown_before_spawning() {
     let h = Harness::new(vec![online(), online()]);

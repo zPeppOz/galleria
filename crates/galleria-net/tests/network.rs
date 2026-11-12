@@ -136,6 +136,7 @@ struct Calls {
     missing: bool,
     fail_undo: bool,
     journal_seen: bool,
+    resolved_failure: Option<u8>,
 }
 #[derive(Clone)]
 struct Runner {
@@ -149,6 +150,23 @@ impl CommandRunner for Runner {
             calls.journal_seen = self.journal.exists();
         }
         calls.commands.push(cmd.to_string());
+        if cmd.program == Program::Resolvectl
+            && let Some(mode) = calls.resolved_failure
+        {
+            return Err(match mode {
+                0 => NetError::DnsUnavailable("resolvectl not installed".into()),
+                1 => NetError::ToolMissing("resolvectl"),
+                _ => NetError::Command {
+                    cmd: cmd.to_string(),
+                    stderr: if mode == 2 {
+                        "Failed to connect to bus"
+                    } else {
+                        "Unit dbus-org.freedesktop.resolve1.service not found"
+                    }
+                    .into(),
+                },
+            });
+        }
         if calls.fail_at == Some(calls.commands.len())
             || calls.missing
             || (calls.fail_undo && (cmd.args.iter().any(|s| s == "del" || s == "revert")))
@@ -247,6 +265,46 @@ fn resolvectl_failure_is_dns_unavailable() {
     ));
     assert!(!h.journal.exists());
 }
+#[rstest::rstest]
+#[case(0)]
+#[case(1)]
+#[case(2)]
+#[case(3)]
+fn unavailable_resolved_rolls_back_and_allows_retry(#[case] mode: u8) {
+    let h = Harness::new();
+    h.calls.lock().unwrap().resolved_failure = Some(mode);
+    for _ in 0..2 {
+        h.calls.lock().unwrap().commands.clear();
+        assert!(matches!(
+            h.net.apply(&config()),
+            Err(NetError::DnsUnavailable(_))
+        ));
+        assert!(!h.journal.exists());
+        assert!(h.commands().contains(&"ip link del glr-wg0".into()));
+        h.net.teardown().unwrap();
+        h.net.recover().unwrap();
+    }
+}
+#[rstest::rstest]
+#[case(0)]
+#[case(1)]
+#[case(2)]
+#[case(3)]
+fn unavailable_resolved_does_not_block_existing_journal_cleanup(#[case] mode: u8) {
+    for recover in [false, true] {
+        let h = Harness::new();
+        h.net.apply(&config()).unwrap();
+        h.calls.lock().unwrap().resolved_failure = Some(mode);
+        if recover {
+            h.net.recover().unwrap();
+        } else {
+            h.net.teardown().unwrap();
+        }
+        assert!(h.commands().contains(&"resolvectl revert glr-wg0".into()));
+        assert!(h.commands().contains(&"ip link del glr-wg0".into()));
+        assert!(!h.journal.exists());
+    }
+}
 #[test]
 fn teardown_runs_undos_in_reverse_and_removes_journal() {
     let h = Harness::new();
@@ -327,7 +385,7 @@ fn failed_cleanup_keeps_journal_and_attempts_every_undo() {
     h.calls.lock().unwrap().commands.clear();
     h.calls.lock().unwrap().fail_undo = true;
     assert!(h.net.teardown().is_err());
-    assert_eq!(h.commands().len(), 5);
+    assert_eq!(h.commands().len(), 6);
     assert!(h.journal.exists());
     h.calls.lock().unwrap().fail_undo = false;
     h.net.teardown().unwrap();

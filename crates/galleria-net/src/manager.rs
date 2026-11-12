@@ -4,6 +4,7 @@ use crate::{
     plan::{fixed_cleanup, plan, validate},
 };
 use std::{
+    collections::VecDeque,
     path::PathBuf,
     sync::{Mutex, MutexGuard},
 };
@@ -60,12 +61,23 @@ impl<R: CommandRunner> NetManager<R> {
     }
     fn undo(&self, commands: &[Cmd]) -> Result<(), NetError> {
         let mut first = None;
-        for cmd in commands.iter().rev() {
-            if let Err(error) = self.runner.run(cmd)
+        let mut pending: VecDeque<_> = commands.iter().rev().cloned().collect();
+        while let Some(cmd) = pending.pop_front() {
+            if let Err(error) = self.runner.run(&cmd)
                 && !missing(&error)
-                && first.is_none()
             {
-                first = Some(error);
+                if cmd.program == crate::Program::Resolvectl
+                    && let [action, interface] = cmd.args.as_slice()
+                    && action == "revert"
+                {
+                    // Removing this link also discards resolved's per-link state.
+                    pending.push_back(Cmd {
+                        program: crate::Program::Ip,
+                        args: vec!["link".into(), "del".into(), interface.clone()],
+                    });
+                } else if first.is_none() {
+                    first = Some(error);
+                }
             }
         }
         match first {

@@ -5,6 +5,16 @@ pub fn import_openvpn(
     name: &str,
     read_file: &dyn Fn(&str) -> std::io::Result<String>,
 ) -> Result<Imported, ImportError> {
+    import_openvpn_bytes(text, name, &|path| read_file(path).map(String::into_bytes))
+}
+/// Byte-oriented import supports binary PKCS#12 references; the text API remains an adapter.
+pub fn import_openvpn_bytes(
+    text: &str,
+    name: &str,
+    read_file: &dyn Fn(&str) -> std::io::Result<Vec<u8>>,
+) -> Result<Imported, ImportError> {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    use zeroize::{Zeroize, Zeroizing};
     let parsed = parse(text).map_err(|_| ImportError::Invalid)?;
     let mut items = vec![];
     let mut secrets = vec![];
@@ -21,8 +31,30 @@ pub fn import_openvpn(
             }
             Item::Directive { line, name, args } if classify(&name, &args) == Class::FileRef => {
                 let path = args.first().ok_or(ImportError::Syntax(line))?;
-                let body = read_file(path).map_err(|_| ImportError::MissingFile(path.clone()))?;
-                let block = format!("<{name}>\n{}\n</{name}>\n", body.trim_end_matches('\n'));
+                let mut raw = Zeroizing::new(
+                    read_file(path).map_err(|_| ImportError::MissingFile(path.clone()))?,
+                );
+                let body = Zeroizing::new(if name == "pkcs12" {
+                    let encoded = Zeroizing::new(STANDARD.encode(raw.as_slice()));
+                    let mut wrapped = String::new();
+                    for (index, ch) in encoded.chars().enumerate() {
+                        if index > 0 && index % 64 == 0 {
+                            wrapped.push('\n');
+                        }
+                        wrapped.push(ch);
+                    }
+                    wrapped
+                } else {
+                    String::from_utf8(std::mem::take(&mut *raw)).map_err(|e| {
+                        let mut bytes = e.into_bytes();
+                        bytes.zeroize();
+                        ImportError::Invalid
+                    })?
+                });
+                let block = Zeroizing::new(format!(
+                    "<{name}>\n{}\n</{name}>\n",
+                    body.trim_end_matches('\n')
+                ));
                 let mut parsed = parse(&block).map_err(|_| ImportError::Invalid)?;
                 if parsed.len() != 1 || !matches!(&parsed[0],Item::Block {tag,..} if tag==&name) {
                     return Err(ImportError::Invalid);

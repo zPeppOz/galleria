@@ -358,3 +358,31 @@ fn secrets_symlink_is_refused() {
         Err(StoreError::Invalid(_)) | Err(StoreError::Io(_))
     ));
 }
+
+#[test]
+fn binary_pkcs12_references_are_encoded_and_kept_out_of_public_config() {
+    let imported = import_openvpn_bytes("client\npkcs12 client.p12\n", "Office", &|path| {
+        assert_eq!(path, "client.p12");
+        Ok(vec![0, 255, 16])
+    })
+    .unwrap();
+    assert_eq!(imported.secrets.len(), 1);
+    assert_eq!(imported.secrets[0].0, "openvpn.block.pkcs12");
+    assert_eq!(imported.secrets[0].1.expose(), "AP8Q\n");
+    let public = imported.profile.to_toml().unwrap();
+    assert!(!public.contains("AP8Q"));
+    assert!(!public.contains("<pkcs12>"));
+}
+#[test]
+fn pkcs12_base64_lines_fit_the_openvpn_buffer() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    let bytes = vec![255; 1024];
+    let imported =
+        import_openvpn_bytes("client\npkcs12 bundle\n", "Office", &|_| Ok(bytes.clone())).unwrap();
+    let body = imported.secrets[0].1.expose();
+    assert!(body.lines().all(|line| line.len() <= 64));
+    assert_eq!(
+        STANDARD.decode(body.lines().collect::<String>()).unwrap(),
+        bytes
+    );
+}

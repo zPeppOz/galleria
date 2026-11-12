@@ -271,7 +271,8 @@ impl Cmd {
                 interface(iface) && domains.iter().all(|s| domain(s))
             }
             (Program::Resolvectl, ["default-route", iface, "yes"]) => interface(iface),
-            (Program::Sysctl, ["-q", "-w", "net.ipv4.conf.all.src_valid_mark=1"]) => true,
+            (Program::Sysctl, ["-q", "-w", "net.ipv4.conf.all.src_valid_mark=1"])
+            | (Program::Sysctl, ["-n", "net.ipv4.conf.all.src_valid_mark"]) => true,
             _ => false,
         };
         if valid {

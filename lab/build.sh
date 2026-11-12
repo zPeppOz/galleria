@@ -37,7 +37,7 @@ else
   cargo test -p galleria-e2e --no-run --message-format=json > lab/out/artifacts.json
   build_target=${CARGO_TARGET_DIR:-target}
 fi
-cp "$build_target/debug/galleriad" "$build_target/debug/ipc-probe" lab/out/bin/
+cp "$build_target/debug/galleriad" "$build_target/debug/ipc-probe" "$build_target/debug/galleria" lab/out/bin/
 python3 - <<'PY'
 import json, pathlib, shutil
 out=pathlib.Path('lab/out/tests')

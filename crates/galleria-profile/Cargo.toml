@@ -6,6 +6,7 @@ license.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 [dependencies]
+base64.workspace = true
 galleria-ipc.workspace = true
 galleria-ovpn = { path = "../galleria-ovpn" }
 serde.workspace = true

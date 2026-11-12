@@ -10,6 +10,7 @@ publish = false
 rust-version = "1.96"
 
 [workspace.dependencies]
+base64 = "0.22"
 toml = "0.9"
 time = { version = "0.3", features = ["formatting"] }
 galleria-ipc = { path = "crates/galleria-ipc" }

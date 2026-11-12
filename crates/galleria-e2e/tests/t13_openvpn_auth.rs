@@ -286,9 +286,10 @@ async fn blackholed_server_triggers_reconnect_and_recovery() {
     tokio::time::timeout(Duration::from_secs(40), async {
         loop {
             let s: Status = c.call("status", &serde_json::json!({})).await.unwrap();
+            let process = sh("pgrep -xo openvpn");
             if s.attempt > 1
-                && sh("pgrep -xo openvpn").status.success()
-                && checked("pgrep -xo openvpn") != pid
+                && process.status.success()
+                && String::from_utf8_lossy(&process.stdout).trim() != pid
             {
                 break;
             }

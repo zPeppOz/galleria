@@ -5,5 +5,6 @@ RUN dnf install -y --setopt=install_weak_deps=False systemd systemd-resolved dbu
     && dnf clean all && groupadd galleria && useradd -m -G galleria alice && useradd -m mallory \
     && systemctl mask systemd-binfmt.service proc-sys-fs-binfmt_misc.automount systemd-networkd.service systemd-networkd-wait-online.service \
     && systemctl enable systemd-resolved
+RUN dnf install -y --setopt=install_weak_deps=False util-linux-script && dnf clean all
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]

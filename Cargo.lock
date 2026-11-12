@@ -551,6 +551,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "galleria-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "galleria-ipc",
+ "galleria-profile",
+ "nix",
+ "rstest",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "galleria-e2e"
 version = "0.1.0"
 dependencies = [
@@ -598,6 +613,7 @@ dependencies = [
 name = "galleria-profile"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "galleria-ipc",
  "galleria-ovpn",
  "nix",

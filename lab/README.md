@@ -2,13 +2,13 @@
 
 Eseguire dalla radice del worktree: `LAB_BUILD=host lab/run.sh 26 t07`.
 Client ammessi: 26 (Ubuntu 24.04), 27 (Ubuntu 26.04), 79 (Fedora corrente).
-Il filtro seleziona un file (`t07`, `t08`, `t09`, `t12`) oppure un nome di test.
+Il filtro seleziona un file (`t07`, `t08`, `t09`, `t12`, `t13`, `t14`, `t16`) oppure un nome di test.
 Senza filtro esegue tutti i test ignorati, in serie, con il demone vero.
 
 Docker e il modulo WireGuard devono essere disponibili. In WSL2 il modulo è già
 caricato: non eseguire modprobe sull'host. Le prove modificano solo container
 `glab-*` e rete dual-stack `galleria-fase1`, mai rotte o DNS dell'host.
-I client usano NET_ADMIN, NET_RAW, SYS_ADMIN e un cgroup privato scrivibile;
+I client usano NET_ADMIN, NET_RAW, SYS_ADMIN, SYS_PTRACE e un cgroup privato scrivibile;
 seccomp/AppArmor del container sono disattivati per consentire le sandbox systemd.
 La unit del prodotto conserva tutte le restrizioni della spec.
 
@@ -37,3 +37,17 @@ Il job `lab-dco` installa il modulo sul runner ed esegue solo il filtro `dco`.
 Il server `dns-option` usa DNS `10.9.0.1`; quello base usa `10.8.0.1`.
 Il build in container usa uid/gid dell'utente e HOME nel worktree, così target e
 cache Cargo restano rimovibili dall'utente. PKI/profili sono generati root 0600.
+
+T13 prova credenziali, errori e riconnessione; T14 misura IPv6 (controlli inclusi);
+T16 usa la CLI come alice e verifica anche il rifiuto di mallory. SYS_PTRACE serve
+soltanto al processo osservatore dei test per leggere i fd del demone non dumpabile:
+la CapabilityBoundingSet della unit del prodotto resta invariata.
+La CLI si installa insieme al demone. Password e OTP dei test passano esclusivamente
+su stdin, senza valori segreti negli argomenti. L'archivio personale usa file 0600
+in directory 0700; il demone non legge la home.
+
+Docker monta /proc/sys in sola lettura: il client riceve src_valid_mark=1 alla
+creazione del proprio namespace tramite --sysctl. Il runner di rete verifica il
+valore dopo il comando: procps 4.0.4 può restituire successo senza scrivere,
+mentre procps 4.0.6 segnala errore anche se il valore è già quello richiesto.
+Nessun sysctl dell'host viene modificato.

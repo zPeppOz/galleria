@@ -3,7 +3,9 @@
 Client desktop open source per OpenVPN e WireGuard (poi le VPN aziendali via OpenConnect e le reti filtrate): una rubrica di connessioni in stile VirtualBox,
 una connessione attiva alla volta, Linux e Windows (macOS in seguito).
 
-Stato: analisi + mockup cliccabile, nessun codice dell'app.
+Stato: demone Linux e CLI minima implementati, con laboratorio Docker per WireGuard e OpenVPN.
+La GUI resta un mockup; CI remota, desktop con NetworkManager e DCO restano da verificare.
+Vedi [esito della fase 1](docs/06-esito-fase1.md) e [laboratorio](lab/README.md).
 
 ![Mockup rubrica](design/mockup/rubrica-connesso.png)
 

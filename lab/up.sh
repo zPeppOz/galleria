@@ -20,10 +20,10 @@ for client in $clients; do
   octet=$((client+10))
   docker run -d --name "glab-client$client" --hostname "client$client" --network galleria-fase1 \
     --ip "172.31.0.$octet" --ip6 "2001:db8:31::$octet" \
-    --cap-add NET_ADMIN --cap-add NET_RAW --cap-add SYS_ADMIN --cgroupns=private \
+    --cap-add NET_ADMIN --cap-add NET_RAW --cap-add SYS_ADMIN --cap-add SYS_PTRACE --cgroupns=private \
     --security-opt seccomp=unconfined --security-opt apparmor=unconfined \
     --tmpfs /run --tmpfs /run/lock --tmpfs /tmp --device /dev/net/tun \
-    --sysctl net.ipv6.conf.all.disable_ipv6=0 \
+    --sysctl net.ipv6.conf.all.disable_ipv6=0 --sysctl net.ipv4.conf.all.src_valid_mark=1 \
     -v "$PWD/..:/lab:ro" "glab-client$client" \
     bash -euc 'umount /sys/fs/cgroup; mount -t cgroup2 none /sys/fs/cgroup; exec /sbin/init' >/dev/null
   ready=0

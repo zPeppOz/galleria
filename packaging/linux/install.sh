@@ -4,7 +4,7 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 bin=${1:-$root/lab/out/bin}
 install -Dm755 "$bin/galleriad" /usr/local/libexec/galleria/galleriad
-if [[ -x "$bin/galleria" ]]; then install -Dm755 "$bin/galleria" /usr/local/bin/galleria; fi
+install -Dm755 "$bin/galleria" /usr/local/bin/galleria
 install -Dm644 "$root/packaging/linux/galleria.sysusers" /usr/lib/sysusers.d/galleria.conf
 systemd-sysusers /usr/lib/sysusers.d/galleria.conf
 install -Dm644 "$root/packaging/linux/90-galleria.conf" /etc/NetworkManager/conf.d/90-galleria.conf

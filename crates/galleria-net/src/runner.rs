@@ -112,7 +112,32 @@ impl SystemRunner {
 
 impl CommandRunner for SystemRunner {
     fn run(&self, cmd: &Cmd) -> Result<(), NetError> {
-        match self.execute(cmd) {
+        let result = self.execute(cmd);
+        let args = cmd.args.iter().map(String::as_str).collect::<Vec<_>>();
+        if cmd.program == Program::Sysctl
+            && args.as_slice() == ["-q", "-w", "net.ipv4.conf.all.src_valid_mark=1"]
+        {
+            // procps versions disagree about errors on a read-only /proc/sys.
+            // The observable value, rather than the exit status alone, is authoritative.
+            let query = Cmd {
+                program: Program::Sysctl,
+                args: ["-n", "net.ipv4.conf.all.src_valid_mark"]
+                    .map(String::from)
+                    .to_vec(),
+            };
+            if let Ok(value) = self.execute(&query)
+                && String::from_utf8_lossy(&value).trim() == "1"
+            {
+                return Ok(());
+            }
+            return result.and_then(|_| {
+                Err(NetError::Command {
+                    cmd: cmd.to_string(),
+                    stderr: "Required sysctl value was not applied".into(),
+                })
+            });
+        }
+        match result {
             Ok(_) => Ok(()),
             Err(error) => {
                 let args = cmd.args.iter().map(String::as_str).collect::<Vec<_>>();
@@ -172,6 +197,31 @@ mod tests {
                     .to_vec(),
             };
             assert_eq!(runner.run(&cmd).is_ok(), accepted, "{route}");
+        }
+    }
+    #[test]
+    fn sysctl_write_is_accepted_only_after_the_required_value_is_verified() {
+        for (value, write_exit, accepted) in [
+            ("1", 1, true),
+            ("0", 1, false),
+            ("", 1, false),
+            ("1", 0, true),
+            ("0", 0, false),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("sysctl");
+            std::fs::write(&path,format!("#!/bin/sh\nif [ \"$1\" = -n ]; then printf '%s\\n' '{value}'; exit 0; fi\necho 'permission denied' >&2\nexit {write_exit}\n")).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+            let runner = SystemRunner {
+                paths: HashMap::from([("sysctl", path)]),
+            };
+            let cmd = Cmd {
+                program: Program::Sysctl,
+                args: ["-q", "-w", "net.ipv4.conf.all.src_valid_mark=1"]
+                    .map(String::from)
+                    .to_vec(),
+            };
+            assert_eq!(runner.run(&cmd).is_ok(), accepted, "value={value}");
         }
     }
 }

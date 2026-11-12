@@ -27,6 +27,7 @@ jobs:
       - run: cargo test --workspace
       - run: cargo deny check
       - run: scripts/check-boundaries.sh
+      - run: lab/tests/check-wsl.sh
 
   coverage:
     runs-on: ubuntu-latest

@@ -101,6 +101,61 @@ impl WgDevice for KernelDevice {
         })
     }
     fn remove(&mut self) -> Result<(), WgError> {
-        self.api.remove_interface().map_err(|_| WgError("remove"))
+        // Defguard's removal invokes unbounded DNS helpers and also owns policy rules.
+        // The daemon already tears those down; delete only our link with bounded netlink.
+        delete_link()
+    }
+}
+fn delete_link() -> Result<(), WgError> {
+    use netlink_packet_core::{NLM_F_ACK, NLM_F_REQUEST, NetlinkMessage, NetlinkPayload};
+    use netlink_packet_route::{
+        RouteNetlinkMessage,
+        link::{LinkAttribute, LinkMessage},
+    };
+    use netlink_sys::{Socket, SocketAddr, protocols::NETLINK_ROUTE};
+    use std::{
+        io::ErrorKind,
+        time::{Duration, Instant},
+    };
+    let failure = || WgError("remove");
+    let mut link = LinkMessage::default();
+    link.attributes
+        .push(LinkAttribute::IfName(WG_INTERFACE.into()));
+    let mut request = NetlinkMessage::from(RouteNetlinkMessage::DelLink(link));
+    request.header.flags = NLM_F_REQUEST | NLM_F_ACK;
+    request.header.sequence_number = 1;
+    request.finalize();
+    let mut buffer = vec![0; request.buffer_len()];
+    request.serialize(&mut buffer);
+    let socket = Socket::new(NETLINK_ROUTE).map_err(|_| failure())?;
+    socket
+        .connect(&SocketAddr::new(0, 0))
+        .map_err(|_| failure())?;
+    socket.set_non_blocking(true).map_err(|_| failure())?;
+    if socket.send(&buffer, 0).map_err(|_| failure())? != buffer.len() {
+        return Err(failure());
+    }
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let mut reply = [0u8; 4096];
+        match socket.recv(&mut &mut reply[..], 0) {
+            Ok(n) => {
+                let response = NetlinkMessage::<RouteNetlinkMessage>::deserialize(&reply[..n])
+                    .map_err(|_| failure())?;
+                return match response.payload {
+                    NetlinkPayload::Error(error)
+                        if error.code.is_none()
+                            || error.code.is_some_and(|c| matches!(c.get(), -2 | -19)) =>
+                    {
+                        Ok(())
+                    }
+                    _ => Err(failure()),
+                };
+            }
+            Err(e) if e.kind() == ErrorKind::WouldBlock && Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(10))
+            }
+            Err(_) => return Err(failure()),
+        }
     }
 }

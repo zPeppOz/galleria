@@ -27,3 +27,6 @@ Il job CI `lab` è definito per i tre client; l'esecuzione remota richiede un pu
 Le unit binfmt sono mascherate nelle immagini. Ogni run controlla WSLInterop e,
 se necessario, applica la riparazione autorizzata con un container temporaneo.
 Il controllo non è applicabile sui runner Linux senza WSL.
+
+`lab/tests/check-wsl.sh` verifica la riparazione con letture proc e Docker simulati:
+nessuna registrazione binfmt reale viene cambiata dal test. Eseguito anche dal job check.

@@ -148,3 +148,92 @@ pub async fn connect_wg(c: &mut Client, name: &str) -> Status {
         .unwrap_or_else(|e| panic!("connect: {e}"));
     wait_state(c, State::Connected, Duration::from_secs(5)).await
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddressFamily {
+    Ipv4,
+    Ipv6,
+}
+/// Count global IPv6 on the physical link while generating real IPv6 HTTP attempts.
+pub fn count_global_ipv6_on_eth0(secs: u64) -> u64 {
+    use std::process::Stdio;
+    assert_lab();
+    assert!(secs > 0);
+    let duration = secs.to_string();
+    let capture = Command::new("timeout")
+        .args([
+            "--signal=INT",
+            &duration,
+            "tcpdump",
+            "-ln",
+            "-i",
+            "eth0",
+            "ip6 and not net fe80::/10 and not multicast",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|e| panic!("capture: {e}"));
+    let mut traffic=Command::new("timeout").args([&duration,"bash","-c","while :; do curl --noproxy '*' -6 -s --max-time 1 'http://[2001:db8:99::1]/' >/dev/null; sleep .1; done"])
+        .stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap_or_else(|e|panic!("traffic: {e}"));
+    let output = capture
+        .wait_with_output()
+        .unwrap_or_else(|e| panic!("capture wait: {e}"));
+    let _ = traffic.wait();
+    assert_eq!(
+        output.status.code(),
+        Some(124),
+        "capture did not run for the requested duration: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("listening on eth0"),
+        "capture never started"
+    );
+    let packets = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|l| !l.is_empty())
+        .count() as u64;
+    println!("global IPv6 packets on eth0 over {secs}s: {packets}");
+    packets
+}
+/// Deliberately try AAAA before A, each with the application's 10-second timeout.
+pub fn sequential_client(host: &str, port: u16) -> (Duration, AddressFamily) {
+    assert_lab();
+    let script = r#"
+import socket, sys, time, json
+addresses=socket.getaddrinfo(sys.argv[1],int(sys.argv[2]),type=socket.SOCK_STREAM)
+assert any(a[0]==socket.AF_INET6 for a in addresses) and any(a[0]==socket.AF_INET for a in addresses)
+addresses.sort(key=lambda a:a[0]!=socket.AF_INET6)
+start=time.monotonic()
+for family,_,_,_,address in addresses:
+    try:
+        with socket.create_connection((address[0],address[1]),timeout=10):
+            print(json.dumps([time.monotonic()-start,6 if family==socket.AF_INET6 else 4]))
+            break
+    except OSError:
+        pass
+else:
+    raise RuntimeError('all addresses failed')
+"#;
+    let output = Command::new("python3")
+        .args(["-c", script, host, &port.to_string()])
+        .output()
+        .unwrap_or_else(|e| panic!("sequential client: {e}"));
+    assert!(
+        output.status.success(),
+        "sequential client failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let (seconds, family): (f64, u8) =
+        serde_json::from_slice(&output.stdout).unwrap_or_else(|e| panic!("sequential result: {e}"));
+    println!("sequential client: IPv{family}, {seconds:.6}s");
+    (
+        Duration::from_secs_f64(seconds),
+        match family {
+            4 => AddressFamily::Ipv4,
+            6 => AddressFamily::Ipv6,
+            _ => panic!("invalid family"),
+        },
+    )
+}

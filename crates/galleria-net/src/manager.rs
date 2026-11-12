@@ -111,6 +111,8 @@ fn missing(cmd: &Cmd, error: &NetError) -> bool {
                 "Connection refused",
                 "org.freedesktop.resolve1 was not provided",
                 "Unit dbus-org.freedesktop.resolve1.service not found",
+                "Unit dbus-org.freedesktop.resolve1.service is masked",
+                "Unit dbus-org.freedesktop.resolve1.service failed to load properly",
             ]
             .iter()
             .any(|text| stderr.contains(text))

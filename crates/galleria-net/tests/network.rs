@@ -558,15 +558,15 @@ fn global_ipv6_cover_does_not_move_internal_specific_routes_to_policy_table() {
 }
 
 struct UnavailableDns {
-    stopped: bool,
+    stderr: Option<&'static str>,
 }
 impl CommandRunner for UnavailableDns {
     fn run(&self, cmd: &Cmd) -> Result<(), NetError> {
         if cmd.program == Program::Resolvectl {
-            if self.stopped {
+            if let Some(stderr) = self.stderr {
                 return Err(NetError::Command {
                     cmd: cmd.to_string(),
-                    stderr: "Failed to connect to bus: Connection refused".into(),
+                    stderr: stderr.into(),
                 });
             }
             return Err(NetError::DnsUnavailable("resolvectl not installed".into()));
@@ -575,12 +575,16 @@ impl CommandRunner for UnavailableDns {
     }
 }
 #[rstest::rstest]
-#[case(false)]
-#[case(true)]
-fn unavailable_dns_does_not_poison_rollback_or_recovery(#[case] stopped: bool) {
+#[case(None)]
+#[case(Some("Failed to connect to bus: Connection refused"))]
+#[case(Some(
+    "Failed to revert interface configuration: Unit dbus-org.freedesktop.resolve1.service failed to load properly, please adjust/correct and reload service manager: File exists"
+))]
+#[case(Some("Unit dbus-org.freedesktop.resolve1.service is masked"))]
+fn unavailable_dns_does_not_poison_rollback_or_recovery(#[case] stderr: Option<&'static str>) {
     let tmp = tempfile::tempdir().unwrap();
     let path = tmp.path().join("journal");
-    let net = NetManager::new(UnavailableDns { stopped }, path.clone());
+    let net = NetManager::new(UnavailableDns { stderr }, path.clone());
     assert!(matches!(
         net.apply(&config()),
         Err(NetError::DnsUnavailable(_))

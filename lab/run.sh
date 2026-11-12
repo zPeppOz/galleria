@@ -26,6 +26,6 @@ for executable in lab/out/tests/*; do
   listed=$(docker exec -e GALLERIA_LAB=1 "glab-client$client" "/lab/$executable" --ignored --list "${args[@]}")
   if [[ $listed != *': test'* ]]; then continue; fi
   matched=$((matched+1))
-  docker exec -e GALLERIA_LAB=1 "glab-client$client" "/lab/$executable" --ignored --test-threads=1 "${args[@]}"
+  docker exec -e GALLERIA_LAB=1 "glab-client$client" "/lab/$executable" --ignored --test-threads=1 --nocapture "${args[@]}"
 done
 ((matched>0)) || { echo 'no end-to-end tests matched' >&2; exit 1; }

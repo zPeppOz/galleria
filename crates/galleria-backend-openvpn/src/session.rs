@@ -336,6 +336,9 @@ pub async fn drive_with_output<S: AsyncRead + AsyncWrite + Unpin, R: AsyncRead +
                             }
                         }
                         "RECONNECTING" => {
+                            // A hard/soft restart enters management-hold again.
+                            hold = false;
+                            hold_queued = false;
                             accepted = false;
                             pushed = None;
                             management_push.clear();

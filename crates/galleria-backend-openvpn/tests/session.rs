@@ -486,3 +486,17 @@ async fn continued_push_retains_redirect_until_final_part(#[case] stdout: bool) 
     h.commands.send(BackendCommand::Stop).await.unwrap();
     h.task.abort();
 }
+
+#[tokio::test]
+async fn internal_restart_releases_the_new_management_hold() {
+    let mut h = Harness::new(values());
+    h.setup().await;
+    h.connect().await;
+    h.line(">STATE:0,RECONNECTING,SIGUSR1,,,,,").await;
+    assert!(matches!(h.event().await, BackendEvent::Restarting(_)));
+    h.line(">HOLD:Waiting for hold release:1").await;
+    assert_eq!(h.command().await, "hold release");
+    h.line("SUCCESS: hold release succeeded").await;
+    h.connect().await;
+    h.finish().await;
+}

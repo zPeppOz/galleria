@@ -1,11 +1,10 @@
 #![deny(unsafe_code)]
 use clap::{Parser, Subcommand};
-use galleria_ipc::ErrorCode;
 use galleria_net::{NetManager, SystemRunner};
 use galleriad::{
     config::DaemonConfig,
     machine::RetryPolicy,
-    manager::{BackendFactory, spawn_manager},
+    manager::spawn_manager,
     server::{DaemonInfo, serve},
 };
 use std::{path::PathBuf, sync::Arc};
@@ -48,8 +47,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     galleriad::harden_process();
-    let factory: BackendFactory =
-        Arc::new(|_, _| Err(ErrorCode::BackendUnavailable.to_rpc("No backend available")));
+    let factory = galleriad::factory::real_factory(std::env::current_exe()?);
     let net = NetManager::new(
         SystemRunner::locate()?,
         cfg.runtime_dir.join("net-journal.json"),
@@ -73,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
         manager,
         DaemonInfo {
             version: env!("CARGO_PKG_VERSION").into(),
-            backends: vec![],
+            backends: galleriad::factory::backend_infos(),
         },
         shutdown,
     )

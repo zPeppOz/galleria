@@ -3,6 +3,7 @@
 pub mod auth;
 pub mod config;
 pub mod dispatch;
+pub mod factory;
 pub mod logbuf;
 pub mod machine;
 pub mod manager;

@@ -70,6 +70,81 @@ pub fn residue() -> String {
 pub fn lab_file(name: &str) -> String {
     assert_lab();
     assert!(!name.contains('/') && !name.contains(".."));
-    std::fs::read_to_string(Path::new("/lab/out").join(name))
+    std::fs::read_to_string(Path::new("/lab/lab/out").join(name))
         .unwrap_or_else(|e| panic!("lab fixture unavailable: {e}"))
+}
+
+pub fn wg_params(name: &str) -> galleria_ipc::ConnectParams {
+    use galleria_ipc::*;
+    let text = lab_file(name);
+    let mut private = None;
+    let mut addresses = vec![];
+    let mut dns = vec![];
+    let mut public = String::new();
+    let mut endpoint = None;
+    let mut allowed = vec![];
+    let mut keepalive = None;
+    for line in text.lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = value.trim();
+        let list = || {
+            value
+                .split(',')
+                .map(|s| s.trim().to_owned())
+                .collect::<Vec<_>>()
+        };
+        match key.trim() {
+            "PrivateKey" => private = Some(Secret::new(value)),
+            "Address" => addresses = list(),
+            "DNS" => dns = list(),
+            "PublicKey" => public = value.into(),
+            "Endpoint" => endpoint = Some(value.into()),
+            "AllowedIPs" => allowed = list(),
+            "PersistentKeepalive" => keepalive = value.parse().ok(),
+            _ => {}
+        }
+    }
+    ConnectParams {
+        profile: ProfileRef {
+            id: "lab-wireguard".into(),
+            name: "Lab WireGuard".into(),
+        },
+        replace: false,
+        backend: BackendParams::Wireguard(WireGuardParams {
+            private_key: private.unwrap_or_else(|| panic!("missing lab private key")),
+            addresses,
+            dns,
+            search_domains: vec![],
+            mtu: Some(1420),
+            peers: vec![WireGuardPeer {
+                public_key: public,
+                preshared_key: None,
+                endpoint,
+                allowed_ips: allowed,
+                persistent_keepalive: keepalive,
+            }],
+        }),
+        options: ConnectOptions {
+            ipv6_block: true,
+            ignore_pushed_routes: false,
+            reconnect: ReconnectOptions { enabled: false },
+        },
+    }
+}
+pub async fn disconnect(c: &mut Client) {
+    let _: serde_json::Value = c
+        .call("disconnect", &serde_json::json!({}))
+        .await
+        .unwrap_or_else(|e| panic!("disconnect: {e}"));
+    wait_state(c, State::Disconnected, Duration::from_secs(5)).await;
+}
+pub async fn connect_wg(c: &mut Client, name: &str) -> Status {
+    disconnect(c).await;
+    let _: galleria_ipc::ConnectResult = c
+        .call("connect", &wg_params(name))
+        .await
+        .unwrap_or_else(|e| panic!("connect: {e}"));
+    wait_state(c, State::Connected, Duration::from_secs(5)).await
 }

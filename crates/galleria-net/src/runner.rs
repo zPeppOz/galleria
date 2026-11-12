@@ -34,8 +34,8 @@ impl SystemRunner {
         Ok(Self { paths })
     }
 }
-impl CommandRunner for SystemRunner {
-    fn run(&self, cmd: &Cmd) -> Result<(), NetError> {
+impl SystemRunner {
+    fn execute(&self, cmd: &Cmd) -> Result<Vec<u8>, NetError> {
         cmd.validate()?;
         let missing = if cmd.program == Program::Resolvectl {
             NetError::DnsUnavailable("resolvectl not installed".into())
@@ -51,10 +51,25 @@ impl CommandRunner for SystemRunner {
             .args(&cmd.args)
             .env("LC_ALL", "C")
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
+            .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|_| failed("cannot start tool"))?;
+        let stdout = child.stdout.take();
+        let output_reader = std::thread::spawn(move || {
+            let mut output = Vec::new();
+            if let Some(mut stdout) = stdout {
+                let mut chunk = [0u8; 1024];
+                while let Ok(n) = stdout.read(&mut chunk) {
+                    if n == 0 {
+                        break;
+                    }
+                    let keep = n.min(4096usize.saturating_sub(output.len()));
+                    output.extend_from_slice(&chunk[..keep]);
+                }
+            }
+            output
+        });
         let stderr = child.stderr.take();
         // Drain even beyond the retained limit so a noisy child cannot deadlock the runner.
         let reader = std::thread::spawn(move || {
@@ -86,10 +101,77 @@ impl CommandRunner for SystemRunner {
             }
         };
         let stderr = reader.join().unwrap_or_default();
+        let output = output_reader.join().unwrap_or_default();
         match result {
-            Ok(true) => Ok(()),
+            Ok(true) => Ok(output),
             Ok(false) => Err(failed(&String::from_utf8_lossy(&stderr))),
             Err(e) => Err(e),
+        }
+    }
+}
+
+impl CommandRunner for SystemRunner {
+    fn run(&self, cmd: &Cmd) -> Result<(), NetError> {
+        match self.execute(cmd) {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let args = cmd.args.iter().map(String::as_str).collect::<Vec<_>>();
+                if cmd.program == Program::Ip
+                    && let [family, "route", "add", cidr, "dev", iface, tail @ ..] = args.as_slice()
+                    && matches!(&error,NetError::Command {stderr,..} if stderr.contains("File exists"))
+                {
+                    let table = if tail.is_empty() { "main" } else { "51820" };
+                    let query = Cmd {
+                        program: Program::Ip,
+                        args: [*family, "route", "show", "table", table, "exact", *cidr]
+                            .map(String::from)
+                            .to_vec(),
+                    };
+                    if let Ok(output) = self.execute(&query) {
+                        let text = String::from_utf8_lossy(&output);
+                        if text.lines().any(|line| {
+                            let words = line.split_whitespace().collect::<Vec<_>>();
+                            words.first().is_some_and(|s| {
+                                *s == *cidr
+                                    || (*s == "default" && matches!(*cidr, "0.0.0.0/0" | "::/0"))
+                            }) && words.windows(2).any(|w| w == ["dev", *iface])
+                        }) {
+                            return Ok(());
+                        }
+                    }
+                }
+                Err(error)
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    #[test]
+    fn existing_route_is_accepted_only_when_the_destination_uses_the_tunnel() {
+        for (route, accepted) in [
+            ("10.99.0.0/24 dev glr-wg0 proto kernel scope link", true),
+            ("10.99.0.0/24 dev eth0 proto kernel scope link", false),
+            ("", false),
+        ] {
+            let tmp = tempfile::tempdir().unwrap();
+            let path = tmp.path().join("ip");
+            let filtered = route.replace("dev glr-wg0 ", "").replace("dev eth0 ", "");
+            std::fs::write(&path,format!("#!/bin/sh\nif [ \"$3\" = add ]; then echo 'RTNETLINK answers: File exists' >&2; exit 2; fi\nif [ \"$8\" = dev ]; then printf '%s\\n' '{filtered}'; else printf '%s\\n' '{route}'; fi\n")).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+            let runner = SystemRunner {
+                paths: HashMap::from([("ip", path)]),
+            };
+            let cmd = Cmd {
+                program: Program::Ip,
+                args: ["-4", "route", "add", "10.99.0.0/24", "dev", "glr-wg0"]
+                    .map(String::from)
+                    .to_vec(),
+            };
+            assert_eq!(runner.run(&cmd).is_ok(), accepted, "{route}");
         }
     }
 }

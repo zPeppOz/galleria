@@ -252,6 +252,13 @@ impl Cmd {
                         }
                     })
             }
+            (Program::Ip, [family, "route", "show", "table", table, "exact", cidr]) => {
+                matches!(*family, "-4" | "-6")
+                    && matches!(*table, "main" | "51820")
+                    && cidr
+                        .parse::<ipnet::IpNet>()
+                        .is_ok_and(|n| n.addr().is_ipv4() == (*family == "-4"))
+            }
             (Program::Resolvectl, ["revert", iface]) => interface(iface),
             (Program::Resolvectl, ["dns", iface, servers @ ..]) => {
                 interface(iface)

@@ -206,9 +206,11 @@ impl Manager {
     }
     fn log(&mut self, level: LogLevel, source: LogSource, message: &str) {
         for line in message.lines() {
-            let entry = self
-                .logs
-                .push(level, source, self.redactor.redact(line).into_owned());
+            let entry = self.logs.push(
+                level,
+                source,
+                self.redactor.redact_source(source, line).into_owned(),
+            );
             println!(
                 "{} {:?} {:?}: {}",
                 entry.ts, entry.level, entry.source, entry.message
@@ -221,9 +223,13 @@ impl Manager {
         operation: impl FnOnce(&dyn NetControl) -> Result<(), SessionError> + Send + 'static,
     ) -> Result<(), SessionError> {
         let net = self.net.clone();
-        tokio::task::spawn_blocking(move || operation(net.as_ref()))
+        let result = tokio::task::spawn_blocking(move || operation(net.as_ref()))
             .await
-            .unwrap_or_else(|_| Err(SessionError::new(SessionErrorCode::NetSetupFailed)))
+            .unwrap_or_else(|_| Err(SessionError::new(SessionErrorCode::NetSetupFailed)));
+        if let Err(error) = &result {
+            self.log(LogLevel::Error, LogSource::Net, &error.message);
+        }
+        result.map_err(|error| SessionError::new(error.code))
     }
     async fn teardown(&mut self) -> Result<(), SessionError> {
         let result = self.network_call(|net| net.teardown()).await;

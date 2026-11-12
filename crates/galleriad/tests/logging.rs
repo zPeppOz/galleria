@@ -160,3 +160,17 @@ fn pem_payload_before_an_end_delimiter_is_redacted() {
     );
     assert_eq!(r.redact("public again"), "public again");
 }
+
+#[test]
+fn unterminated_pem_is_scoped_to_its_source() {
+    let r = Redactor::new();
+    r.redact_source(LogSource::Wireguard, "-----BEGIN PRIVATE KEY-----");
+    assert_eq!(
+        r.redact_source(LogSource::Daemon, "uid 42 disconnect"),
+        "uid 42 disconnect"
+    );
+    assert_eq!(
+        r.redact_source(LogSource::Wireguard, "hidden body"),
+        REDACTED
+    );
+}

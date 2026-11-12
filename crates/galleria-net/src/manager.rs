@@ -50,7 +50,7 @@ impl<R: CommandRunner> NetManager<R> {
                     journal::remove(&self.journal)?;
                 }
                 return Err(if step.apply.program == crate::Program::Resolvectl {
-                    NetError::DnsUnavailable("resolvectl did not apply DNS".into())
+                    NetError::DnsUnavailable(error.to_string())
                 } else {
                     error
                 });
@@ -62,7 +62,7 @@ impl<R: CommandRunner> NetManager<R> {
         let mut first = None;
         for cmd in commands.iter().rev() {
             if let Err(error) = self.runner.run(cmd)
-                && !missing(&error)
+                && !missing(cmd, &error)
                 && first.is_none()
             {
                 first = Some(error);
@@ -90,7 +90,7 @@ impl<R: CommandRunner> NetManager<R> {
             .unwrap_or(Ok(()));
         for cmd in fixed_cleanup() {
             if let Err(error) = self.runner.run(&cmd)
-                && !missing(&error)
+                && !missing(&cmd, &error)
                 && result.is_ok()
             {
                 result = Err(error);
@@ -100,6 +100,29 @@ impl<R: CommandRunner> NetManager<R> {
         journal::remove(&self.journal)
     }
 }
-fn missing(error: &NetError) -> bool {
+fn missing(cmd: &Cmd, error: &NetError) -> bool {
+    if cmd.program == crate::Program::Resolvectl {
+        if matches!(error, NetError::DnsUnavailable(_)) {
+            return true;
+        }
+        if let NetError::Command { stderr, .. } = error
+            && [
+                "Failed to connect to bus",
+                "Connection refused",
+                "org.freedesktop.resolve1 was not provided",
+                "Unit dbus-org.freedesktop.resolve1.service not found",
+            ]
+            .iter()
+            .any(|text| stderr.contains(text))
+        {
+            return true;
+        }
+    }
+    if cmd.program == crate::Program::Ip
+        && cmd.args.first().is_some_and(|a| a == "-6")
+        && matches!(error, NetError::Command { stderr, .. } if stderr.contains("Address family not supported by protocol"))
+    {
+        return true;
+    }
     matches!(error,NetError::Command{stderr,..} if stderr.contains("No such device") || stderr.contains("No such file or directory") || stderr.contains("No such process") || stderr.contains("Cannot find device") || stderr.contains("not known"))
 }

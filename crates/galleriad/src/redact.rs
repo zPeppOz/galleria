@@ -6,6 +6,7 @@ pub const REDACTED: &str = "[redatto]";
 pub struct Redactor {
     secrets: Vec<Secret>,
     in_pem: Cell<bool>,
+    sources: [Cell<bool>; 4],
 }
 impl Redactor {
     pub fn new() -> Self {
@@ -23,6 +24,9 @@ impl Redactor {
     pub fn clear(&mut self) {
         self.secrets.clear();
         self.in_pem.set(false);
+        for source in &self.sources {
+            source.set(false);
+        }
     }
     pub(crate) fn add_backend(&mut self, params: &BackendParams) {
         match params {
@@ -60,6 +64,23 @@ impl Redactor {
         if let Some(username) = &values.username {
             self.add_secret(username);
         }
+    }
+    pub fn redact_source<'a>(
+        &self,
+        source: galleria_ipc::LogSource,
+        line: &'a str,
+    ) -> Cow<'a, str> {
+        use galleria_ipc::LogSource;
+        let index = match source {
+            LogSource::Daemon => 0,
+            LogSource::Openvpn => 1,
+            LogSource::Wireguard => 2,
+            LogSource::Net => 3,
+        };
+        let saved = self.in_pem.replace(self.sources[index].get());
+        let output = self.redact(line);
+        self.sources[index].set(self.in_pem.replace(saved));
+        output
     }
     pub fn redact<'a>(&self, line: &'a str) -> Cow<'a, str> {
         let mut output = String::new();

@@ -4,10 +4,12 @@ use galleria_backend::net::NetConfig;
 use galleria_ipc::{SessionError, SessionErrorCode};
 use galleria_net::{CommandRunner, NetError, NetManager};
 fn session_error(error: NetError) -> SessionError {
-    SessionError::new(match error {
+    let mut result = SessionError::new(match &error {
         NetError::DnsUnavailable(_) => SessionErrorCode::DnsUnavailable,
         _ => SessionErrorCode::NetSetupFailed,
-    })
+    });
+    result.message = error.to_string();
+    result
 }
 impl<R: CommandRunner + 'static> NetControl for NetManager<R> {
     fn recover(&self) -> Result<(), SessionError> {

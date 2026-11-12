@@ -566,3 +566,67 @@ async fn repeated_state_publications_redact_prompt_only_once() {
     assert_eq!(s.input_request.unwrap().prompt, "[redatto]");
     h.handle.disconnect(1).await;
 }
+
+struct DiagnosticFailure;
+impl galleria_net::CommandRunner for DiagnosticFailure {
+    fn run(&self, cmd: &galleria_net::Cmd) -> Result<(), galleria_net::NetError> {
+        if cmd.args.iter().any(|a| a == "add") {
+            return Err(galleria_net::NetError::Command {
+                cmd: cmd.to_string(),
+                stderr: "synthetic private-value diagnostic".into(),
+            });
+        }
+        Ok(())
+    }
+}
+#[tokio::test]
+async fn network_diagnostics_are_logged_redacted_and_status_is_generic() {
+    let tmp = tempfile::tempdir().unwrap();
+    let factory: BackendFactory = Arc::new(|_, _| {
+        Ok(Box::new(FakeBackend::new(
+            online(),
+            Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        )))
+    });
+    let net = galleria_net::NetManager::new(DiagnosticFailure, tmp.path().join("journal"));
+    let h = spawn_manager(
+        factory,
+        Arc::new(net),
+        RetryPolicy::default(),
+        tmp.path().to_path_buf(),
+    );
+    let mut p = params(false);
+    if let BackendParams::Wireguard(wg) = &mut p.backend {
+        wg.private_key = Secret::new("private-value");
+    }
+    h.connect(p, 1).await.unwrap();
+    let s = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let s = h.status().await;
+            if s.state == State::Error {
+                break s;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        s.error.unwrap().message,
+        SessionError::new(SessionErrorCode::NetSetupFailed).message
+    );
+    let logs = h
+        .logs(LogsParams {
+            after: None,
+            limit: 100,
+        })
+        .await
+        .unwrap();
+    assert!(
+        logs.entries
+            .iter()
+            .any(|e| e.message.contains("ip -4 route add")
+                && e.message.contains("synthetic [redatto] diagnostic")),
+        "missing network diagnostic"
+    );
+}

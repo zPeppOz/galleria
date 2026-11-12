@@ -556,3 +556,63 @@ fn global_ipv6_cover_does_not_move_internal_specific_routes_to_policy_table() {
             .any(|s| s == "ip -6 route add fd00::/8 dev glr-wg0")
     );
 }
+
+struct UnavailableDns {
+    stopped: bool,
+}
+impl CommandRunner for UnavailableDns {
+    fn run(&self, cmd: &Cmd) -> Result<(), NetError> {
+        if cmd.program == Program::Resolvectl {
+            if self.stopped {
+                return Err(NetError::Command {
+                    cmd: cmd.to_string(),
+                    stderr: "Failed to connect to bus: Connection refused".into(),
+                });
+            }
+            return Err(NetError::DnsUnavailable("resolvectl not installed".into()));
+        }
+        Ok(())
+    }
+}
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn unavailable_dns_does_not_poison_rollback_or_recovery(#[case] stopped: bool) {
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("journal");
+    let net = NetManager::new(UnavailableDns { stopped }, path.clone());
+    assert!(matches!(
+        net.apply(&config()),
+        Err(NetError::DnsUnavailable(_))
+    ));
+    assert!(!path.exists(), "failed DNS rollback left a journal");
+    journal::Journal {
+        undo: plan(&config()).into_iter().filter_map(|s| s.undo).collect(),
+        interfaces: vec!["glr-wg0".into()],
+    }
+    .write(&path)
+    .unwrap();
+    net.teardown().unwrap();
+    assert!(!path.exists());
+    net.recover().unwrap();
+}
+struct NoIpv6;
+impl CommandRunner for NoIpv6 {
+    fn run(&self, cmd: &Cmd) -> Result<(), NetError> {
+        if cmd.args.first().is_some_and(|a| a == "-6") {
+            return Err(NetError::Command {
+                cmd: cmd.to_string(),
+                stderr: "RTNETLINK answers: Address family not supported by protocol".into(),
+            });
+        }
+        Ok(())
+    }
+}
+#[test]
+fn recover_tolerates_ipv6_family_absent_but_apply_does_not() {
+    let tmp = tempfile::tempdir().unwrap();
+    let net = NetManager::new(NoIpv6, tmp.path().join("journal"));
+    net.recover().unwrap();
+    assert!(net.apply(&config()).is_err());
+    net.teardown().unwrap();
+}

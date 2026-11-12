@@ -85,6 +85,12 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "base64"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+
+[[package]]
+name = "base64"
 version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
@@ -351,7 +357,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fa2a70b14430feb68aa2ffe2be259650c0eb1c182ee49c9c7edeae3a0a07cc6"
 dependencies = [
  "aead",
- "base64",
+ "base64 0.23.1",
  "blake2",
  "chacha20poly1305",
  "hex",
@@ -375,7 +381,7 @@ version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c2a381d2f363f68431e9ff7f90304a98752321e048c2264c8d205af6d465e5c"
 dependencies = [
- "base64",
+ "base64 0.23.1",
  "defguard_boringtun",
  "ipnet",
  "libc",
@@ -502,10 +508,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "galleria-backend-openvpn"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "galleria-backend",
+ "galleria-ipc",
+ "galleria-ovpn",
+ "ipnet",
+ "proptest",
+ "rstest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "galleria-backend-wireguard"
 version = "0.1.0"
 dependencies = [
- "base64",
+ "base64 0.23.1",
  "defguard_wireguard_rs",
  "galleria-backend",
  "galleria-ipc",

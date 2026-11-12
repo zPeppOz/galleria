@@ -2,7 +2,7 @@
 
 Eseguire dalla radice del worktree: `LAB_BUILD=host lab/run.sh 26 t07`.
 Client ammessi: 26 (Ubuntu 24.04), 27 (Ubuntu 26.04), 79 (Fedora corrente).
-Il filtro seleziona un file (`t07`, `t08`, `t09`) oppure un nome di test.
+Il filtro seleziona un file (`t07`, `t08`, `t09`, `t12`) oppure un nome di test.
 Senza filtro esegue tutti i test ignorati, in serie, con il demone vero.
 
 Docker e il modulo WireGuard devono essere disponibili. In WSL2 il modulo è già
@@ -30,3 +30,10 @@ Il controllo non è applicabile sui runner Linux senza WSL.
 
 `lab/tests/check-wsl.sh` verifica la riparazione con letture proc e Docker simulati:
 nessuna registrazione binfmt reale viene cambiata dal test. Eseguito anche dal job check.
+
+OpenVPN: `LAB_BUILD=host lab/run.sh 26 t12` (poi 27 e 79). Il test DCO si salta
+se non è impostato `GALLERIA_E2E_DCO=1`; il runner inoltra la variabile al client.
+Il job `lab-dco` installa il modulo sul runner ed esegue solo il filtro `dco`.
+Il server `dns-option` usa DNS `10.9.0.1`; quello base usa `10.8.0.1`.
+Il build in container usa uid/gid dell'utente e HOME nel worktree, così target e
+cache Cargo restano rimovibili dall'utente. PKI/profili sono generati root 0600.

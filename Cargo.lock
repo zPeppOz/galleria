@@ -549,6 +549,7 @@ name = "galleria-e2e"
 version = "0.1.0"
 dependencies = [
  "galleria-ipc",
+ "galleria-ovpn",
  "serde_json",
  "tokio",
 ]
@@ -594,6 +595,7 @@ dependencies = [
  "anyhow",
  "clap",
  "galleria-backend",
+ "galleria-backend-openvpn",
  "galleria-backend-wireguard",
  "galleria-ipc",
  "galleria-net",

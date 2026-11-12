@@ -389,3 +389,22 @@ fn net_config_decides_ipv6_block(
     assert_eq!(cfg.ipv6_block, want);
     assert_eq!(cfg.install_routes, None);
 }
+#[test]
+fn hook_env_reads_dns_option_variables() {
+    let mut e = env();
+    e.remove("foreign_option_1");
+    e.remove("foreign_option_2");
+    e.insert("dns_server_0_address_0".into(), "10.9.0.1".into());
+    e.insert("dns_search_domain_0".into(), "galleria.test".into());
+    let h = parse_hook_env(&e).unwrap();
+    assert_eq!(h.dns_servers[0].to_string(), "10.9.0.1");
+    assert_eq!(h.search_domains, ["galleria.test"]);
+}
+#[test]
+fn rendered_profile_cannot_exceed_openvpn_line_buffer() {
+    let p = params(&format!("remote {}", "x".repeat(247)));
+    assert!(
+        validate(&p).is_err(),
+        "canonical quoting must not exceed OpenVPN's input line buffer"
+    );
+}

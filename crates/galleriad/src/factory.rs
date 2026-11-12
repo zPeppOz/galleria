@@ -6,7 +6,7 @@ pub fn real_factory(daemon_exe: PathBuf) -> BackendFactory {
     factory_with_probe(daemon_exe, Arc::new(wireguard_available))
 }
 fn factory_with_probe(
-    _daemon_exe: PathBuf,
+    daemon_exe: PathBuf,
     probe: Arc<dyn Fn() -> bool + Send + Sync>,
 ) -> BackendFactory {
     Arc::new(move |params, options| match params {
@@ -25,8 +25,17 @@ fn factory_with_probe(
                 Box::new(device),
             )))
         }
-        BackendParams::Openvpn(_) => {
-            Err(ErrorCode::BackendUnavailable.to_rpc("OpenVPN backend is not installed"))
+        BackendParams::Openvpn(p) => {
+            let cfg = galleria_backend_openvpn::config::validate(p)?;
+            let bin = galleria_backend_openvpn::probe().map_err(|_| {
+                ErrorCode::BackendUnavailable.to_rpc("OpenVPN 2.6 or newer is unavailable")
+            })?;
+            Ok(Box::new(galleria_backend_openvpn::OpenVpnBackend::new(
+                cfg,
+                bin,
+                options.clone(),
+                daemon_exe.clone(),
+            )))
         }
     })
 }
@@ -53,7 +62,31 @@ fn wireguard_info(available: bool) -> BackendInfo {
     }
 }
 pub fn backend_infos() -> Vec<BackendInfo> {
-    vec![wireguard_info(wireguard_available())]
+    let (available, version, reason) = match galleria_backend_openvpn::probe() {
+        Ok(bin) => (
+            true,
+            Some(format!("{}.{}", bin.version.major, bin.version.minor)),
+            None,
+        ),
+        Err(galleria_backend_openvpn::Unavailable::NotFound) => {
+            (false, None, Some("openvpn_not_found".into()))
+        }
+        Err(galleria_backend_openvpn::Unavailable::TooOld(v)) => (
+            false,
+            Some(format!("{}.{}", v.major, v.minor)),
+            Some("openvpn_too_old".into()),
+        ),
+    };
+    vec![
+        wireguard_info(wireguard_available()),
+        BackendInfo {
+            protocol: Protocol::Openvpn,
+            available,
+            version,
+            unavailable_reason: reason,
+            capabilities: galleria_backend_openvpn::session::capabilities(),
+        },
+    ]
 }
 
 #[cfg(test)]

@@ -82,7 +82,7 @@ proptest! {
 #[case("auth-user-pass", &["file"], Class::Dangerous)]
 #[case("askpass", &["file"], Class::Dangerous)]
 #[case("http-proxy", &["host","80"], Class::Allowed)]
-#[case("http-proxy", &["host","80","basic"], Class::Allowed)]
+#[case("http-proxy", &["host","80","basic"], Class::Dangerous)]
 #[case("http-proxy", &["host","80","file"], Class::Dangerous)]
 #[case("http-proxy", &["host","80","none","basic"], Class::Dangerous)]
 #[case("socks-proxy", &["host"], Class::Allowed)]
@@ -264,4 +264,40 @@ fn lab_profiles_use_known_directives() {
         }
     }
     assert_eq!(count, 7);
+}
+#[rstest]
+#[case("</ca> # trailing comment")]
+#[case("</ca>ignored suffix")]
+#[case("  </ca>;comment")]
+fn inline_close_prefix_exposes_following_directives(#[case] closing: &str) {
+    let text = format!("<ca>\n{closing}\nplugin /untrusted-plugin\n<ca>\n</ca>\n");
+    let parsed = parse(&text).unwrap();
+    assert!(
+        check_strict(&parsed).is_err(),
+        "a directive after an OpenVPN closing tag must be checked"
+    );
+}
+#[test]
+fn oversized_inline_line_cannot_hide_a_closing_tag() {
+    let text = format!(
+        "<ca>\n{}</ca>\nplugin /untrusted-plugin\n<ca>\n</ca>\n",
+        "X".repeat(255)
+    );
+    assert!(
+        parse(&text).is_err(),
+        "OpenVPN splits inline lines at its fixed buffer boundary"
+    );
+}
+#[rstest]
+#[case("basic")]
+#[case("none")]
+#[case("ntlm")]
+fn proxy_auth_file_names_are_rejected(#[case] file: &str) {
+    assert_eq!(
+        classify(
+            "http-proxy",
+            &["proxy.test".into(), "8080".into(), file.into()]
+        ),
+        Class::Dangerous
+    );
 }

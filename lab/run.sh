@@ -23,9 +23,9 @@ for executable in lab/out/tests/*; do
   args=()
   if [[ -n $filter && $name != *"$filter"* ]]; then args+=("$filter"); fi
   # Count real matches so a misspelled filter cannot produce a false green run.
-  listed=$(docker exec -e GALLERIA_LAB=1 "glab-client$client" "/lab/$executable" --ignored --list "${args[@]}")
+  listed=$(docker exec -e GALLERIA_LAB=1 -e "GALLERIA_E2E_DCO=${GALLERIA_E2E_DCO:-0}" "glab-client$client" "/lab/$executable" --ignored --list "${args[@]}")
   if [[ $listed != *': test'* ]]; then continue; fi
   matched=$((matched+1))
-  docker exec -e GALLERIA_LAB=1 "glab-client$client" "/lab/$executable" --ignored --test-threads=1 --nocapture "${args[@]}"
+  docker exec -e GALLERIA_LAB=1 -e "GALLERIA_E2E_DCO=${GALLERIA_E2E_DCO:-0}" "glab-client$client" "/lab/$executable" --ignored --test-threads=1 --nocapture "${args[@]}"
 done
 ((matched>0)) || { echo 'no end-to-end tests matched' >&2; exit 1; }

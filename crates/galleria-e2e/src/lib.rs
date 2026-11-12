@@ -237,3 +237,29 @@ else:
         },
     )
 }
+
+pub fn ovpn_params(profile: &str) -> galleria_ipc::OpenVpnParams {
+    use galleria_ipc::*;
+    let text = lab_file(&format!("{profile}.ovpn"));
+    let items = galleria_ovpn::parse(&text).unwrap_or_else(|_| panic!("invalid lab profile"));
+    let mut public = Vec::new();
+    let mut secret_blocks = std::collections::BTreeMap::new();
+    for item in items {
+        match item {
+            galleria_ovpn::Item::Block { tag, body, .. }
+                if galleria_ovpn::SECRET_BLOCKS.contains(&tag.as_str()) =>
+            {
+                secret_blocks.insert(tag, Secret::new(body));
+            }
+            item => public.push(item),
+        }
+    }
+    OpenVpnParams {
+        config: galleria_ovpn::render(&public),
+        secret_blocks,
+        username: Some("alice".into()),
+        password: Some(Secret::new("alice-secret")),
+        otp: None,
+        key_passphrase: None,
+    }
+}

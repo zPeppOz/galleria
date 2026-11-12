@@ -46,6 +46,21 @@ pub fn parse_hook_env(env: &BTreeMap<String, String>) -> Result<HookEnv, String>
             .is_some_and(|s| s.parse::<IpAddr>().is_ok()),
     };
     for (key, value) in env {
+        if key.starts_with("dns_server_") && key.contains("_address_") {
+            h.dns_servers
+                .push(value.parse().map_err(|_| "Invalid DNS address")?);
+        }
+        if key.starts_with("dns_search_domain_") {
+            if value.is_empty()
+                || value.starts_with('-')
+                || !value
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b".-_~".contains(&c))
+            {
+                return Err("Invalid search domain".into());
+            }
+            h.search_domains.push(value.clone());
+        }
         if key.starts_with("foreign_option_") {
             let words = galleria_ovpn::words(value).map_err(|_| "Invalid foreign option")?;
             if words.first().is_some_and(|s| s == "dhcp-option") && words.len() >= 3 {

@@ -17,6 +17,11 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    OvpnHook {
+        socket: PathBuf,
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<std::ffi::OsString>,
+    },
     Run {
         #[arg(long)]
         socket: Option<PathBuf>,
@@ -29,6 +34,9 @@ enum Command {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    if let Some(Command::OvpnHook { socket, .. }) = &cli.command {
+        std::process::exit(galleria_backend_openvpn::hook::hook_main(socket));
+    }
     let mut cfg = DaemonConfig::default();
     if let Some(Command::Run {
         socket,

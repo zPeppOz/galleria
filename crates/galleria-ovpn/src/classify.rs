@@ -170,8 +170,7 @@ pub fn classify(name: &str, args: &[String]) -> Class {
     }
     if name == "http-proxy" {
         return if args.len() == 2
-            || args.len() == 3
-                && ["none", "basic", "ntlm", "auto", "auto-nct"].contains(&args[2].as_str())
+            || args.len() == 3 && ["auto", "auto-nct"].contains(&args[2].as_str())
         {
             Class::Allowed
         } else {

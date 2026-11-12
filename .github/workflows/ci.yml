@@ -28,6 +28,7 @@ jobs:
       - run: cargo deny check
       - run: scripts/check-boundaries.sh
       - run: lab/tests/check-wsl.sh
+      - run: bash lab/tests/build-user.sh
 
   coverage:
     runs-on: ubuntu-latest
@@ -61,3 +62,22 @@ jobs:
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       - run: sudo modprobe wireguard
       - run: LAB_BUILD=host lab/run.sh ${{ matrix.client }}
+
+
+  lab-dco:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy,llvm-tools-preview
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - name: Install and load DCO
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openvpn-dco-dkms
+          sudo modprobe wireguard
+          sudo modprobe ovpn-dco-v2
+      - run: GALLERIA_E2E_DCO=1 LAB_BUILD=host lab/run.sh 26 dco

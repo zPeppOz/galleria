@@ -94,6 +94,9 @@ pub fn parse(text: &str) -> Result<Vec<Item>, ParseError> {
     let mut connection = false;
     while let Some((i, raw)) = lines.next() {
         let line = i + 1;
+        if raw.len() > 255 || raw.contains('\0') {
+            return Err(ParseError::Syntax { line });
+        }
         let t = raw.trim();
         if t.is_empty() || t.starts_with(['#', ';']) {
             continue;
@@ -122,7 +125,13 @@ pub fn parse(text: &str) -> Result<Vec<Item>, ParseError> {
             let mut body = String::new();
             let mut closed = false;
             for (_, raw) in lines.by_ref() {
-                if raw.trim() == close {
+                if raw.len() > 255 || raw.contains('\0') {
+                    return Err(ParseError::Syntax {
+                        line: line + body.bytes().filter(|b| *b == b'\n').count() + 1,
+                    });
+                }
+                // OpenVPN read_inline_file recognizes the closing tag as a prefix.
+                if raw.trim_start().starts_with(&close) {
                     closed = true;
                     break;
                 }

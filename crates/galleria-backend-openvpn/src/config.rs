@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, path::Path};
 use zeroize::Zeroize;
 pub struct ValidOpenVpn {
     pub(crate) items: Vec<Item>,
+    pub(crate) credentials: InputValues,
     pub(crate) secrets: BTreeMap<String, Secret>,
 }
 impl Drop for ValidOpenVpn {
@@ -39,12 +40,32 @@ pub fn validate(p: &OpenVpnParams) -> Result<ValidOpenVpn, RpcError> {
         );
         return Err(e);
     }
+    // OpenVPN reads physical lines into a fixed 256-byte buffer; canonical quoting
+    // must not move unvalidated text past that boundary.
+    if render(&items)
+        .split_inclusive('\n')
+        .any(|line| line.len() > 255)
+    {
+        return Err(ErrorCode::InvalidConfig.to_rpc("OpenVPN configuration line is too long"));
+    }
     for (tag, body) in &p.secret_blocks {
-        if !SECRET_BLOCKS.contains(&tag.as_str()) || body.expose().contains(['\0', '<', '>']) {
+        if !SECRET_BLOCKS.contains(&tag.as_str())
+            || body.expose().contains(['\0', '<', '>'])
+            || body
+                .expose()
+                .split_inclusive('\n')
+                .any(|line| line.len() > 255)
+        {
             return Err(ErrorCode::InvalidConfig.to_rpc("Invalid OpenVPN secret block"));
         }
     }
     Ok(ValidOpenVpn {
+        credentials: InputValues {
+            username: p.username.clone(),
+            password: p.password.clone(),
+            otp: p.otp.clone(),
+            key_passphrase: p.key_passphrase.clone(),
+        },
         items,
         secrets: p.secret_blocks.clone(),
     })

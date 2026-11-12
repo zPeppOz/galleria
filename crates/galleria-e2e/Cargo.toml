@@ -1,0 +1,15 @@
+[package]
+name = "galleria-e2e"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+galleria-ipc = { workspace = true, features = ["client"] }
+tokio.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

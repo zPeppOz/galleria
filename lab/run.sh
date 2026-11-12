@@ -1,0 +1,31 @@
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+client=${1:-26}
+filter=${2:-}
+case "$client" in 26|27|79) ;; *) echo 'usage: lab/run.sh <26|27|79> [test-file-or-test-filter]' >&2; exit 2;; esac
+cleanup() {
+  result=$?
+  trap - EXIT INT TERM
+  if [[ ${KEEP:-0} != 1 ]]; then lab/down.sh || result=1; fi
+  lab/check-wsl.sh || result=1
+  exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+lab/build.sh "$client"
+lab/gen-pki.sh
+CLIENTS="$client" lab/up.sh
+matched=0
+for executable in lab/out/tests/*; do
+  name=$(basename "$executable")
+  args=()
+  if [[ -n $filter && $name != *"$filter"* ]]; then args+=("$filter"); fi
+  # Count real matches so a misspelled filter cannot produce a false green run.
+  listed=$(docker exec -e GALLERIA_LAB=1 "glab-client$client" "/lab/$executable" --ignored --list "${args[@]}")
+  if [[ $listed != *': test'* ]]; then continue; fi
+  matched=$((matched+1))
+  docker exec -e GALLERIA_LAB=1 "glab-client$client" "/lab/$executable" --ignored --test-threads=1 "${args[@]}"
+done
+((matched>0)) || { echo 'no end-to-end tests matched' >&2; exit 1; }

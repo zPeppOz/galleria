@@ -1,0 +1,22 @@
+[Unit]
+Description=Galleria VPN daemon
+After=network.target systemd-resolved.service
+
+[Service]
+Type=exec
+ExecStart=/usr/local/libexec/galleria/galleriad run
+Restart=on-failure
+RestartSec=1
+RuntimeDirectory=galleria
+RuntimeDirectoryPreserve=yes
+KillMode=control-group
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectSystem=strict
+PrivateTmp=yes
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_CHOWN CAP_DAC_OVERRIDE CAP_SETUID CAP_SETGID
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
+LimitCORE=0
+
+[Install]
+WantedBy=multi-user.target

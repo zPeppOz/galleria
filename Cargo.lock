@@ -305,6 +305,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "galleria-e2e"
+version = "0.1.0"
+dependencies = [
+ "galleria-ipc",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "galleria-ipc"
 version = "0.1.0"
 dependencies = [

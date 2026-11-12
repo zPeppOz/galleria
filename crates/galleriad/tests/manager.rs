@@ -53,7 +53,20 @@ async fn unavailable_resolved_reports_dns_error_and_accepts_next_connect() {
         })
         .await
         .unwrap();
+        let response = serde_json::to_string(&status).unwrap();
+        assert!(!response.contains("Failed to connect to bus") && !response.contains("synthetic"));
         assert_eq!(status.error.unwrap().code, SessionErrorCode::DnsUnavailable);
+        let logs = manager
+            .logs(LogsParams {
+                after: None,
+                limit: 1000,
+            })
+            .await
+            .unwrap();
+        assert!(logs.entries.iter().any(|e| e.source == LogSource::Net
+            && e.message.contains("resolvectl dns glr-wg0")
+            && e.message.contains("Failed to connect to bus: [redatto]")));
+        assert!(!serde_json::to_string(&logs).unwrap().contains("synthetic"));
         assert!(!journal.exists());
     }
     manager.disconnect(1000).await;

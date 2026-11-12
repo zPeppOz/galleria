@@ -1,3 +1,4 @@
+use crate::network::NetOperation;
 use crate::{logbuf::LogBuffer, machine::*, redact::Redactor, session_dir::create_session_dir};
 use galleria_backend::{net::*, *};
 use galleria_ipc::*;
@@ -10,6 +11,13 @@ pub type BackendFactory = Arc<
     dyn Fn(&BackendParams, &ConnectOptions) -> Result<Box<dyn Backend>, RpcError> + Send + Sync,
 >;
 pub trait NetControl: Send + Sync + 'static {
+    fn run(&self, operation: NetOperation, _: &mut dyn FnMut(String)) -> Result<(), SessionError> {
+        match operation {
+            NetOperation::Recover => self.recover(),
+            NetOperation::Apply(cfg) => self.apply(&cfg),
+            NetOperation::Teardown => self.teardown(),
+        }
+    }
     fn recover(&self) -> Result<(), SessionError>;
     fn apply(&self, cfg: &NetConfig) -> Result<(), SessionError>;
     fn teardown(&self) -> Result<(), SessionError>;
@@ -216,17 +224,27 @@ impl Manager {
             let _ = self.events.send(Event::Log(entry));
         }
     }
-    async fn network_call(
-        &mut self,
-        operation: impl FnOnce(&dyn NetControl) -> Result<(), SessionError> + Send + 'static,
-    ) -> Result<(), SessionError> {
+    async fn network_call(&mut self, operation: NetOperation) -> Result<(), SessionError> {
         let net = self.net.clone();
-        tokio::task::spawn_blocking(move || operation(net.as_ref()))
-            .await
-            .unwrap_or_else(|_| Err(SessionError::new(SessionErrorCode::NetSetupFailed)))
+        let (result, logs) = tokio::task::spawn_blocking(move || {
+            let mut logs = Vec::new();
+            let result = net.run(operation, &mut |line| logs.push(line));
+            (result, logs)
+        })
+        .await
+        .unwrap_or_else(|_| {
+            (
+                Err(SessionError::new(SessionErrorCode::NetSetupFailed)),
+                vec![],
+            )
+        });
+        for line in logs {
+            self.log(LogLevel::Error, LogSource::Net, &line);
+        }
+        result
     }
     async fn teardown(&mut self) -> Result<(), SessionError> {
-        let result = self.network_call(|net| net.teardown()).await;
+        let result = self.network_call(NetOperation::Teardown).await;
         self.network_dirty = result.is_err();
         self.network_applied = false;
         self.status.net = None;
@@ -442,7 +460,7 @@ impl Manager {
                 let result = if matches!(self.phase, Phase::Disconnected | Phase::Error(_))
                     && self.active.is_none()
                 {
-                    self.network_call(|net| net.recover()).await
+                    self.network_call(NetOperation::Recover).await
                 } else {
                     Err(SessionError::new(SessionErrorCode::NetSetupFailed))
                 };
@@ -603,7 +621,7 @@ impl Manager {
                     Ok(()) => {
                         self.network_dirty = true;
                         let cfg = config.clone();
-                        self.network_call(move |net| net.apply(&cfg)).await
+                        self.network_call(NetOperation::Apply(cfg)).await
                     }
                     Err(error) => Err(error),
                 };

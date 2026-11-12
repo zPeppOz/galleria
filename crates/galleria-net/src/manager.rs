@@ -51,7 +51,7 @@ impl<R: CommandRunner> NetManager<R> {
                     journal::remove(&self.journal)?;
                 }
                 return Err(if step.apply.program == crate::Program::Resolvectl {
-                    NetError::DnsUnavailable("resolvectl did not apply DNS".into())
+                    NetError::DnsUnavailable(error.to_string())
                 } else {
                     error
                 });

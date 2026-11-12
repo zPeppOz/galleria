@@ -71,7 +71,8 @@ async fn main() -> anyhow::Result<()> {
         manager,
         DaemonInfo {
             version: env!("CARGO_PKG_VERSION").into(),
-            backends: galleriad::factory::backend_infos(),
+            backends: vec![],
+            backend_probe: Some(Arc::new(galleriad::factory::backend_infos)),
         },
         shutdown,
     )

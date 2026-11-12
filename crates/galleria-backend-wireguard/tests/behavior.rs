@@ -95,6 +95,7 @@ fn ipv6_block_option_disables_block() {
 #[derive(Default)]
 struct Observed {
     calls: Vec<&'static str>,
+    fail: Option<&'static str>,
     endpoint: Option<std::net::SocketAddr>,
     fwmark: Option<u32>,
     handshake: Option<SystemTime>,
@@ -102,12 +103,19 @@ struct Observed {
 struct Device(Arc<Mutex<Observed>>);
 impl WgDevice for Device {
     fn create(&mut self) -> Result<(), WgError> {
-        self.0.lock().unwrap().calls.push("create");
+        let mut o = self.0.lock().unwrap();
+        o.calls.push("create");
+        if o.fail == Some("create") {
+            return Err(WgError("create"));
+        }
         Ok(())
     }
     fn configure(&mut self, c: &DeviceConfig) -> Result<(), WgError> {
         let mut o = self.0.lock().unwrap();
         o.calls.push("configure");
+        if o.fail == Some("configure") {
+            return Err(WgError("configure"));
+        }
         o.endpoint = c.peers[0].endpoint;
         o.fwmark = c.fwmark;
         Ok(())
@@ -115,6 +123,9 @@ impl WgDevice for Device {
     fn read(&self) -> Result<DeviceStats, WgError> {
         let mut o = self.0.lock().unwrap();
         o.calls.push("read");
+        if o.fail == Some("read") {
+            return Err(WgError("read"));
+        }
         Ok(DeviceStats {
             rx_bytes: 10,
             tx_bytes: 20,
@@ -122,7 +133,11 @@ impl WgDevice for Device {
         })
     }
     fn remove(&mut self) -> Result<(), WgError> {
-        self.0.lock().unwrap().calls.push("remove");
+        let mut o = self.0.lock().unwrap();
+        o.calls.push("remove");
+        if o.fail == Some("remove") {
+            return Err(WgError("remove"));
+        }
         Ok(())
     }
 }
@@ -299,4 +314,65 @@ async fn no_handshake_warning_when_keepalive_is_set() {
 #[tokio::test(start_paused = true)]
 async fn no_handshake_warning_when_handshake_happened() {
     assert_eq!(warning_case(false, true).await, 0);
+}
+
+#[rstest]
+#[case("create")]
+#[case("configure")]
+#[case("read")]
+#[case("remove")]
+#[tokio::test]
+async fn error_paths_remove_device(#[case] failure: &'static str) {
+    let state = Arc::new(Mutex::new(Observed {
+        fail: Some(failure),
+        ..Default::default()
+    }));
+    let (events, mut rx) = mpsc::channel(128);
+    let h = Box::new(WireGuardBackend::new(
+        validate(&params()).unwrap(),
+        &options(),
+        Box::new(Device(state.clone())),
+    ))
+    .spawn(SessionContext {
+        session: 1,
+        session_dir: Default::default(),
+        events,
+    });
+    if failure == "read" || failure == "remove" {
+        accept(&mut rx).await;
+        if failure == "remove" {
+            h.commands.send(BackendCommand::Stop).await.unwrap();
+        }
+    }
+    let reason = loop {
+        if let BackendEvent::Exited(reason) = event(&mut rx).await {
+            break reason;
+        }
+    };
+    h.task.await.unwrap();
+    if failure == "read" {
+        assert!(matches!(reason, ExitReason::Transport(_)));
+    } else {
+        assert!(matches!(
+            reason,
+            ExitReason::Fatal(SessionError {
+                code: SessionErrorCode::TunnelSetupFailed,
+                ..
+            })
+        ));
+    }
+    assert_eq!(state.lock().unwrap().calls.last(), Some(&"remove"));
+}
+#[tokio::test]
+async fn stop_during_resolution_never_creates_device() {
+    let mut p = params();
+    p.peers[0].endpoint = Some("nonexistent.invalid:51820".into());
+    let (h, mut rx, o) = spawn(p);
+    h.commands.send(BackendCommand::Stop).await.unwrap();
+    assert!(matches!(
+        event(&mut rx).await,
+        BackendEvent::Exited(ExitReason::Stopped)
+    ));
+    h.task.await.unwrap();
+    assert!(o.lock().unwrap().calls.is_empty());
 }

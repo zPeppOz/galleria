@@ -22,6 +22,7 @@ use tokio_util::sync::CancellationToken;
 pub struct DaemonInfo {
     pub version: String,
     pub backends: Vec<BackendInfo>,
+    pub backend_probe: Option<std::sync::Arc<dyn Fn() -> Vec<BackendInfo> + Send + Sync>>,
 }
 struct SocketGuard {
     path: PathBuf,

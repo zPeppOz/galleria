@@ -33,6 +33,7 @@ fn cfg(h: &Harness) -> DaemonConfig {
 }
 fn info() -> DaemonInfo {
     DaemonInfo {
+        backend_probe: None,
         version: "0.1.0".into(),
         backends: vec![],
     }
@@ -43,10 +44,13 @@ impl Server {
         Self::with_h(h).await
     }
     async fn with_h(h: Harness) -> Self {
+        Self::with_info(h, info()).await
+    }
+    async fn with_info(h: Harness, info: DaemonInfo) -> Self {
         let cfg = cfg(&h);
         let path = cfg.socket.clone();
         let shutdown = CancellationToken::new();
-        let task = tokio::spawn(serve(cfg, h.handle.clone(), info(), shutdown.clone()));
+        let task = tokio::spawn(serve(cfg, h.handle.clone(), info, shutdown.clone()));
         tokio::time::timeout(Duration::from_secs(5), async {
             loop {
                 assert!(!task.is_finished(), "server stopped");
@@ -771,4 +775,35 @@ async fn daemon_recovers_before_listening() {
     assert_eq!(calls.lock().unwrap().len(), 6);
     shutdown.cancel();
     task.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn hello_refreshes_backend_availability() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    let available = Arc::new(AtomicBool::new(false));
+    let state = available.clone();
+    let mut metadata = info();
+    metadata.backend_probe = Some(Arc::new(move || {
+        vec![BackendInfo {
+            protocol: Protocol::Wireguard,
+            available: state.load(Ordering::SeqCst),
+            version: None,
+            unavailable_reason: None,
+            capabilities: Capabilities {
+                handshake: true,
+                interactive_auth: false,
+                server_pushed_config: false,
+            },
+        }]
+    }));
+    let s = Server::with_info(Harness::new(vec![]), metadata).await;
+    let mut c = Client::connect(&s.path).await.unwrap();
+    assert!(!c.hello("test", "1").await.unwrap().backends[0].available);
+    available.store(true, Ordering::SeqCst);
+    let mut c = Client::connect(&s.path).await.unwrap();
+    assert!(c.hello("test", "1").await.unwrap().backends[0].available);
+    s.stop().await;
 }

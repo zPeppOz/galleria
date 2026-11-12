@@ -11,7 +11,10 @@ pub async fn dispatch(
         Call::Hello(params) => serde_json::to_value(HelloResult {
             protocol: negotiate(params.protocol)?,
             daemon_version: info.version.clone(),
-            backends: info.backends.clone(),
+            backends: info
+                .backend_probe
+                .as_ref()
+                .map_or_else(|| info.backends.clone(), |probe| probe()),
             status: manager.status().await,
         }),
         Call::Status => serde_json::to_value(manager.status().await),

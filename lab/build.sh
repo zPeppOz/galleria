@@ -25,10 +25,10 @@ fi
 if [[ ${LAB_BUILD:-container} != host && ${GLAB_BUILD_INSIDE:-0} != 1 ]]; then
   image glab-build lab/images/build.Dockerfile
   # Use the installed global toolchain read-only, without copying it into the worktree.
-  docker run --rm --name glab-build -v "$PWD:/work" -w /work \
+  docker run --rm --user "$(id -u):$(id -g)" --name glab-build -v "$PWD:/work" -w /work \
     -v "${RUSTUP_HOME:-$HOME/.rustup}:/opt/rustup:ro" \
     -v "$HOME/.cargo/bin:/opt/cargo/bin:ro" -v "$HOME/.cargo/registry:/cargo-registry" \
-    -e RUSTUP_HOME=/opt/rustup -e CARGO_HOME=/work/target/lab-cargo-home \
+    -e HOME=/work/target/lab-cargo-home -e RUSTUP_HOME=/opt/rustup -e CARGO_HOME=/work/target/lab-cargo-home \
     -e CARGO_TARGET_DIR=/work/target/lab-build -e PATH=/opt/cargo/bin:/usr/bin:/bin \
     glab-build bash -euc 'mkdir -p "$CARGO_HOME"; ln -sfn /cargo-registry "$CARGO_HOME/registry"; cargo build --workspace; cargo test -p galleria-e2e --no-run --message-format=json > lab/out/artifacts.json'
   build_target=target/lab-build

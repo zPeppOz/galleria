@@ -103,7 +103,12 @@ pub struct GenInput<'a> {
     pub options: &'a ConnectOptions,
 }
 pub fn generate_config(input: &GenInput) -> String {
-    let mut s = render(&input.profile.items);
+    let mut s = String::new();
+    // OpenVPN applies the first matching pull-filter. Daemon policy must win.
+    if input.options.ignore_pushed_routes {
+        s.push_str("pull-filter ignore \"route \"\npull-filter ignore \"route-ipv6 \"\npull-filter ignore \"redirect-gateway\"\n");
+    }
+    s.push_str(&render(&input.profile.items));
     s.push_str(&format!("management {} unix\nmanagement-client-user root\nmanagement-hold\nmanagement-query-passwords\nauth-retry none\nconnect-retry-max 1\nserver-poll-timeout 5\nverb 3\ndev {}\n",quote(&input.mgmt_socket.to_string_lossy()),galleria_backend::OVPN_INTERFACE));
     if !has_directive(&input.profile.items, "dev-type") {
         s.push_str("dev-type tun\n");
@@ -120,9 +125,6 @@ pub fn generate_config(input: &GenInput) -> String {
     ));
     if input.version >= (OpenVpnVersion { major: 2, minor: 7 }) {
         s.push_str("dns-updown disable\n");
-    }
-    if input.options.ignore_pushed_routes {
-        s.push_str("pull-filter ignore \"route \"\npull-filter ignore \"route-ipv6 \"\npull-filter ignore \"redirect-gateway\"\n");
     }
     for (tag, body) in &input.profile.secrets {
         s.push_str(&format!(

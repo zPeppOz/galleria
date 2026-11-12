@@ -461,7 +461,9 @@ manda direttive fuori lista, e un client malevolo non ottiene una configurazione
 nessun percorso per eseguire uno script di un profilo, nemmeno con conferma (Q5). L'elenco completo sta in
 `galleria-ovpn` con un test per riga; la sua completezza rispetto ai profili reali è **[S]** (T10).
 
-Alla configurazione ammessa il demone aggiunge, in coda (l'ultima occorrenza vince):
+Alla configurazione ammessa il demone aggiunge le direttive seguenti in coda. Fanno eccezione i
+`pull-filter` di `ignore_pushed_routes`: precedono il profilo, perché OpenVPN applica il **primo** filtro
+corrispondente; una regola `accept` del profilo non deve scavalcare la scelta del demone:
 `management <dir>/mgmt.sock unix`, `management-client-user root`, `management-hold`, `management-query-passwords`,
 `auth-retry none`, `connect-retry-max 1`, `server-poll-timeout 5`, `verb 3`, `dev glr-ovpn0` (+ `dev-type tun`
 se il profilo non ne ha uno), `script-security 2`, `up`/`down` = `"<percorso di galleriad> ovpn-hook <dir>/hook.sock"`,

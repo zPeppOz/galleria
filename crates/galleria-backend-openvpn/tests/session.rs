@@ -447,3 +447,42 @@ async fn stdout_push_is_read_before_hook_when_management_log_is_delayed() {
     assert!(v.await.unwrap());
     h.finish().await;
 }
+
+#[rstest]
+#[case(false)]
+#[case(true)]
+#[tokio::test]
+async fn continued_push_retains_redirect_until_final_part(#[case] stdout: bool) {
+    let mut h = Harness::new(InputValues::default());
+    h.setup().await;
+    for text in [
+        "PUSH_REPLY,redirect-gateway def1,push-continuation 2",
+        "PUSH_REPLY,route 192.0.2.0 255.255.255.0,push-continuation 2",
+        "PUSH_REPLY,dhcp-option DNS 10.8.0.1,push-continuation 1",
+    ] {
+        if stdout {
+            h.output
+                .write_all(format!("{text}\n").as_bytes())
+                .await
+                .unwrap();
+        } else {
+            h.line(&format!(">LOG:0,I,{text}")).await;
+        }
+        assert!(matches!(h.event().await, BackendEvent::Log(_)));
+    }
+    let verdict = h.hook("up").await;
+    let config = h.netup().await;
+    assert_eq!(config.ipv6_block, Ipv6Block::Unreachable);
+    assert!(config.routes.contains(&"192.0.2.0/24".parse().unwrap()));
+    assert!(verdict.await.unwrap());
+    h.line(">STATE:0,RECONNECTING,restart,,,,,").await;
+    h.line(">STATE:0,WAIT,,,,,,").await;
+    assert!(matches!(h.event().await, BackendEvent::Progress(_)));
+    h.line(">LOG:0,I,PUSH_REPLY,dhcp-option DNS 10.9.0.1").await;
+    assert!(matches!(h.event().await, BackendEvent::Log(_)));
+    let verdict = h.hook("up").await;
+    assert_eq!(h.netup().await.ipv6_block, Ipv6Block::None);
+    assert!(verdict.await.unwrap());
+    h.commands.send(BackendCommand::Stop).await.unwrap();
+    h.task.abort();
+}

@@ -235,6 +235,8 @@ pub async fn drive_with_output<S: AsyncRead + AsyncWrite + Unpin, R: AsyncRead +
     let mut was_up = false;
     let mut restarting = false;
     let mut pushed = None;
+    let mut management_push = PushAccumulator::default();
+    let mut output_push = PushAccumulator::default();
     let mut pending = None;
     let mut prompt = None;
     let mut stopping = None;
@@ -336,6 +338,8 @@ pub async fn drive_with_output<S: AsyncRead + AsyncWrite + Unpin, R: AsyncRead +
                         "RECONNECTING" => {
                             accepted = false;
                             pushed = None;
+                            management_push.clear();
+                            output_push.clear();
                             if was_up && !restarting && stopping.is_none() {
                                 restarting = true;
                                 let _ = ctx.events.send(BackendEvent::Restarting(detail)).await;
@@ -361,8 +365,7 @@ pub async fn drive_with_output<S: AsyncRead + AsyncWrite + Unpin, R: AsyncRead +
                         }
                     }
                     MgmtEvent::Log { flags, text } => {
-                        if let Some(mut p) = parse_push_reply(&text) {
-                            if creds.ignore_routes { p.redirect = Redirect::default(); p.routes.clear(); }
+                        if let Some(p) = management_push.feed(&text, creds.ignore_routes) {
                             pushed = Some(p);
                         }
                         let level = if flags.contains(['F', 'E']) { LogLevel::Error }
@@ -378,8 +381,7 @@ pub async fn drive_with_output<S: AsyncRead + AsyncWrite + Unpin, R: AsyncRead +
                 match line {
                     Ok(Some(text)) => {
                         let text = text.trim_end_matches(['\r', '\n']);
-                        if let Some(mut p) = parse_push_reply(text) {
-                            if creds.ignore_routes { p.redirect = Redirect::default(); p.routes.clear(); }
+                        if let Some(p) = output_push.feed(text, creds.ignore_routes) {
                             pushed = Some(p);
                         }
                         let _ = ctx.events.send(BackendEvent::Log(LogLine {
@@ -402,7 +404,7 @@ pub async fn drive_with_output<S: AsyncRead + AsyncWrite + Unpin, R: AsyncRead +
                         }
                         Ok(_) => {
                             accepted = false;
-                            if was_up { pushed = None; }
+                            if was_up { pushed = None; management_push.clear(); output_push.clear(); }
                             let (reply, receive) = oneshot::channel();
                             if ctx.events.send(BackendEvent::NetDown { reply }).await.is_err() {
                                 let _ = call.reply.send(true);

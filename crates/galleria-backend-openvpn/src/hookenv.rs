@@ -55,7 +55,7 @@ pub fn parse_hook_env(env: &BTreeMap<String, String>) -> Result<HookEnv, String>
                 || value.starts_with('-')
                 || !value
                     .bytes()
-                    .all(|c| c.is_ascii_alphanumeric() || b".-_~".contains(&c))
+                    .all(|c| c.is_ascii_alphanumeric() || b".-_".contains(&c))
             {
                 return Err("Invalid search domain".into());
             }
@@ -74,7 +74,7 @@ pub fn parse_hook_env(env: &BTreeMap<String, String>) -> Result<HookEnv, String>
                                 || d.starts_with('-')
                                 || !d
                                     .bytes()
-                                    .all(|c| c.is_ascii_alphanumeric() || b".-_~".contains(&c))
+                                    .all(|c| c.is_ascii_alphanumeric() || b".-_".contains(&c))
                             {
                                 return Err("Invalid search domain".into());
                             }

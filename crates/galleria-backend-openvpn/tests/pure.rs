@@ -408,3 +408,42 @@ fn rendered_profile_cannot_exceed_openvpn_line_buffer() {
         "canonical quoting must not exceed OpenVPN's input line buffer"
     );
 }
+
+#[test]
+fn daemon_pull_filters_precede_profile_accept_filters() {
+    let mut options = opts();
+    options.ignore_pushed_routes = true;
+    let s = generated(
+        "client\npull-filter accept \"redirect-gateway\"\npull-filter accept \"route \"\n",
+        6,
+        &options,
+    );
+    // OpenVPN stops at the FIRST matching filter.
+    for pushed in [
+        "redirect-gateway def1",
+        "route 192.0.2.0 255.255.255.0",
+        "route-ipv6 ::/0",
+    ] {
+        let items = galleria_ovpn::parse(&s).unwrap();
+        let first = items.iter().find_map(|i| match i {
+            galleria_ovpn::Item::Directive { name, args, .. }
+                if name == "pull-filter" && pushed.starts_with(&args[1]) =>
+            {
+                Some(args[0].as_str())
+            }
+            _ => None,
+        });
+        assert_eq!(first, Some("ignore"), "{pushed}");
+    }
+}
+#[rstest]
+#[case("foreign_option_1", "dhcp-option DOMAIN ~.")]
+#[case("foreign_option_1", "dhcp-option DOMAIN-SEARCH safe.test ~.")]
+#[case("dns_search_domain_1", "~.")]
+fn pushed_routing_domains_are_rejected(#[case] key: &str, #[case] value: &str) {
+    let env = [("dev", "glr-ovpn0"), ("script_type", "up"), (key, value)]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v.into()))
+        .collect();
+    assert!(parse_hook_env(&env).is_err());
+}

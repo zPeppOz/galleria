@@ -10,11 +10,13 @@ publish = false
 rust-version = "1.96"
 
 [workspace.dependencies]
+toml = "0.9"
+time = { version = "0.3", features = ["formatting"] }
 galleria-ipc = { path = "crates/galleria-ipc" }
 galleria-backend = { path = "crates/galleria-backend" }
 galleria-net = { path = "crates/galleria-net" }
 ipnet = "2"
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 rstest = "0.26"
 proptest = "1"
 tempfile = "3"

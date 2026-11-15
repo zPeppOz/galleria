@@ -53,12 +53,13 @@ Decidere cosa costruire e provare su Linux e Windows i punti tecnici più rischi
   - [x] E1–E7 verificati in locale sui tre client, esito in `docs/06-esito-fase1.md`
   - [x] 511 test passati e 0 falliti, gate locali 6/6, laboratorio 80 casi per client
   - [x] copertura sopra l'80% su IPC, rete, parser OpenVPN e macchina a stati
-- [ ] Correggi gli Importanti della review finale T13–T16 <!-- base: aitano/galleria-fase1-t13-16 -->
-  - [ ] il lavoro parte da `aitano/galleria-fase1-t13-16`, non da `spike/windows` né da `main`
-  - [ ] I1: `galleria logs` mostra le ultime righe e `-f` non salta quelle oltre le prime 1000, con test di paginazione
-  - [ ] I2: l'import rifiuta file referenziati con percorso assoluto o `..` fuori dalla cartella del `.ovpn` (spec §8.2), con test
-  - [ ] minore 3: un dominio con `~` spinto dal server viene scartato con una riga di log, senza far cadere la connessione
-  - [ ] gate locali 6/6 verdi e laboratorio T13 e T16 verdi sui tre client
+- [x] Correggi gli Importanti della review finale T13–T16 <!-- branch: galleria/t_17a7470c-galleria-correggi-gli-importanti-della-r · base: aitano/galleria-fase1-t13-16 · task: t_17a7470c · by: aitano -->
+  - [x] il lavoro parte da `aitano/galleria-fase1-t13-16`, non da `spike/windows` né da `main`
+  - [x] I1: `galleria logs` mostra le ultime righe e `-f` non salta quelle oltre le prime 1000, con test di paginazione (`c43cd53`)
+  - [x] I2: l'import rifiuta file referenziati con percorso assoluto o `..` fuori dalla cartella del `.ovpn` (spec §8.2), con test (`6feb783`)
+  - [x] minore 3: un dominio con `~` spinto dal server viene scartato con una riga di log, senza far cadere la connessione (`09e3cdb`)
+  - [x] gate locali 6/6 verdi: 529 test passati e 0 falliti
+  - [ ] laboratorio T13 e T16 verdi sui tre client: verde su Ubuntu 24.04; su 26.04 e Fedora OpenVPN 2.7 usa il DCO del kernel 7.3 e Docker rootless lo nega (EPERM), da rifare sulla CI
 - [ ] CI remota verde sulla fase 1 (S2) <!-- branch: aitano/galleria-fase1-t13-16 -->
   - [x] `check` e `coverage` verdi su GitHub Actions (run 43661067765, primo push del 2026-11-15)
   - [x] `lab` verde su Ubuntu 24.04, Ubuntu 26.04 e Fedora (stesso run: job 26, 27 e 79)

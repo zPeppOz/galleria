@@ -24,8 +24,11 @@ else
 fi
 if [[ ${LAB_BUILD:-container} != host && ${GLAB_BUILD_INSIDE:-0} != 1 ]]; then
   image glab-build lab/images/build.Dockerfile
+  # Build as the invoking user; rootless Docker already maps container root to that user.
+  build_user="$(id -u):$(id -g)"
+  if docker info --format '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless; then build_user=0:0; fi
   # Use the installed global toolchain read-only, without copying it into the worktree.
-  docker run --rm --user "$(id -u):$(id -g)" --name glab-build -v "$PWD:/work" -w /work \
+  docker run --rm --user "$build_user" --name glab-build -v "$PWD:/work" -w /work \
     -v "${RUSTUP_HOME:-$HOME/.rustup}:/opt/rustup:ro" \
     -v "$HOME/.cargo/bin:/opt/cargo/bin:ro" -v "$HOME/.cargo/registry:/cargo-registry" \
     -e HOME=/work/target/lab-cargo-home -e RUSTUP_HOME=/opt/rustup -e CARGO_HOME=/work/target/lab-cargo-home \

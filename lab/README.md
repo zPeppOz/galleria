@@ -36,7 +36,8 @@ se non è impostato `GALLERIA_E2E_DCO=1`; il runner inoltra la variabile al clie
 Il job `lab-dco` installa il modulo sul runner ed esegue solo il filtro `dco`.
 Il server `dns-option` usa DNS `10.9.0.1`; quello base usa `10.8.0.1`.
 Il build in container usa uid/gid dell'utente e HOME nel worktree, così target e
-cache Cargo restano rimovibili dall'utente. PKI/profili sono generati root 0600.
+cache Cargo restano rimovibili dall'utente. Con Docker rootless il build gira come
+root del container, che corrisponde già all'utente sull'host. PKI/profili sono generati root 0600.
 
 T13 prova credenziali, errori e riconnessione; T14 misura IPv6 (controlli inclusi);
 T16 usa la CLI come alice e verifica anche il rifiuto di mallory. SYS_PTRACE serve

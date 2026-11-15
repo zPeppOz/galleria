@@ -21,8 +21,17 @@ pub struct HookEnv {
     pub dev: String,
     pub dns_servers: Vec<IpAddr>,
     pub search_domains: Vec<String>,
+    /// Search domains from the server that are not plain names (for example `~.` routing
+    /// domains): dropped, never applied, and reported in the log by the session.
+    pub dropped_domains: Vec<String>,
     pub routes: Vec<IpNet>,
     pub has_ipv6_address: bool,
+}
+fn valid_search_domain(d: &str) -> bool {
+    !d.is_empty()
+        && !d.starts_with('-')
+        && d.bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b".-_".contains(&c))
 }
 pub fn parse_hook_env(env: &BTreeMap<String, String>) -> Result<HookEnv, String> {
     let script_type = env
@@ -40,6 +49,7 @@ pub fn parse_hook_env(env: &BTreeMap<String, String>) -> Result<HookEnv, String>
         dev,
         dns_servers: vec![],
         search_domains: vec![],
+        dropped_domains: vec![],
         routes: vec![],
         has_ipv6_address: env
             .get("ifconfig_ipv6_local")
@@ -51,15 +61,11 @@ pub fn parse_hook_env(env: &BTreeMap<String, String>) -> Result<HookEnv, String>
                 .push(value.parse().map_err(|_| "Invalid DNS address")?);
         }
         if key.starts_with("dns_search_domain_") {
-            if value.is_empty()
-                || value.starts_with('-')
-                || !value
-                    .bytes()
-                    .all(|c| c.is_ascii_alphanumeric() || b".-_".contains(&c))
-            {
-                return Err("Invalid search domain".into());
+            if valid_search_domain(value) {
+                h.search_domains.push(value.clone());
+            } else {
+                h.dropped_domains.push(value.clone());
             }
-            h.search_domains.push(value.clone());
         }
         if key.starts_with("foreign_option_") {
             let words = galleria_ovpn::words(value).map_err(|_| "Invalid foreign option")?;
@@ -70,15 +76,11 @@ pub fn parse_hook_env(env: &BTreeMap<String, String>) -> Result<HookEnv, String>
                         .push(words[2].parse().map_err(|_| "Invalid DNS address")?),
                     "DOMAIN" | "DOMAIN-SEARCH" => {
                         for d in &words[2..] {
-                            if d.is_empty()
-                                || d.starts_with('-')
-                                || !d
-                                    .bytes()
-                                    .all(|c| c.is_ascii_alphanumeric() || b".-_".contains(&c))
-                            {
-                                return Err("Invalid search domain".into());
+                            if valid_search_domain(d) {
+                                h.search_domains.push(d.clone());
+                            } else {
+                                h.dropped_domains.push(d.clone());
                             }
-                            h.search_domains.push(d.clone());
                         }
                     }
                     _ => {}

@@ -522,3 +522,26 @@ async fn ipv6_hook_reports_the_default_route_sources() {
     assert!(verdict.await.unwrap());
     h.finish().await;
 }
+
+#[tokio::test]
+async fn pushed_routing_domain_is_logged_and_dropped_without_failing_up() {
+    let mut h = Harness::new(values());
+    h.setup().await;
+    let verdict = h
+        .hook_with(
+            "up",
+            &[("foreign_option_1", "dhcp-option DOMAIN-SEARCH safe.test ~.")],
+        )
+        .await;
+    let BackendEvent::Log(log) = h.event().await else {
+        panic!("dropped domain must leave a log line");
+    };
+    assert_eq!(log.level, LogLevel::Warn);
+    assert!(log.message.contains("\"~.\""), "{}", log.message);
+    assert_eq!(h.netup().await.search_domains, ["safe.test"]);
+    assert!(verdict.await.unwrap());
+    h.line(">STATE:0,CONNECTED,SUCCESS,10.8.0.2,172.31.0.10,1194,,")
+        .await;
+    assert!(matches!(h.event().await, BackendEvent::Up(_)));
+    h.finish().await;
+}

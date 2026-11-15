@@ -437,15 +437,23 @@ fn daemon_pull_filters_precede_profile_accept_filters() {
     }
 }
 #[rstest]
-#[case("foreign_option_1", "dhcp-option DOMAIN ~.")]
-#[case("foreign_option_1", "dhcp-option DOMAIN-SEARCH safe.test ~.")]
-#[case("dns_search_domain_1", "~.")]
-fn pushed_routing_domains_are_rejected(#[case] key: &str, #[case] value: &str) {
+#[case("foreign_option_1", "dhcp-option DOMAIN ~.", &[])]
+#[case("foreign_option_1", "dhcp-option DOMAIN-SEARCH safe.test ~.", &["safe.test"])]
+#[case("dns_search_domain_1", "~.", &[])]
+#[case("dns_search_domain_1", "~corp.test", &[])]
+fn pushed_routing_domains_are_dropped(
+    #[case] key: &str,
+    #[case] value: &str,
+    #[case] kept: &[&str],
+) {
     let env = [("dev", "glr-ovpn0"), ("script_type", "up"), (key, value)]
         .into_iter()
         .map(|(k, v)| (k.into(), v.into()))
         .collect();
-    assert!(parse_hook_env(&env).is_err());
+    let h = parse_hook_env(&env).unwrap();
+    assert_eq!(h.search_domains, kept);
+    assert_eq!(h.dropped_domains.len(), 1);
+    assert!(h.dropped_domains[0].starts_with('~'));
 }
 
 #[test]

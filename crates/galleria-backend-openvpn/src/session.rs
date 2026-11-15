@@ -405,6 +405,10 @@ pub async fn drive_with_output<S: AsyncRead + AsyncWrite + Unpin, R: AsyncRead +
                     match parse_hook_env(&call.env) {
                         Ok(env) if env.script_type == "up" => {
                             let (reply, receive) = oneshot::channel();
+                            for domain in &env.dropped_domains {
+                                // Debug formatting escapes control characters from the server.
+                                let _ = ctx.events.send(BackendEvent::Log(LogLine {level: LogLevel::Warn, message: format!("Ignored search domain pushed by the server: {domain:?}")})).await;
+                            }
                             if env.has_ipv6_address {
                                 let profile = creds.profile.redirect.ipv6 || galleria_backend::net::carries_ipv6_default(&creds.profile.ipv6_routes);
                                 let push = pushed.as_ref().is_some_and(|p| p.redirect.ipv6 || galleria_backend::net::carries_ipv6_default(&p.routes));

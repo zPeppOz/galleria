@@ -256,20 +256,30 @@ pub async fn run(cli: Cli) -> Result<(), CliError> {
                     .await
                     .map_err(ipc)?;
             }
-            let logs: LogsResult = c
-                .call(
-                    "logs",
-                    &LogsParams {
-                        after: None,
-                        limit: 1000,
-                    },
-                )
-                .await
-                .map_err(ipc)?;
-            let mut seq = logs.last;
-            for entry in logs.entries {
-                print_log(&entry)?;
-            }
+            // The daemon serves at most LOG_PAGE lines per call, oldest first: page with
+            // `after` until a short page, so the newest lines are shown and -f skips none.
+            const LOG_PAGE: usize = 1000;
+            let mut after = None;
+            let mut seq = loop {
+                let logs: LogsResult = c
+                    .call(
+                        "logs",
+                        &LogsParams {
+                            after,
+                            limit: LOG_PAGE,
+                        },
+                    )
+                    .await
+                    .map_err(ipc)?;
+                let full = logs.entries.len() >= LOG_PAGE;
+                for entry in &logs.entries {
+                    print_log(entry)?;
+                }
+                if !full {
+                    break logs.last;
+                }
+                after = Some(logs.last);
+            };
             if follow {
                 loop {
                     match c.next_event().await {

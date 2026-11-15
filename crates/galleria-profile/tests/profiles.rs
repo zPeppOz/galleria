@@ -214,6 +214,37 @@ fn import_openvpn_reports_missing_file() {
         matches!(import_openvpn("ca ca.crt\n","Office",&|_| Err(std::io::ErrorKind::NotFound.into())),Err(ImportError::MissingFile(p)) if p=="ca.crt")
     );
 }
+// Spec §8.2: referenced files are read from the folder of the .ovpn, nowhere else.
+#[rstest]
+#[case("/home/alice/.ssh/id_ed25519")]
+#[case("/etc/ssl/certs/ca.pem")]
+#[case("../ca.crt")]
+#[case("certs/../../ca.crt")]
+#[case("./../ca.crt")]
+#[case("..")]
+fn import_openvpn_rejects_files_outside_the_profile_folder(#[case] path: &str) {
+    let text = format!("client\nca \"{path}\"\n");
+    let result = import_openvpn(&text, "Office", &|p| panic!("must not read {p}"));
+    assert!(
+        matches!(&result, Err(ImportError::OutsideFolder(p)) if p == path),
+        "{path}: {:?}",
+        result.err()
+    );
+}
+#[rstest]
+#[case("ca.crt")]
+#[case("./ca.crt")]
+#[case("certs/ca.crt")]
+#[case("certs/../ca.crt")]
+fn import_openvpn_reads_files_inside_the_profile_folder(#[case] path: &str) {
+    let text = format!("client\nca \"{path}\"\n");
+    let i = import_openvpn(&text, "Office", &|p| {
+        assert_eq!(p, path);
+        Ok("CERTIFICATE".into())
+    })
+    .unwrap();
+    assert!(i.profile.openvpn.unwrap().config.contains("<ca>"));
+}
 fn import() -> Imported {
     import_openvpn(
         "client\n<key>\nprivate-test-key\n</key>\n<tls-auth>\ntls-test-key\n</tls-auth>\n",

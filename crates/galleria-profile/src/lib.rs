@@ -36,6 +36,8 @@ pub enum ImportError {
     Syntax(usize),
     #[error("Cannot read referenced file: {0}")]
     MissingFile(String),
+    #[error("Referenced file is outside the profile folder: {0}")]
+    OutsideFolder(String),
     #[error("Invalid VPN profile")]
     Invalid,
 }

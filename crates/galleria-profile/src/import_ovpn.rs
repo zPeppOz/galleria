@@ -1,5 +1,20 @@
 use crate::*;
 use galleria_ovpn::*;
+/// Spec §8.2: a referenced file is read from the folder of the `.ovpn`. Lexical check only:
+/// no absolute path and no `..` that climbs above that folder. Symlinks are the reader's job.
+fn inside_profile_folder(path: &str) -> bool {
+    use std::path::Component;
+    let mut depth = 0usize;
+    for component in std::path::Path::new(path).components() {
+        match component {
+            Component::Normal(_) => depth += 1,
+            Component::CurDir => {}
+            Component::ParentDir if depth > 0 => depth -= 1,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return false,
+        }
+    }
+    depth > 0
+}
 pub fn import_openvpn(
     text: &str,
     name: &str,
@@ -31,6 +46,9 @@ pub fn import_openvpn_bytes(
             }
             Item::Directive { line, name, args } if classify(&name, &args) == Class::FileRef => {
                 let path = args.first().ok_or(ImportError::Syntax(line))?;
+                if !inside_profile_folder(path) {
+                    return Err(ImportError::OutsideFolder(path.clone()));
+                }
                 let mut raw = Zeroizing::new(
                     read_file(path).map_err(|_| ImportError::MissingFile(path.clone()))?,
                 );

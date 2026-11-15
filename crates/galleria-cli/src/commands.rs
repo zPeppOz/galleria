@@ -80,13 +80,24 @@ pub async fn run(cli: Cli) -> Result<(), CliError> {
             });
             let imported = match file.extension().and_then(|s| s.to_str()) {
                 Some("conf") => galleria_profile::import_wireguard(&text, &name),
-                Some("ovpn") => galleria_profile::import_openvpn_bytes(&text, &name, &|path| {
-                    std::fs::read(
-                        file.parent()
-                            .unwrap_or(std::path::Path::new("."))
-                            .join(path),
-                    )
-                }),
+                Some("ovpn") => {
+                    // Spec §8.2: only the folder of the .ovpn; resolve symlinks before reading.
+                    let folder = file
+                        .parent()
+                        .filter(|p| !p.as_os_str().is_empty())
+                        .unwrap_or(std::path::Path::new("."));
+                    let root = std::fs::canonicalize(folder).map_err(storage)?;
+                    galleria_profile::import_openvpn_bytes(&text, &name, &|path| {
+                        let real = std::fs::canonicalize(root.join(path))?;
+                        if !real.starts_with(&root) {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::PermissionDenied,
+                                "outside the profile folder",
+                            ));
+                        }
+                        std::fs::read(real)
+                    })
+                }
                 _ => return Err(storage("Use a .conf or .ovpn profile")),
             }
             .map_err(storage)?;

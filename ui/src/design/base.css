@@ -1,0 +1,17 @@
+/* The reset, the page and the rules every control shares. Colours, sizes and fonts come from tokens.css. */
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: var(--fs-base); line-height: var(--lh); }
+
+/* One focus ring for everything that can take the focus, from the keyboard. */
+:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+/* Text that only assistive technology reads. */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; border: 0;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

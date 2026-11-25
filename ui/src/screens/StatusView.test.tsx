@@ -1,11 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { VPN_STATES } from "../daemon/types";
-import { I18n } from "../i18n";
-import { messages, type Lang } from "../messages";
+import { I18n, type Lang } from "../i18n";
+import en from "../i18n/en.json";
+import it_ from "../i18n/it.json";
 import { makeStatus, makeView } from "../test/fixtures";
 import { StatusView } from "./StatusView";
 
+const catalogues = { en, it: it_ } as Record<Lang, Record<string, string>>;
 const show = (view = makeView(), lang: Lang = "it") =>
   render(
     <I18n lang={lang}>
@@ -23,7 +25,7 @@ describe("StatusView", () => {
     "each_of_the_seven_states_has_a_label: %s in %s",
     (state, lang) => {
       show(makeView({ status: makeStatus({ state }) }), lang);
-      expect(screen.getByText(messages[lang][`state.${state}`])).toBeTruthy();
+      expect(screen.getByText(catalogues[lang][`state.${state}`])).toBeTruthy();
     },
   );
 
@@ -39,7 +41,12 @@ describe("StatusView", () => {
   it("session_error_shows_code_and_daemon_message", () => {
     show(makeView({ status: makeStatus({ state: "error", error: { code: "auth_failed", message: "Authentication failed" } }) }));
     expect(screen.getByRole("alert").textContent).toContain("auth_failed");
-    expect(screen.getByRole("alert").textContent).toContain("Authentication failed");
+    expect(screen.getByRole("alert").textContent).toContain("Autenticazione fallita"); // the catalogue text, not the daemon message
+  });
+
+  it("unknown_session_error_code_shows_the_daemon_message", () => {
+    show(makeView({ status: makeStatus({ state: "error", error: { code: "brand_new_code", message: "Daemon said so" } }) }));
+    expect(screen.getByRole("alert").textContent).toContain("Daemon said so");
   });
 
   it("there_is_no_connect_control", () => {

@@ -1,0 +1,39 @@
+/* Dialog and menu. Only variables of tokens.css; the final look is finished in T5. */
+.gx-backdrop { position: fixed; inset: 0; background: var(--scrim); transition: opacity 120ms; }
+.gx-backdrop[data-starting-style], .gx-backdrop[data-ending-style] { opacity: 0; }
+
+.gx-dialog {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r-lg); padding: var(--sp-7);
+  box-shadow: var(--shadow-lg);
+}
+.gx-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-5); }
+.gx-dialog-title { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.gx-dialog-description { margin: var(--sp-4) 0 0; color: var(--muted); }
+.gx-dialog-body { margin-top: var(--sp-6); }
+.gx-dialog-footer { margin-top: var(--sp-7); display: flex; justify-content: flex-end; gap: var(--sp-4); }
+
+.gx-icon-button {
+  display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent;
+  border-radius: var(--r-sm); background: transparent; color: inherit; cursor: pointer;
+}
+.gx-icon-button:hover { background: var(--panel-2); }
+
+.gx-menu-trigger {
+  display: inline-flex; align-items: center; gap: var(--sp-3); min-height: 28px; padding: var(--sp-2) var(--sp-5); border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm); background: var(--panel-2); color: inherit; font: inherit; cursor: pointer;
+}
+.gx-menu-positioner { z-index: 10; outline: none; }
+.gx-menu {
+  min-width: 200px; padding: var(--sp-2); background: var(--panel); color: var(--ink); border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-md); outline: none;
+}
+.gx-menu-item {
+  display: flex; align-items: center; gap: var(--sp-4); min-height: 30px; padding: var(--sp-2) 10px; border-radius: var(--r-sm); cursor: pointer; outline: none;
+}
+.gx-menu-item[data-highlighted] { background: var(--panel-2); outline: var(--focus-ring); outline-offset: -2px; }
+.gx-menu-item.gx-danger { color: var(--err); }
+.gx-menu-indicator { display: inline-grid; place-items: center; width: 16px; height: 16px; }
+.gx-menu-separator { height: 1px; margin: var(--sp-2) 0; background: var(--line); }
+.gx-menu-group-label { padding: var(--sp-2) 10px; font-size: var(--fs-sm); color: var(--muted); }

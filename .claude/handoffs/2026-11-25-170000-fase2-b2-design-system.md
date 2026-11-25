@@ -1,0 +1,57 @@
+# Handoff — fase 2, blocco B2 (design system e guscio)
+
+## Session Metadata
+
+- Data: 2026-11-25, task kanban `t_fa55d26a`, esecutore Genny.
+- Worktree: /home/g7aro/dev/galleria/.worktrees/t_fa55d26a, ramo `galleria/t_fa55d26a-galleria-fase-2-blocco-b2-design-system`.
+- Partito da `main` `1b3d588` più il piano `0c1584e` (ramo `t_24690770`, ff). Nessun push.
+- Piano: `docs/superpowers/plans/2026-11-25-fase2-b2-design-system.md`. Esito vivo: `docs/08-esito-fase2.md`, sezione «B2».
+- Q22–Q26 approvate da Aitano il 2026-11-25 su delega di Peppe, tutte come raccomandate (segnate nella spec §18, commit del T1).
+
+## Work Completed
+
+| Task | Contenuto |
+| --- | --- |
+| T1 | Q12 verificata: **Base UI 1.9.0 regge** (nessuna condizione di stop scattata, niente Radix). `design/{Dialog,Menu,icons}.tsx`, `app/{AppMenu,AboutDialog}.tsx`, controllo licenze JS, `scripts/gui.sh a11y` con Orca + AT-SPI, `ui/e2e/{support,overlays.a11y}.ts` |
+| T2 | `design/{tokens.css,base.css,theme.ts,color.ts}`, prove di contrasto/tema/regole CSS; S8 verde nella finestra vera, S17 falso (via `system-ui`) |
+| T3 | `i18n/{en,it}.json` (74 chiavi, con `error.*` per i 19 codici), `i18n/index.tsx`, `prefs.tsx` (lingua e tema in memoria, Q25), `tests/catalogs.rs` + `GUI_CODES` in `error.rs` (G8), gruppo «Tema» nel menu, fumo `language_switches_without_a_restart` |
+| T4 | `design/{icons,Button,Field,Switch,Segmented,Tabs}.tsx` + css + prove (axe e tastiera per ciascuno); HTML nativo salvo `Tabs` (Base UI) |
+
+## Scelte da sapere (T1)
+
+- Il canale di verifica funziona: Orca 46.1 nell'immagine legge la webview, le righe `SPEECH OUTPUT` e l'albero AT-SPI stanno in
+  `target/gui-a11y/` (ignorato da git); la trascrizione completa è in `docs/08-esito-fase2.md`.
+- Orca apre il file di debug con buffer a blocchi: `lab/tests/orca-line-buffered.py` lo rende a righe (senza, le prove non
+  vedono la voce se non a fine esecuzione).
+- WebKitGTK esporta `<button aria-haspopup="menu">` come `combo box` senza `expanded`, anche per un bottone nudo (prova di
+  controllo nel file); il piano si aspettava `push button` + `expanded`. Le righe M1/M2 leggono `aria-expanded` dal DOM.
+- `Menu.RadioItem` non chiude il menu al clic di predefinito: `closeOnClick` lo chiude (M5).
+- `lab/tests/gui-lib.sh` è il pezzo condiviso (cartella temporanea, `daemon-start`/`daemon-stop`, driver) di `gui-smoke.sh` e
+  `gui-a11y.sh`. Il fumo di B1 è rimasto identico (5 prove su 5).
+- `expectNoAccessibilityViolations(container, { landmarks: false })` spegne la regola `region` per un componente in un portale.
+- Lingua e tema stanno in `prefs.tsx` (T3), solo in memoria; `AppMenu` li legge da `usePrefs()`. Il menu ha due gruppi radio: `overlays.a11y.ts` aspetta sei radio e due segnati.
+- Strumenti di sessione: heredoc e `python3 -c` sono bloccati in modalità non presidiata: i file si scrivono con gli strumenti
+  di file; per Docker `scripts/gui.sh run` fa da tramite (con `GUI_CONTAINER_NAME=t_fa55d26a-…`).
+
+## Scelte da sapere (T2)
+
+- WebKitWebDriver: `takeScreenshot` di un elemento restituisce **tutta la pagina**. Per i colori si fotografa la finestra e si legge
+  il pixel di un riquadro messo in alto a sinistra (`paint()` in `smoke.e2e.ts`); prima del clic si aspettano due `requestAnimationFrame`.
+- `system-ui` non segue il carattere del desktop in WebKitGTK 2.52.6 (provato con `gtk-font-name` serif): tolto da `--font` (F3).
+- In questa immagine WebKitGTK dichiara `prefers-color-scheme: light`: con «Sistema» l'app parte chiara.
+- `GALLERIA_SMOKE_FILTER='nome'` fa girare una sola prova del fumo (pattern `-t` di vitest); comodo con `scripts/gui.sh run`
+  e i binari già costruiti (`target/gui-image/release/galleria-gui`, `target/gui-image/debug/examples/fake-daemon`).
+- `styles.css` resta con le misure di B1 (eccezione per nome in `css-rules.test.ts`); sparisce al T6.
+- `--tint` è `14%`: le tinte si scrivono `color-mix(in oklch, var(--ok) var(--tint), transparent)`, testo `--ink` sopra.
+
+## Scelte da sapere (T3–T4)
+
+- `errorText(t, code, fallback)`: il codice sconosciuto mostra il messaggio inglese del demone (D22). `StatusView` lo usa.
+- `GUI_CODES` in `error.rs` è vuoto: ogni codice `gui_…`/`import_…` va aggiunto lì e nei due cataloghi nello stesso commit
+  (`tests/catalogs.rs` lo pretende, anche cercando i letterali nei sorgenti).
+- Per aggiungere una variante a `ErrorCode`/`SessionErrorCode`/`State`/`LinkState`: `tests/catalogs.rs` non compila finché non è
+  nell'elenco della macro `every_variant!`.
+- `Tabs.Panel` di Base UI ha `tabindex="0"`: dalla lista il Tab va al pannello. Il `Tabs.Indicator` non è ancora provato nella
+  finestra vera (T7).
+- Restano T5 (avvisi, conferma, schermate B1 sui componenti), T6 (guscio) e T7 (tastiera, fumo, Orca, esito, roadmap): card
+  successive già create. `styles.css` sparisce al T6.

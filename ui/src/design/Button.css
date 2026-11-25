@@ -1,0 +1,22 @@
+.gx-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-3);
+  min-width: 24px; min-height: var(--h-control); padding: 0 var(--sp-6);
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--panel-2); color: var(--ink);
+  font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer;
+}
+.gx-button:hover:not(:disabled) { background: var(--panel); }
+.gx-button:disabled { opacity: 0.55; cursor: default; }
+.gx-button[aria-busy="true"] { cursor: progress; }
+.gx-button-lg { min-height: var(--h-control-lg); padding: 0 var(--sp-8); font-size: var(--fs-base); }
+.gx-button-icon-only { width: var(--h-control); padding: 0; }
+.gx-button-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: var(--fw-strong); }
+.gx-button-primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+.gx-button-danger { color: var(--err); }
+.gx-button-ghost { border-color: transparent; background: transparent; }
+.gx-button-ghost:hover:not(:disabled) { background: var(--panel-2); }
+
+.gx-spinner {
+  width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: gx-spin 800ms linear infinite;
+}
+@keyframes gx-spin { to { transform: rotate(360deg); } }

@@ -1,0 +1,11 @@
+.gx-tablist { position: relative; display: flex; gap: var(--sp-2); border-bottom: 1px solid var(--line); }
+.gx-tab {
+  min-height: var(--h-control); padding: 0 var(--sp-6); border: 0; border-radius: var(--r-sm); background: transparent;
+  color: var(--muted); font: inherit; font-size: var(--fs-base); cursor: pointer;
+}
+.gx-tab:hover { color: var(--ink); }
+.gx-tab[data-active] { color: var(--ink); font-weight: var(--fw-strong); }
+.gx-tab-indicator {
+  position: absolute; left: var(--active-tab-left); bottom: 0; width: var(--active-tab-width); height: 2px; background: var(--accent);
+}
+.gx-tabpanel { padding-top: var(--sp-6); }

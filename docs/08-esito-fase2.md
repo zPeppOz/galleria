@@ -90,3 +90,133 @@ che invoca; Node 26.12.1 e pnpm 12.15.0 come in `.nvmrc` e `package.json`.
 - Clone pulito (`scripts/gui.sh check` da un clone) non provato.
 - Le versioni dei pacchetti npm nuove (`webdriverio` 10.2.0, `@types/node` 26.6.10) sono sotto `minimumReleaseAge` di
   pnpm 12: `@types/node` è in `minimumReleaseAgeExclude`. Il comportamento di pnpm 12 su un runner pulito è da vedere.
+
+## B2 · Design system e guscio
+
+Piano: `docs/superpowers/plans/2026-11-25-fase2-b2-design-system.md`. Q22–Q26 approvate da Aitano il 2026-11-25 su delega di
+Peppe, tutte come raccomandate (segnate nella spec, §18). Ambiente: quello di B1, più nell'immagine `galleria-gui-dev` Orca
+46.1, AT-SPI 2.52 e `python3-gi` (`lab/images/gui.Dockerfile`). `scripts/gui.sh a11y` lancia la verifica con lo screen reader
+(locale, non in CI: Q22) e scrive `target/gui-a11y/` (`transcript.txt`, `orca-speech.log`, `orca-debug.log`).
+
+### Punti [S] di B2
+
+| # | Supposizione | Esito | Dove | Ripiego applicato |
+|---|---|---|---|---|
+| S14 | Orca nell'immagine riceve il contenuto e gli eventi della webview | **Vero.** Con `dbus-run-session`, `xvfb-run`, `gsettings set org.gnome.desktop.interface toolkit-accessibility true`, `at-spi-bus-launcher` e Orca, `orca -l` elenca `galleria-gui`; l'albero AT-SPI della finestra contiene il documento web con landmark, titoli, pulsanti, menu e finestra modale; Orca pronuncia lo spostamento del fuoco dentro la pagina («Menu combo box. opens popup», «System selected radio menu item.») anche senza gestore di finestre. Per leggere il log mentre Orca gira serve un lanciatore (`lab/tests/orca-line-buffered.py`): Orca apre il file di debug con buffer a blocchi e le righe `SPEECH OUTPUT` arrivano in ritardo | T1 | nessun gestore di finestre (`openbox`): non è servito. Il lanciatore rende il file di debug a righe |
+| S15 | Finestra modale e menu della libreria funzionano con la nostra CSP | **Vero.** Nessun evento `securitypolicyviolation` nella finestra vera mentre si usano menu e finestra modale (riga X2), con la CSP invariata (`default-src 'self'`, mai `unsafe-inline`: `tests/config.rs::csp_has_no_unsafe_inline`). Il `csp-provider` della libreria non è stato necessario; non ho cercato quali stili la libreria imposti, ho solo osservato che la finestra vera non ne vede violazioni | T1 | nessuno |
+| S16 | `pnpm licenses list --prod --json` dà nome e licenza di ogni pacchetto di produzione | **Vero.** Oggetto con chiave la licenza e per valore un array di pacchetti con `name`, `versions`, `license` (pnpm 12.15.0). `scripts/check-js-licenses.mjs` lo legge, confronta con l'elenco `allow` di `deny.toml` (anche le espressioni `OR`/`AND`) e passa su 13 pacchetti di produzione; `scripts/tests/check-js-licenses.sh` lo prova con una licenza `GPL-2.0-only`, con una `AND`, e con una licenza assente | T1 | nessuno |
+| S8 | `oklch()` e `color-mix()` disegnati giusti da WebKitGTK | **Vero** su WebKitGTK 2.52.6 (Ubuntu 24.04, l'immagine). `tokens_paint_the_expected_srgb` nella finestra vera, per i due temi: 15 colori dei token (riquadro con quello sfondo, fotografia della pagina, pixel in mezzo) e 5 tinte al 14 % (`color-mix(in oklch, var(--ok) var(--tint), transparent)` sopra `--panel`) coincidono con l'esadecimale atteso, **differenza massima 1,3 per canale** (tolleranza della prova: 3). WebKit calcola `oklch()` come `lab()` nello stile calcolato e lo disegna giusto. **Aperto** per Ubuntu 26.04 e Fedora: provato solo sull'immagine; resta aperto fino alla prima passata manuale su quelle distribuzioni (B6, con G10) | T2 | nessuno: i token restano `oklch()` |
+| S17 | `system-ui` in WebKitGTK è il carattere del desktop | **Falso.** Nell'immagine, con `gtk-font-name=DejaVu Serif 11` in `~/.config/gtk-3.0/settings.ini` (GTK lo legge: `Gtk.Settings` restituisce «DejaVu Serif 11»), la larghezza di una frase a 40 px in `system-ui` resta quella del sans predefinito (817 px, uguale a «DejaVu Sans» e a `sans-serif`) e non diventa quella del serif (832 px); `fc-match system-ui` dà «DejaVu Sans». Misurato con una prova usa e getta, non committata | T2 | F3 applicato: `system-ui` tolto da `--font`, resta l'elenco del mockup (Segoe UI Variable Text, Segoe UI, Cantarell, Ubuntu, Noto Sans, `ui-sans-serif`, `sans-serif`). Su un desktop vero il carattere che esce dall'elenco non è stato guardato |
+
+### Q12 · Libreria «headless»: tabella di accettazione (T1)
+
+Libreria scelta: **`@base-ui/react` 1.9.0** (MIT). Non è scattata né la condizione di stop sulla libreria né quella sul canale
+di verifica: tutte le righe sono verdi con Base UI, quindi **non si è passati a Radix**. Nessun file fuori da `ui/src/design/`
+importa la libreria (`design/boundary.test.ts`).
+
+(a) = Vitest in jsdom (`Dialog.test.tsx`, `Menu.test.tsx`); (b) = albero AT-SPI e (c) = trascrizione di Orca nella finestra vera
+(`ui/e2e/overlays.a11y.ts`, `scripts/gui.sh a11y`). Parole di Orca copiate da `orca-speech.log`.
+
+| # | Comportamento | (a) | (b) AT-SPI | (c) Orca |
+|---|---|---|---|---|
+| D1 | Il fuoco entra nella finestra, ruolo `dialog` con il titolo come nome | verde | `dialog «About Galleria»`, il pulsante «Close» ha `focused` | «About Galleria dialog A VPN client for WireGuard and OpenVPN.», «Close push button.» |
+| D2 | `Tab`/`Shift+Tab` non escono; dietro non è raggiungibile | verde | 6 pressioni: il fuoco resta nel `dialog`; i pulsanti «Copy» e «Try again» della pagina dietro non sono nell'albero | — |
+| D3 | La descrizione è collegata | verde | `description=«A VPN client for WireGuard and OpenVPN.»`, relazione `described-by` | pronunciata insieme al titolo (D1) |
+| D4 | `Esc` chiude; il fuoco torna al pulsante «Menu» | verde (Esc e pulsante di chiusura) | `dialog` sparito, «Menu» ha `focused` | «Menu combo box.» «opens popup» |
+| M1 | Il pulsante dichiara il menu | verde (`aria-haspopup`, `aria-expanded`) | ruolo **`combo box`**, stato `has-popup`; **`expanded` non viene esportato** (vedi sotto); relazione `controller-for` quando è aperto | «Menu combo box.» «opens popup» |
+| M2 | `Invio` apre; il fuoco va sulla prima voce; ruolo `menu` con nome | verde (`Invio`, `Spazio`, `↓`) | `menu «Menu»` con relazione `controlled-by`, «System» ha `focused`; `aria-expanded="true"` letto dal DOM con WebDriver | «Menu menu», «Language panel.», «System selected radio menu item.» |
+| M3 | `↓` `↑` `Home` `End` e la lettera muovono il fuoco | verde | dopo ogni tasto la voce attesa ha `focused` (English, About Galleria, System, About Galleria con `a`) | una frase per voce («English not selected radio menu item.», «About Galleria.») |
+| M4 | La scelta singola espone il suo stato e cambia con `Invio` | verde | `radio menu item` ×3, `checked` su una sola voce; dopo `Invio` su «English» il segno passa a «English» | «System selected radio menu item.» / «English not selected radio menu item.» |
+| M5 | `Esc` chiude e riporta il fuoco; una voce scelta chiude | verde | menu sparito, «Menu» ha `focused` | «Menu combo box.» |
+| X1 | axe senza violazioni con finestra e menu aperti | verde (regola dei landmark spenta: sono componenti in un portale, il guscio la tiene accesa) | — | — |
+| X2 | Nessuna violazione della CSP | — | `no_csp_violation_while_using_dialog_and_menu` (ascolta `securitypolicyviolation`) verde | — |
+
+**Divergenza dal piano, M1/M2.** Il piano si aspettava ruolo `push button` e stato `expanded` sul pulsante. WebKitGTK 2.52.6
+espone un `<button aria-haspopup="menu">` come **`combo box`** (stato `has-popup`) e non esporta `expanded`. Non è Base UI:
+la prova di controllo `control_how_webkitgtk_exposes_a_plain_popup_button` inserisce nella pagina un `<button
+aria-haspopup="menu" aria-expanded="true">` nudo e ottiene la stessa cosa (`combo box`, `has-popup`, nessun `expanded`).
+Per questo la riga M1/M2 verifica `aria-expanded` nel DOM (dove lo imposta la libreria) e, nell'albero, `has-popup` e le
+relazioni `controller-for`/`controlled-by` tra pulsante e menu; Orca dice «opens popup» e non «collapsed/expanded». Non è
+una riga bocciata: il difetto sta nell'esportazione di WebKitGTK, la stessa che avrebbe Radix.
+
+Altre osservazioni: (1) il primo `Tab` sul menu e sul resto dell'app funziona anche senza gestore di finestre; (2) un
+gruppo del menu è esposto come `panel` con nome («Language panel.») e non come `group`: così lo esporta WebKitGTK per un
+`role="group"` con etichetta; (3) il gruppo a scelta singola in jsdom: `Menu.RadioItem` di Base UI **non chiude** il menu al
+clic, di predefinito; `closeOnClick` (proprietà documentata) lo fa chiudere come le altre voci, come chiede M5.
+
+### Verifiche del T1
+
+- Rosso prima del verde: `scripts/tests/check-js-licenses.sh` senza lo script («No such file or directory»); `Dialog` e
+  `Menu` e le loro prove sono stati scritti insieme (il primo giro di Vitest: 4 prove su 18 rosse, tutte per difetti della
+  prova: `Tab` che passa un istante dalla guardia di fuoco della libreria, un tasto premuto prima che il menu fosse
+  aperto, la regola axe dei landmark su un componente solo, `closeOnClick` della voce a scelta singola).
+- `scripts/gui.sh check`: 65 prove Vitest, 7 prove di `tests/config.rs`, controllo delle licenze; `scripts/gui.sh smoke`: le
+  cinque prove di B1 (il fumo ora usa `ui/e2e/support.ts` e `lab/tests/gui-lib.sh`, condiviso con `gui-a11y.sh`);
+  `scripts/gui.sh a11y`: 11 prove, verdi.
+
+### Token e temi (T2)
+
+Q23 applicata per intero: `ui/src/design/tokens.css` ha i due temi con le correzioni C1–C7, la scala dei raggi (R1), degli spazi
+(P1), dei caratteri (F1, F2, F4) e `--font` senza `system-ui` (F3, vedi S17). Il tema è sempre scritto sulla radice come
+`data-theme` (`theme.ts`), prima del montaggio di React (`main.tsx`); in B2 non c'è salvataggio (Q25).
+
+Nota sul tema del sistema: in questa immagine WebKitGTK dichiara `prefers-color-scheme: light` (nessun desktop che chieda lo
+scuro), quindi con la scelta «Sistema» l'app parte chiara. Come lo riporti un desktop vero resta da vedere (non verificato).
+
+Scoperta sulla finestra vera: `takeScreenshot` di un elemento, con WebKitWebDriver, restituisce l'**intera pagina** (1180×740 per
+un riquadro di 60×60). La prova S8 fotografa la finestra e legge il pixel in mezzo a un riquadro messo in alto a sinistra.
+
+### Verifiche del T2
+
+- Rosso prima del verde, con i valori del mockup così come sono in `tokens.css`: 13 prove su 42 rosse. Tema chiaro: `--faint`
+  2,47; `--ok`, `--warn`, `--err`, `--wg`, `--ovpn` come testo 1,61–2,68 (la prova ne cita uno per volta: `--ok` 1,73, `--warn`
+  1,61, `--err` 2,68, `--wg` 1,88, `--ovpn` 1,98 su `--bg`); `--accent-ink` bianco su `--accent` 3,83; sigle del protocollo sulla
+  loro tinta 1,88 e 1,98; tema scuro: `--faint` 3,51 su `--bg`; più le due prove di `css-rules` sui valori scritti a mano di
+  `styles.css`. Con i valori della proposta: 107 prove Vitest verdi.
+- I dodici valori `oklch()` della tabella del piano coincidono con la conversione scritta in `color.ts` a ±1 per canale.
+- `scripts/gui.sh smoke`: 7 prove su 7 (le cinque di B1 e le due nuove), `S8: 20 colori … differenza massima 1,3`.
+
+### Cataloghi e lingua (T3)
+
+I testi stanno solo in `ui/src/i18n/{en,it}.json` (74 chiavi ciascuno); `messages.ts` e `i18n.tsx` non esistono più. `i18n/index.tsx`
+dà `useT`, `detectLang`, `hasKey` e `errorText` (D22: il testo del catalogo per il codice, il messaggio inglese del demone per un
+codice che il catalogo non conosce). `prefs.tsx` tiene lingua e tema **solo in memoria** (Q25), scrive `lang` e `data-theme`
+sulla radice e rende il fornitore della lingua: cambiando lingua dal menu si ridisegna tutto senza smontare `App`. `AppMenu` ha
+il gruppo «Tema» (Sistema · Chiaro · Scuro) accanto a «Lingua».
+
+- G8: `crates/galleria-gui/tests/catalogs.rs` legge i due cataloghi e chiede `error.<codice>` per le 11 varianti di `ErrorCode`,
+  le 8 di `SessionErrorCode` e le voci di `GUI_CODES` (oggi vuoto), `state.<s>` per i 7 stati e `bar.<l>` per i 5 stati del
+  collegamento. Ogni enum ha un elenco e, generato dalla stessa macro, un `match` senza ramo di ripiego: una variante nuova non
+  compila finché non è nell'elenco, e nell'elenco senza testo la prova diventa rossa. Un'altra prova cerca nei sorgenti di
+  `galleria-gui/src` i letterali `gui_…` e `import_…` e pretende che stiano in `GUI_CODES`; una terza scarta le chiavi `error.*`
+  senza codice. Le frasi partono dalla tabella della CLI (`galleria-cli/src/messages.rs`): «demone» → «servizio» come nel resto
+  dell'interfaccia, e `already_active` senza `--replace` (la GUI non ha quel parametro).
+- Provato a mano: tolta `error.auth_failed` da `it.json`, `every_session_error_code_has_text_in_both_catalogues` diventa rossa
+  («missing in it»); rimessa, torna verde.
+- Fumo: `language_switches_without_a_restart` (dal menu «Italiano» compare «Avvia il servizio», «English» → «Start the
+  service», stessa sessione WebDriver). `scripts/gui.sh smoke`: 8 prove su 8.
+- `overlays.a11y.ts` (T1) aggiornata: il menu ha due gruppi a scelta singola, i radio sono sei e i segnati due. `a11y`: 11 su 11.
+
+### Controlli di base (T4)
+
+`ui/src/design/{icons,Button,Field,Switch,Segmented,Tabs}.tsx`, ciascuno con il suo `.css` (solo token) e la sua `.test.tsx`;
+nove icone nostre (`more`, `close`, `check`, `warning`, `error`, `info`, `star`, `chevron`, `copy`), nascoste alla tecnologia
+assistiva. Nessun componente contiene un testo visibile: arrivano tutti come proprietà.
+
+- Dietro: HTML nativo per `Button` (`<button type="button">`; senza testo il tipo pretende `aria-label`, e la prova lo verifica
+  con `@ts-expect-error`), `Field` (`<label for>`, `aria-describedby`, `aria-invalid`; `select` nativo, in sola lettura mostra
+  solo la voce scelta), `Switch` (`<button role="switch">` dentro una `<label>`: Spazio, Invio e clic sull'etichetta) e
+  `Segmented` (radio nativi: frecce e una sola sosta del Tab gratis, `aria-readonly` + cambio ignorato in sola lettura);
+  `@base-ui/react/tabs` per `Tabs` (frecce, Home, End e selezione al fuoco; solo il pannello scelto è disegnato).
+- Per `Tabs` Base UI rende il pannello stesso raggiungibile con Tab (`tabindex="0"`), come nel modello WAI-ARIA: dalla lista il
+  Tab va al pannello e poi al suo contenuto; la prova `tablist_is_one_tab_stop` lo dice così.
+- L'indicatore della scheda (`Tabs.Indicator`) imposta le sue misure con `style` da script, non con un `<style>` né con lo
+  script di pre-idratazione (`renderBeforeHydration` resta spento): non dovrebbe violare la CSP. **Non verificato nella finestra
+  vera**: il componente non è ancora usato dall'app; lo si prova al T7 con il guscio (`no_csp_violation…` esteso).
+- Bersagli: ogni controllo ha almeno 24 × 24 px (WCAG 2.5.8); l'interruttore è 38 × 22 e la sua `<label>` ne copre l'area (24 di
+  altezza minima).
+- Colore: il pulsante primario usa `--accent` solo come riempimento (`--accent-ink` per il testo), il pericolo `--err` come testo,
+  il bordo dei controlli `--line-strong`: `css-rules.test.ts` verde sui file nuovi.
+- Verifiche: 155 prove Vitest (T3: 121), tutte verdi; `scripts/gui.sh check` verde. Axe passa su ogni componente in jsdom, il
+  contrasto non lo vede (jsdom): resta alla prova sui token (T2). `smoke` e `a11y` non rilanciati dopo T4: i componenti non
+  sono ancora nel bundle dell'app.

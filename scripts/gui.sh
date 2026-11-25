@@ -7,6 +7,8 @@
 #   scripts/gui.sh check-here     the same checks on this machine (used inside the image and by the `gui` CI job)
 #   scripts/gui.sh build          build ui/ and the app as for a release, without bundles: target/gui-image/release/galleria-gui
 #   scripts/gui.sh smoke          build the app and the fake daemon, then the WebDriver smoke test (lab/tests/gui-smoke.sh)
+#   scripts/gui.sh a11y           the same build, then the screen reader check under Orca and AT-SPI (lab/tests/gui-a11y.sh);
+#                                 local only (Q22), writes target/gui-a11y/
 #   scripts/gui.sh pnpm-version   print the pnpm version pinned in package.json (for CI)
 #
 # GUI_UID / GUI_GID set the user of the container (default: the invoking user), to try a uid the image does not know.
@@ -67,6 +69,8 @@ run_in_image() {
 
 check_here() {
   pnpm install --frozen-lockfile
+  scripts/check-js-licenses.mjs
+  scripts/tests/check-js-licenses.sh
   pnpm --dir ui test
   pnpm --dir ui typecheck
   pnpm --dir ui build
@@ -84,13 +88,18 @@ build_here() {
 
 # Level 3 (spec §14): the app built as for a release and the real daemon, driven through WebDriver by
 # lab/tests/gui-smoke.sh. tauri-driver is installed once under target/gui-tools (it is not part of the workspace).
-smoke_here() {
+smoke_here() { run_webdriver_here lab/tests/gui-smoke.sh; }
+
+# Screen reader check (Q22): the same app and fake daemon, under Orca and the AT-SPI bus. Local only, not a CI job.
+a11y_here() { run_webdriver_here lab/tests/gui-a11y.sh; }
+
+run_webdriver_here() {
   local target=${CARGO_TARGET_DIR:-$PWD/target}
   build_here
   cargo build -p galleria-gui --example fake-daemon
   [[ -x target/gui-tools/bin/tauri-driver ]] || cargo install tauri-driver --locked --root target/gui-tools
   GALLERIA_SMOKE_APP="$target/release/galleria-gui" GALLERIA_SMOKE_DAEMON="$target/debug/examples/fake-daemon" \
-    GALLERIA_SMOKE_DRIVER="$PWD/target/gui-tools/bin/tauri-driver" lab/tests/gui-smoke.sh
+    GALLERIA_SMOKE_DRIVER="$PWD/target/gui-tools/bin/tauri-driver" "$1"
 }
 
 case "${1:-}" in
@@ -102,6 +111,8 @@ case "${1:-}" in
   build-here) build_here ;;
   smoke) run_in_image scripts/gui.sh smoke-here ;;
   smoke-here) smoke_here ;;
+  a11y) run_in_image scripts/gui.sh a11y-here ;;
+  a11y-here) a11y_here ;;
   pnpm-version) pnpm_version ;;
-  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|pnpm-version>' >&2; exit 2 ;;
+  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|a11y|pnpm-version>' >&2; exit 2 ;;
 esac

@@ -45,6 +45,8 @@ describe("App", () => {
     const write = vi.spyOn(navigator.clipboard, "writeText");
     render(<App lang="it" />);
     await ready();
+    await user.tab(); // the menu button of the title bar comes first
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }));
     await user.tab();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Copia" }));
     await user.keyboard("{Enter}");

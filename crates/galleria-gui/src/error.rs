@@ -11,3 +11,8 @@ pub struct CmdError {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<serde_json::Value>,
 }
+
+/// Every code a command of the GUI can return, apart from the daemon's own: those that start with `gui_` and, from
+/// B4, those that start with `import_`. A code is added here in the same commit that introduces it, together with
+/// its text in both catalogues of the webview; `tests/catalogs.rs` fails when either is missing.
+pub const GUI_CODES: &[&str] = &[];

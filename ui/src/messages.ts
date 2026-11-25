@@ -37,6 +37,20 @@ const en = {
   "backend.openvpn_not_found": "OpenVPN is not installed: profiles that use it cannot connect.",
   "backend.openvpn_too_old": "The installed OpenVPN is too old: profiles that use it cannot connect.",
   "backend.unavailable": "{protocol} is unavailable ({reason}): profiles that use it cannot connect.",
+  "dialog.close": "Close",
+  "menu.label": "Menu",
+  "menu.language": "Language",
+  "menu.language.system": "System",
+  "menu.language.en": "English",
+  "menu.language.it": "Italiano",
+  "menu.about": "About Galleria",
+  "about.title": "About Galleria",
+  "about.description": "A VPN client for WireGuard and OpenVPN.",
+  "about.version": "App version",
+  "about.daemon": "Service version",
+  "about.daemon.unknown": "not connected",
+  "about.socket": "Service socket",
+  "about.licence": "Licence",
 } as const;
 
 const it: Record<keyof typeof en, string> = {
@@ -77,6 +91,20 @@ const it: Record<keyof typeof en, string> = {
   "backend.openvpn_not_found": "OpenVPN non è installato: i profili che lo usano non possono connettersi.",
   "backend.openvpn_too_old": "L'OpenVPN installato è troppo vecchio: i profili che lo usano non possono connettersi.",
   "backend.unavailable": "{protocol} non è disponibile ({reason}): i profili che lo usano non possono connettersi.",
+  "dialog.close": "Chiudi",
+  "menu.label": "Menu",
+  "menu.language": "Lingua",
+  "menu.language.system": "Sistema",
+  "menu.language.en": "English",
+  "menu.language.it": "Italiano",
+  "menu.about": "Informazioni su Galleria",
+  "about.title": "Informazioni su Galleria",
+  "about.description": "Un client VPN per WireGuard e OpenVPN.",
+  "about.version": "Versione dell'app",
+  "about.daemon": "Versione del servizio",
+  "about.daemon.unknown": "non collegato",
+  "about.socket": "Socket del servizio",
+  "about.licence": "Licenza",
 };
 
 export const messages = { en, it };

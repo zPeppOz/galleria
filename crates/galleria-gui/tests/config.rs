@@ -50,6 +50,19 @@ fn csp_is_set_and_has_no_remote_host() {
 }
 
 #[test]
+fn csp_has_no_unsafe_inline() {
+    let conf = tauri_conf();
+    let csp = conf["app"]["security"]["csp"]
+        .as_str()
+        .expect("app.security.csp must be a string");
+    // A component that needs inline styles is changed; the policy is not loosened (plan B2, vincoli globali).
+    assert!(
+        !csp.contains("unsafe-inline"),
+        "csp allows unsafe-inline: {csp}"
+    );
+}
+
+#[test]
 fn global_tauri_is_off_and_prototype_is_frozen() {
     let conf = tauri_conf();
     assert_eq!(conf["app"]["withGlobalTauri"], Value::Bool(false));

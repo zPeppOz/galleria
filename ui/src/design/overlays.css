@@ -1,0 +1,40 @@
+/* Dialog and menu: the final look comes with the tokens (T2) and is finished in T5. Only variables of the design
+   system; the colours and sizes below are the ones of the mockup. */
+.gx-backdrop { position: fixed; inset: 0; background: #0008; transition: opacity 120ms; }
+.gx-backdrop[data-starting-style], .gx-backdrop[data-ending-style] { opacity: 0; }
+
+.gx-dialog {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(460px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 20px;
+  box-shadow: 0 20px 50px #000a;
+}
+.gx-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.gx-dialog-title { margin: 0; font-size: 16px; font-weight: 600; }
+.gx-dialog-description { margin: 8px 0 0; color: var(--muted); }
+.gx-dialog-body { margin-top: 16px; }
+.gx-dialog-footer { margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px; }
+
+.gx-icon-button {
+  display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent;
+  border-radius: 6px; background: transparent; color: inherit; cursor: pointer;
+}
+.gx-icon-button:hover { background: var(--panel-2); }
+
+.gx-menu-trigger {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 12px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--panel-2); color: inherit; font: inherit; cursor: pointer;
+}
+.gx-menu-positioner { z-index: 10; outline: none; }
+.gx-menu {
+  min-width: 200px; padding: 4px; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: 0 10px 30px #0009; outline: none;
+}
+.gx-menu-item {
+  display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 10px; border-radius: 6px; cursor: pointer; outline: none;
+}
+.gx-menu-item[data-highlighted] { background: var(--panel-2); }
+.gx-menu-item.gx-danger { color: var(--err); }
+.gx-menu-indicator { display: inline-grid; place-items: center; width: 16px; height: 16px; }
+.gx-menu-separator { height: 1px; margin: 4px 0; background: var(--line); }
+.gx-menu-group-label { padding: 4px 10px; font-size: 12px; color: var(--muted); }

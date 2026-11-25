@@ -12,6 +12,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential pkg-config ca-certificates curl wget file git xz-utils xvfb xauth xclip dbus fonts-dejavu-core webkit2gtk-driver \
         libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \
     && rm -rf /var/lib/apt/lists/*
+# The screen reader check (`scripts/gui.sh a11y`, local only: Q22): Orca, the AT-SPI bus and the Python binding that
+# lab/tests/atspi-dump.py uses to print the accessibility tree of the window, plus speech-dispatcher, which Orca wants
+# to start its speech output. `libglib2.0-bin` gives `gsettings`, and `dconf-gsettings-backend` stores what it sets.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        orca at-spi2-core speech-dispatcher python3-gi gir1.2-atspi-2.0 libglib2.0-bin dconf-gsettings-backend dconf-service \
+    && rm -rf /var/lib/apt/lists/*
 RUN set -eux; \
     test -n "$NODE_VERSION" -a -n "$PNPM_VERSION"; \
     case "$(dpkg --print-architecture)" in amd64) node_arch=x64 ;; arm64) node_arch=arm64 ;; *) exit 1 ;; esac; \

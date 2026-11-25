@@ -6,52 +6,15 @@
 //   GALLERIA_SMOKE_DRIVER_PORT  the port tauri-driver listens on
 // Nothing here asks the daemon to connect: no route, DNS or interface is touched.
 import { execFileSync } from "node:child_process";
-import { remote } from "webdriverio";
 import { afterEach, describe, expect, it } from "vitest";
+import { closeApp, daemon, openApp, TEN_SECONDS, waitForBody } from "./support";
 
-type Browser = Awaited<ReturnType<typeof remote>>;
-
-function env(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is not set: run these tests through lab/tests/gui-smoke.sh`);
-  return value;
-}
-
-const daemon = (action: "start" | "stop") => execFileSync(`${env("GALLERIA_SMOKE_BIN")}/daemon-${action}`, { stdio: "inherit" });
-
-const TEN_SECONDS = 10_000;
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 const DISCONNECTED = /Disconnected|Disconnesso/;
 const START_THE_SERVICE = /Start the service|Avvia il servizio/;
 const SYSTEMCTL = "sudo systemctl enable --now galleriad";
 
-let browser: Browser | undefined;
-
-async function openApp(): Promise<Browser> {
-  browser = await remote({
-    hostname: "127.0.0.1",
-    port: Number(env("GALLERIA_SMOKE_DRIVER_PORT")),
-    logLevel: "error",
-    capabilities: { "tauri:options": { application: env("GALLERIA_SMOKE_APP") } } as WebdriverIO.Capabilities,
-  });
-  return browser;
-}
-
-async function bodyText(b: Browser): Promise<string> {
-  return b.$("body").getText();
-}
-
-async function waitForBody(b: Browser, pattern: RegExp | string, timeoutMsg: string) {
-  await b.waitUntil(async () => {
-    const text = await bodyText(b);
-    return typeof pattern === "string" ? text.includes(pattern) : pattern.test(text);
-  }, { timeout: TEN_SECONDS, interval: 250, timeoutMsg });
-}
-
-afterEach(async () => {
-  await browser?.deleteSession().catch(() => undefined);
-  browser = undefined;
-});
+afterEach(closeApp);
 
 describe("galleria-gui against the real daemon", () => {
   it("shows_the_real_daemon_state", async () => {

@@ -9,9 +9,11 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",
-    "test:e2e": "vitest run --config e2e/vitest.config.ts"
+    "test:e2e": "vitest run --config e2e/vitest.config.ts",
+    "test:a11y": "vitest run --config e2e/a11y.config.ts"
   },
   "dependencies": {
+    "@base-ui/react": "1.9.0",
     "@tauri-apps/api": "2.12.5",
     "react": "19.3.1",
     "react-dom": "19.3.1"

@@ -1,6 +1,6 @@
 // Plan B2 T7, the shell under a screen reader (Q22 (a): Orca and the AT-SPI tree in the real window, run locally by
 // lab/tests/gui-a11y.sh, i.e. `scripts/gui.sh a11y`). One session of the app, in order: the list, the tabs, a text field,
-// a switch, a notice that goes away by itself (the confirmation of «Delete» comes back with T8). Assertions are on our own names and on the states
+// a switch, a notice that goes away by itself (and the confirmation of «Delete»). Assertions are on our own names and on the states
 // AT-SPI reports; the words Orca uses for the role and the state are recorded in target/gui-a11y/transcript.txt and
 // copied into docs/08-esito-fase2.md, because they are Orca's, not ours.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -141,9 +141,9 @@ describe("the shell under a screen reader", () => {
     record("S4 switch turned on", await waitForSpeech(again, /\bon\b|pressed|checked/i), on);
   });
 
-  // T3 (P10): «Delete» only says that it arrives later, so the confirmation under Orca waits for T8 (the dialog itself is
-  // still checked in overlays.a11y.ts, D1–D4).
-  it.skip("S5_confirmation_is_an_alert_dialog_with_title_and_text_spoken", async () => {
+  // T8 brought the confirmation of «Delete» back (it was skipped from T3): the real alert dialog of the real profile, under
+  // Orca. Escape gives up, so the profile stays and the session goes on as it was.
+  it("S5_confirmation_is_an_alert_dialog_with_title_and_text_spoken", async () => {
     await reach("More actions", ["Shift", "Tab"], 20);
     await key("Enter");
     await waitForTree(focusedIs("Duplicate"), "the menu open on «Duplicate»");
@@ -155,7 +155,7 @@ describe("the shell under a screen reader", () => {
     const dialog = tree.find((n) => (n.role === "alert" || n.role === "dialog") && /^Delete Datacenter Milano\?$/.test(n.name)) as AtNode;
     expect(focusedName(tree)).toBe("Cancel");
     expect(descendants(tree, dialog).some((n) => n.states.has("focused"))).toBe(true);
-    const text = "These are sample data: nothing is deleted, whatever you choose.";
+    const text = "The profile and its secrets are removed from this computer. This cannot be undone.";
     expect(dialog.description.includes(text) || dialog.relations.some((r) => r.startsWith("described-by")), `the text is the description: ${dialog.description}`).toBe(true);
     // nothing of the page behind is reachable
     expect(findNode(tree, "page tab", "General")).toBeUndefined();
@@ -169,6 +169,15 @@ describe("the shell under a screen reader", () => {
     record("S5 confirmation closed with Escape", await waitForSpeech(closed, "More actions"), after);
   });
 
+  // The text of the newest notice in the page, whatever it is: «Duplicate» makes a real copy now, so the sentence has the
+  // name of the copy in it and is read from the page, not written here.
+  const lastNotice = async (): Promise<string> =>
+    (await b.execute(() => {
+      const all = [...document.querySelectorAll(".gx-toasts .gx-toast-message")];
+      return all.length ? (all[all.length - 1].textContent ?? "") : "";
+    })) as string;
+  let firstCopy = "";
+
   it("S6_notice_appears_without_moving_the_focus", async () => {
     await reach("More actions", ["Shift", "Tab"], 20);
     await key("Enter");
@@ -176,10 +185,13 @@ describe("the shell under a screen reader", () => {
     const mark = speechMark();
     await key("Enter");
     // the notice is in a live region that was already in the page and empty: it appears, the focus stays on the button
+    // (the copy is chosen and the focus goes to «More actions» of the copy)
     const tree = await waitForTree((t) => !!findNode(t, "push button", "Dismiss the notice") && focusedIs("More actions")(t), "the notice shown and the focus on «More actions»");
     expect(findNode(tree, "push button", "Dismiss the notice")?.states.has("focused") ?? false).toBe(false);
     const region = tree.find((n) => n.role === "status bar");
     expect(region, "the live region is a status bar in the tree").toBeTruthy();
+    firstCopy = await lastNotice();
+    expect(firstCopy).toMatch(/^Duplicated as “Datacenter Milano \(copy\)”\.$/);
     // what Orca said in the meantime, whatever it is, goes into the transcript
     await new Promise((resolve) => setTimeout(resolve, 3000));
     record("S6 notice after «Duplicate»", speechSince(mark), tree);
@@ -189,7 +201,7 @@ describe("the shell under a screen reader", () => {
   // also sent by the `announce` command, which makes the Rust side emit the ATK `notification` signal on the accessible
   // of the window; the atk-bridge turns it into `object:announcement` and Orca says it. S6b is the positive test the
   // spike called for: after «Duplicate» Orca says the text of the notice, once, and the focus stays on «More actions».
-  const NOTICE = "This action arrives in a later release.";
+  let NOTICE = "";
   const noticeShown = (t: AtNode[]) => !!findNode(t, "push button", "Dismiss the notice") && focusedIs("More actions")(t);
 
   it("S6b_notice_is_spoken_by_orca", async () => {
@@ -197,6 +209,10 @@ describe("the shell under a screen reader", () => {
     await waitForTree(focusedIs("Duplicate"), "the menu open on «Duplicate»");
     const mark = speechMark();
     await key("Enter");
+    // the notice of the first copy may still be in the page: wait for the one of this copy
+    await b.waitUntil(async () => (await lastNotice()) !== firstCopy, { timeout: 8000, interval: 200, timeoutMsg: "the notice of the second copy never showed" });
+    NOTICE = await lastNotice();
+    expect(NOTICE).toMatch(/^Duplicated as “.+”\.$/);
     const tree = await waitForTree(noticeShown, "the notice shown and the focus on «More actions»");
     const said = await waitForSpeech(mark, NOTICE, 4000);
     // once: the notice is in the page too, and if Orca ever starts to say the live region this counts two

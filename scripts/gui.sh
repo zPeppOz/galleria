@@ -97,9 +97,11 @@ run_webdriver_here() {
   local target=${CARGO_TARGET_DIR:-$PWD/target}
   build_here
   cargo build -p galleria-gui --example fake-daemon --example seed-rubrica
+  # the `galleria` binary of the phase 1: the smoke test asks it to list what the window saved (R1, R6)
+  cargo build -p galleria-cli --bin galleria
   [[ -x target/gui-tools/bin/tauri-driver ]] || cargo install tauri-driver --locked --root target/gui-tools
   GALLERIA_SMOKE_APP="$target/release/galleria-gui" GALLERIA_SMOKE_DAEMON="$target/debug/examples/fake-daemon" \
-    GALLERIA_SMOKE_SEED="$target/debug/examples/seed-rubrica" \
+    GALLERIA_SMOKE_SEED="$target/debug/examples/seed-rubrica" GALLERIA_SMOKE_CLI="$target/debug/galleria" \
     GALLERIA_SMOKE_DRIVER="$PWD/target/gui-tools/bin/tauri-driver" "$1"
 }
 

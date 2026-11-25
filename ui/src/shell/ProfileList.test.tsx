@@ -127,6 +127,19 @@ describe("ProfileList", () => {
     expect(option("Delta").getAttribute("aria-selected")).toBe("true");
   });
 
+  it("enter_and_space_choose_the_row_that_has_the_focus", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    // a row that has the focus without being chosen (the search field hands the focus over like this)
+    option("Delta").focus();
+    expect(option("Delta").getAttribute("aria-selected")).toBe("false");
+    await user.keyboard("{Enter}");
+    expect(selectedName()[0]).toMatch(/^Delta/);
+    option("Echo").focus();
+    await user.keyboard(" ");
+    expect(selectedName()[0]).toMatch(/^Echo/);
+  });
+
   it("has_no_accessibility_violations", async () => {
     const { container } = render(<main><Harness /></main>);
     await expectNoAccessibilityViolations(container);

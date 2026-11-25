@@ -7,6 +7,7 @@
 #   GALLERIA_SMOKE_APP      the built galleria-gui binary
 #   GALLERIA_SMOKE_DAEMON   the built fake-daemon example of galleria-gui (a real `galleriad` server with a fake backend)
 #   GALLERIA_SMOKE_SEED     the built seed-rubrica example of galleria-gui (the made-up rubrica every test starts from)
+#   GALLERIA_SMOKE_CLI      the built `galleria` binary of the phase 1 (the test that asks it what the window saved)
 #   GALLERIA_SMOKE_DRIVER   the tauri-driver binary (default: tauri-driver from PATH)
 #
 # It creates a temporary directory with the daemon socket, runs `fake-daemon <dir>` (S5: the real `galleriad run` cleans

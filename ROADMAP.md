@@ -104,12 +104,12 @@ La rubrica in Tauri 2 + React sopra il demone della fase 1, in sei blocchi B1–
   - [ ] disposizione lista + dettaglio e navigazione da tastiera (G12): tastiera e ruoli verdi in jsdom e nella finestra vera con Orca; resta un buco di Orca con WebKitGTK, non del markup: nessuna regione viva viene pronunciata, `role="alert"` compreso (`S6b`), confermato su GNOME vero dallo spike `t_b81c3909`; la strada è Q27 (segnale ATK dal lato Rust), primo uso in B3. Il nome dei campi di testo non pronunciato (`S4b`) esiste solo nell'immagine con Orca 46.1: su GNOME vero si sente; vedi `docs/08` «Buco 1», «Buco 2» e «Spike Orca»
   - [x] cataloghi `en` e `it` con il test dei codici del demone (D22, G8): `tests/catalogs.rs` e cambio di lingua a caldo nel fumo
   - [x] ci si può fermare qui: guscio navigabile con dati finti, nelle due lingue (U1: fumo 13/13 tre volte, `a11y` 22 prove verdi due volte, con i due buchi di G12 registrati come prove)
-- [ ] B3 · Rubrica e profili
-  - [ ] lista con gruppi, ricerca, preferiti, ordinamento e icona di stato; gruppi in `galleria.toml`
-  - [ ] schede Generale, Autenticazione e Rete: campi veri per WireGuard, sola lettura più interruttori per OpenVPN (D26)
-  - [ ] editor raw con la validazione delle direttive della fase 1
-  - [ ] duplica, esporta ed elimina profilo; «ultimo uso» in `state.toml` (D32)
-  - [ ] ci si può fermare qui: rubrica completa sui profili importati dalla CLI, senza connettere
+- [ ] B3 · Rubrica e profili <!-- branch: galleria/t_aea4ab04-galleria-b3-task-t9-tastiera-fumo-screen · task: t_aea4ab04 · by: genny -->
+  - [x] lista con gruppi, ricerca, preferiti, ordinamento e icona di stato; gruppi in `galleria.toml`: fumo `rubrica_lists_the_seeded_profiles`, `search_filters_the_list_and_sort_order_survives_a_restart`, `a_group_is_created_renamed_and_survives_a_restart`; tastiera in `keyboard.test.tsx`
+  - [x] schede Generale, Autenticazione e Rete: campi veri per WireGuard, sola lettura più interruttori per OpenVPN (D26): `a_profile_is_renamed_and_the_list_follows`, `cli_lists_what_the_gui_saved`, `a_profile_saved_by_the_gui_keeps_the_phase_1_format`; letti con Orca in `R5d`
+  - [x] editor raw con la validazione delle direttive della fase 1: `a_script_directive_cannot_be_saved_from_the_editor`, `a_comment_typed_in_the_editor_is_saved_as_written`, `R5d`
+  - [ ] duplica, esporta ed elimina profilo; «ultimo uso» in `state.toml` (D32): duplica ed elimina provati nella finestra vera, da tastiera e con Orca (`rubrica_works_with_the_daemon_stopped`, `R4b`, `R4c`); «Esporta» provato fino alla conferma e con il selettore finto, la finestra «Salva» GTK vera non è mai stata pilotata (docs/08 «Non verificato»)
+  - [ ] ci si può fermare qui: rubrica completa sui profili importati dalla CLI, senza connettere: R1–R6 verdi tranne la finestra «Salva» vera di «Esporta» e Orca su un GNOME vero (docs/08, «B3 · chiusura»)
 - [ ] B4 · Import
   - [ ] `.ovpn` con blocchi inline o file separati e `.conf` WireGuard, da file, trascinamento o testo incollato
   - [ ] anteprima con gli avvisi e il testo di D19, salvataggio solo dopo «Importa» (G3)

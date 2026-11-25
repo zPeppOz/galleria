@@ -6,11 +6,12 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { DaemonView } from "../daemon/types";
-import { makeView } from "../test/fixtures";
+import type { ProfilePatch, ProfileSummary } from "../rubrica/types";
+import { applyPatch, makeDetail, makeView, SAMPLE_PROFILES } from "../test/fixtures";
 import { renderShell } from "../test/shell";
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -305,6 +306,252 @@ describe("keyboard on the whole shell", () => {
     await menuOpen("Menu");
     await user.keyboard("{Home}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{Enter}"); // Chiaro
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe("light"));
+  });
+
+  it("a_full_rubrica_tour_needs_no_pointer", async () => {
+    const user = userEvent.setup();
+    const announce = vi.fn();
+    renderShell(makeView(), { announce });
+    const active = () => document.activeElement as HTMLElement;
+    const title = () => screen.getByRole("heading", { level: 1 }).textContent;
+    const noticeSaid = (text: string) => waitFor(() => expect(announce).toHaveBeenCalledWith(text, false));
+    /** Tab until the focus is on the control with this role and name (a test that never presses a pointer key). */
+    const reach = async (role: string, name: string) => {
+      for (let step = 0; step < 40 && `${roleOf(active())}:${nameOf(active())}` !== `${role}:${name}`; step++) await user.tab();
+      expect(`${roleOf(active())}:${nameOf(active())}`, "where the focus is").toBe(`${role}:${name}`);
+    };
+
+    // 1 · search: Ctrl+K from anywhere, a few letters, the arrow goes down to the list, and the choice is the result
+    await user.keyboard("{Control>}k{/Control}");
+    expect(active()).toBe(screen.getByRole("searchbox", { name: "Search connections" }));
+    await user.keyboard("milano");
+    await waitFor(() => expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(1));
+    await user.keyboard("{ArrowDown}");
+    expect(roleOf(active())).toBe("option");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(title()).toBe("Datacenter Milano"));
+    // Escape in the field empties it: the whole list is back
+    await user.keyboard("{Control>}k{/Control}{Escape}");
+    await waitFor(() => expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(5));
+
+    // 2 · edit and save: the name field, a letter, Ctrl+S; the notice is said and the focus stays on the field
+    await reach("input", "Name");
+    await user.keyboard("{End}x");
+    await screen.findByRole("group", { name: "Unsaved changes" });
+    await user.keyboard("{Control>}s{/Control}");
+    await noticeSaid("Profile saved.");
+    expect(title()).toBe("Datacenter Milanox");
+    expect(nameOf(active())).toBe("Name");
+
+    // 3 · another group: the field of the group is a native choice, which jsdom does not drive with keys: the value is
+    // set the way the browser does when a key chooses an entry, and the save is again from the keyboard
+    await reach("select", "Group");
+    fireEvent.change(active(), { target: { value: "Personale" } });
+    await user.keyboard("{Control>}s{/Control}");
+    await waitFor(() => expect(announce).toHaveBeenCalledTimes(2));
+    expect((screen.getByRole("combobox", { name: "Group" }) as HTMLSelectElement).value).toBe("Personale");
+
+    // 4 · the raw editor: the strip, the arrows to «Configuration», the text, Ctrl+S
+    await reach("tab", "General");
+    await user.keyboard("{End}{ArrowLeft}");
+    expect(screen.getByRole("tab", { name: "Configuration" }).getAttribute("aria-selected")).toBe("true");
+    await reach("textarea", "Configuration");
+    await user.keyboard("{Control>}{End}{/Control}# by hand");
+    await screen.findByRole("group", { name: "Unsaved changes" });
+    await user.keyboard("{Control>}s{/Control}");
+    await waitFor(() => expect(announce).toHaveBeenCalledTimes(3));
+
+    // 5 · «Manage groups»: the dialog opens, a group is added with Enter, Escape closes it and the focus is back
+    await reach("button", "Manage groups");
+    await user.keyboard("{Enter}");
+    const dialog = await screen.findByRole("dialog", { name: "Manage groups" });
+    await user.type(within(dialog).getByRole("textbox", { name: "New group" }), "Famiglia{Enter}");
+    await noticeSaid("Group Famiglia created.");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(`${roleOf(active())}:${nameOf(active())}`).toBe("button:Manage groups");
+
+    // 6 · duplicate and delete, from the menu «More actions»; the delete asks and takes the answer from the keyboard
+    await reach("button", "More actions");
+    await user.keyboard("{Enter}");
+    await menuOpen("More actions");
+    await user.keyboard("{Home}{Enter}");
+    await waitFor(() => expect(title()).toBe("Datacenter Milano (copy)"));
+    await waitFor(() => expect(nameOf(active())).toBe("More actions"));
+    await user.keyboard("{Enter}");
+    await menuOpen("More actions");
+    await user.keyboard("{End}{Enter}");
+    const confirm = await screen.findByRole("alertdialog", { name: "Delete Datacenter Milano (copy)?" });
+    // the focus is on the safe answer; Tab reaches the other, and the page behind is out of reach
+    expect(nameOf(active())).toBe("Cancel");
+    await user.tab();
+    expect(nameOf(active())).toBe("Delete");
+    expect(confirm.contains(active())).toBe(true);
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await noticeSaid("Deleted “Datacenter Milano (copy)”.");
+    expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(5);
+    expect(roleOf(active()), "the focus after the delete is in the list").toBe("option");
+  });
+
+  it("every_control_of_every_tab_and_of_the_new_dialogs_is_reachable", async () => {
+    const user = userEvent.setup();
+    show();
+    // each tab of each protocol: the controls of the panel that are not read-only text are stops; the raw editor too
+    for (const profile of ["Ufficio Napoli", "Homelab"]) {
+      screen.getByRole("option", { name: profile }).focus();
+      await user.keyboard("{Enter}");
+      for (const tab of screen.getAllByRole("tab")) {
+        await user.click(tab);
+        const stops = new Set(await tabStops(user));
+        const panel = screen.getByRole("tabpanel");
+        const controls = [...panel.querySelectorAll<HTMLElement>("input, select, textarea, button, [role='switch']")].filter((el) => el.getAttribute("type") !== "hidden" && el.getAttribute("type") !== "radio" && !(el as HTMLButtonElement).disabled);
+        for (const control of controls) expect(stops.has(control), `${profile}, ${tab.textContent}: ${roleOf(control)} «${nameOf(control)}» is a stop`).toBe(true);
+      }
+    }
+    // the menu of the actions: the three entries are reached with the arrows, and an entry that cannot be used stays one of them
+    screen.getByRole("button", { name: "More actions" }).focus();
+    await user.keyboard("{Enter}");
+    const menu = await menuOpen("More actions");
+    const entries = within(menu).getAllByRole("menuitem");
+    expect(entries.map((e) => nameOf(e))).toEqual(["Duplicate", "Export…", "Delete"].map((n) => expect.stringContaining(n.replace("…", ""))));
+    for (const entry of entries) {
+      await user.keyboard("{ArrowDown}");
+      expect(menu.contains(document.activeElement)).toBe(true);
+      expect(entry.isConnected).toBe(true);
+    }
+    await user.keyboard("{Escape}");
+    // «Manage groups»: every control of the dialog is a stop (the focus does not leave the dialog)
+    screen.getByRole("button", { name: "Manage groups" }).focus();
+    await user.keyboard("{Enter}");
+    const dialog = await screen.findByRole("dialog", { name: "Manage groups" });
+    const stops = new Set<HTMLElement>([document.activeElement as HTMLElement]);
+    for (let step = 0; step < 30; step++) {
+      await user.tab();
+      // the trap of the dialog sends the focus back from its guards on a later tick, as the browser does
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      stops.add(document.activeElement as HTMLElement);
+    }
+    const dialogControls = [...dialog.querySelectorAll<HTMLElement>("input, button")].filter((el) => !(el as HTMLButtonElement).disabled);
+    expect(dialogControls.length).toBeGreaterThan(6);
+    for (const control of dialogControls) expect(stops.has(control), `the dialog: ${roleOf(control)} «${nameOf(control)}» is a stop`).toBe(true);
+    expect([...stops].filter((el) => el !== document.body && !el.hasAttribute("data-base-ui-focus-guard")).every((el) => dialog.contains(el)), `the focus does not leave the dialog: ${[...stops].filter((el) => el !== document.body && !el.hasAttribute("data-base-ui-focus-guard") && !dialog.contains(el)).map((el) => `${roleOf(el)}:${nameOf(el)}`).join(", ")}`).toBe(true);
+  });
+
+  it("focus_stays_in_the_page_after_save_duplicate_delete_and_the_groups_dialog", async () => {
+    const user = userEvent.setup();
+    show();
+    const active = () => document.activeElement as HTMLElement;
+    const here = (name: string) => expect(`${roleOf(active())}:${nameOf(active())}`, "where the focus is").toBe(name);
+    const notBody = (what: string) => expect(active(), `the focus after ${what}`).not.toBe(document.body);
+
+    // a save: the focus stays on the field that was being typed in
+    screen.getByRole("textbox", { name: "Name" }).focus();
+    await user.keyboard("{End}x{Control>}s{/Control}");
+    await waitFor(() => expect(toastStatus().textContent).toContain("Profile saved."));
+    here("input:Name");
+    // a save that is refused (the name is empty): the focus goes to the field with the error
+    await user.keyboard("{Control>}a{/Control}{Backspace}{Control>}s{/Control}");
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Name" }).getAttribute("aria-invalid")).toBe("true"));
+    here("input:Name");
+    await user.keyboard("Ufficio{Control>}s{/Control}");
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Name" }).getAttribute("aria-invalid")).not.toBe("true"));
+
+    // the dialog of the groups: closed with Escape and closed after a change, the focus is back on its button both times
+    const manage = screen.getByRole("button", { name: "Manage groups" });
+    for (const closing of ["{Escape}", "{Escape}"]) {
+      manage.focus();
+      await user.keyboard("{Enter}");
+      const dialog = await screen.findByRole("dialog", { name: "Manage groups" });
+      await user.type(within(dialog).getByRole("textbox", { name: "New group" }), `G${closing === "{Escape}" ? "x" : "y"}{Enter}`);
+      await waitFor(() => expect(within(dialog).getAllByRole("textbox", { name: /^Group \d+$/ }).length).toBeGreaterThan(3));
+      await user.keyboard(closing);
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(active()).toBe(manage);
+    }
+
+    // duplicate and export and delete: never the body
+    screen.getByRole("button", { name: "More actions" }).focus();
+    await user.keyboard("{Enter}");
+    await menuOpen("More actions");
+    await user.keyboard("{ArrowDown}{Enter}"); // Export asks first
+    await screen.findByRole("alertdialog", { name: /^Export /});
+    notBody("the export asks");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    here("button:More actions");
+    await user.keyboard("{Enter}");
+    await menuOpen("More actions");
+    await user.keyboard("{End}{Enter}");
+    await screen.findByRole("alertdialog", { name: "Delete Ufficio Napoli?" });
+    await user.keyboard("{Enter}"); // «Cancel» has the focus: Enter gives up
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    here("button:More actions");
+    await user.keyboard("{Enter}");
+    await menuOpen("More actions");
+    await user.keyboard("{End}{Enter}");
+    await screen.findByRole("alertdialog", { name: "Delete Ufficio Napoli?" });
+    await user.tab();
+    await user.keyboard("{Enter}"); // «Delete»
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await waitFor(() => expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(4));
+    notBody("the delete");
+    expect(roleOf(active())).toBe("option");
+  });
+
+  it("no_outcome_depends_on_a_live_region_alone", async () => {
+    // every notice of the shell goes through the one `ToastProvider` of `Shell`, and that has `announce`; no file
+    // makes a provider of its own without it (Q27, rule 4)
+    const sources = (dir: string): string[] =>
+      readdirSync(dir).flatMap((name) => {
+        const path = join(dir, name);
+        return statSync(path).isDirectory() ? sources(path) : /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) && !path.includes(`${join("src", "test")}`) && !path.includes(`${join("src", "design")}`) ? [path] : [];
+      });
+    const providers = sources(SRC).flatMap((file) => [...readFileSync(file, "utf8").matchAll(/<ToastProvider\b[^>]*>/g)].map((m) => ({ file: file.slice(SRC.length), tag: m[0] })));
+    expect(providers.map((p) => p.file), "the shell makes its provider").toContain("/shell/Shell.tsx");
+    for (const provider of providers) expect(provider.tag, `${provider.file} makes a provider without announce`).toMatch(/announce=\{/);
+    // and each outcome of B3 is said, with the text of the notice: save, duplicate, export, delete and a group are
+    // polite, an error is assertive
+    const user = userEvent.setup();
+    const announce = vi.fn();
+    let fail = false;
+    const update = async (id: string, patch: ProfilePatch) => {
+      if (fail) throw { code: "gui_profile_changed", message: "changed", data: null };
+      return applyPatch(makeDetail(SAMPLE_PROFILES.find((p) => p.id === id) as ProfileSummary), patch);
+    };
+    renderShell(makeView(), { announce, update });
+    const said = (text: string, assertive: boolean) => waitFor(() => expect(announce).toHaveBeenCalledWith(text, assertive));
+    const choose = async (entry: number) => {
+      screen.getByRole("button", { name: "More actions" }).focus();
+      await user.keyboard("{Enter}");
+      await menuOpen("More actions");
+      await user.keyboard(`{Home}${"{ArrowDown}".repeat(entry)}{Enter}`);
+    };
+    screen.getByRole("textbox", { name: "Name" }).focus();
+    await user.keyboard("{End}x{Control>}s{/Control}");
+    await said("Profile saved.", false);
+    await choose(0);
+    await said("Duplicated as “Ufficio Napoli (copy)”.", false);
+    await choose(1);
+    await user.click(await screen.findByRole("button", { name: "Export" }));
+    await said("Exported.", false);
+    screen.getByRole("button", { name: "Manage groups" }).focus();
+    await user.keyboard("{Enter}");
+    const dialog = await screen.findByRole("dialog", { name: "Manage groups" });
+    await user.type(within(dialog).getByRole("textbox", { name: "New group" }), "Famiglia{Enter}");
+    await said("Group Famiglia created.", false);
+    await user.keyboard("{Escape}");
+    await choose(2);
+    await user.keyboard("{Tab}{Enter}");
+    await said("Deleted “Ufficio Napoli (copy)”.", false);
+    // an error: the text of the notice is the text announced, as assertive
+    fail = true;
+    screen.getByRole("textbox", { name: "Name" }).focus();
+    await user.keyboard("{End}y{Control>}s{/Control}");
+    await said("This profile was changed somewhere else since you opened it.", true);
+    expect(document.querySelector(".gx-toasts [role=\"alert\"]")?.textContent).toContain("This profile was changed somewhere else since you opened it.");
+    // one call for each notice, no more: nothing is said twice
+    expect(announce).toHaveBeenCalledTimes(6);
   });
 });
 

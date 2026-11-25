@@ -81,6 +81,13 @@ export function ProfileList(props: {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     const current = flat.findIndex((p) => p.id === from);
     let target: ListProfile | undefined;
+    // Enter and Space choose the row that has the focus: the arrows do it by moving, but the row where the search field hands
+    // the focus over is not the chosen one yet (found by the keyboard tour of B3)
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect(from);
+      return;
+    }
     if (event.key === "ArrowDown") target = flat[Math.min(current + 1, flat.length - 1)];
     else if (event.key === "ArrowUp") target = flat[Math.max(current - 1, 0)];
     else if (event.key === "Home") target = flat[0];

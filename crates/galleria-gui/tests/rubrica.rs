@@ -6,6 +6,7 @@ mod seed;
 
 use galleria_gui::{
     configure_with,
+    export::SavePicker,
     rubrica::{Rubrica, openvpn_view, summarize},
     supervisor::RelinkPolicy,
     ui_state::UiStateFile,
@@ -336,6 +337,148 @@ fn no_read_command_returns_a_secret() {
         );
         assert!(!json.contains("PRIVATE KEY"), "a command returned a key");
     }
+}
+
+/// A window «Save» that always picks the same place.
+struct PicksAt(std::path::PathBuf);
+
+impl SavePicker for PicksAt {
+    fn pick(&self, _suggested_name: &str) -> Option<std::path::PathBuf> {
+        Some(self.0.clone())
+    }
+}
+
+/// R3 after a round of work (plan B3, T9): edit, raw check, groups, duplicate and export. Every answer of every command
+/// of B3 is searched for the secrets of the seed, and the answers are not empty, so the search proves something.
+#[test]
+fn no_read_command_returns_a_secret_after_a_round_of_edits() {
+    let root = tempfile::tempdir().unwrap();
+    let seeded = seed(&root.path().join("galleria"), false);
+    let (rubrica, state) = rubrica_in(root.path());
+    let target = root.path().join("exported.ovpn");
+    let picker: Arc<dyn SavePicker> = Arc::new(PicksAt(target.clone()));
+    let mut app = configure_with(
+        mock_builder().manage(Arc::new(rubrica)).manage(picker),
+        std::env::temp_dir().join("galleria-no-daemon-rubrica-round.sock"),
+        RelinkPolicy {
+            delays: vec![Duration::from_millis(20)],
+        },
+        UiStateFile::new(state.path().to_path_buf()),
+    )
+    .build(mock_context(noop_assets()))
+    .unwrap();
+    #[allow(deprecated)]
+    app.run_iteration(|_, _| {});
+    let window = WebviewWindowBuilder::new(&app, "main", Default::default())
+        .build()
+        .unwrap();
+
+    let mut seen: Vec<(&str, String)> = vec![];
+    let mut note = |what: &'static str, answer: Result<Value, Value>| {
+        let value = answer.unwrap_or_else(|e| e);
+        let text = value.to_string();
+        assert!(text.len() > 2, "{what} answered nothing: {text}");
+        seen.push((what, text));
+        value
+    };
+    let ovpn = id_of(&seeded, "Ufficio Napoli").to_string();
+    let wg = id_of(&seeded, "Homelab").to_string();
+    let list = note("profiles_list", invoke(&window, "profiles_list", json!({})));
+    let modified = |id: &str| {
+        list["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == id)
+            .unwrap()["modified"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    note(
+        "profile_get",
+        invoke(&window, "profile_get", json!({ "id": ovpn })),
+    );
+    note(
+        "profile_get (wireguard)",
+        invoke(&window, "profile_get", json!({ "id": wg })),
+    );
+    let updated = note(
+        "profile_update",
+        invoke(
+            &window,
+            "profile_update",
+            json!({ "id": ovpn, "expectedModified": modified(&ovpn), "patch": { "name": "Sede", "favorite": false } }),
+        ),
+    );
+    note(
+        "profile_validate_raw",
+        invoke(
+            &window,
+            "profile_validate_raw",
+            json!({ "id": ovpn, "text": "client\nup /tmp/x.sh\n" }),
+        ),
+    );
+    note(
+        "profile_update (refused raw text)",
+        invoke(
+            &window,
+            "profile_update",
+            json!({ "id": ovpn, "expectedModified": updated["modified"], "patch": { "openvpn_config": "client\nup /tmp/x.sh\n" } }),
+        ),
+    );
+    note(
+        "group_create",
+        invoke(&window, "group_create", json!({ "name": "Nuovo" })),
+    );
+    note(
+        "group_rename",
+        invoke(
+            &window,
+            "group_rename",
+            json!({ "from": "Nuovo", "to": "Famiglia" }),
+        ),
+    );
+    let copy = note(
+        "profile_duplicate",
+        invoke(
+            &window,
+            "profile_duplicate",
+            json!({ "id": wg, "name": "Homelab (copy)" }),
+        ),
+    );
+    note(
+        "profile_get (the copy)",
+        invoke(&window, "profile_get", json!({ "id": copy["id"] })),
+    );
+    note(
+        "profile_export",
+        invoke(&window, "profile_export", json!({ "id": ovpn })),
+    );
+    note(
+        "profile_delete",
+        invoke(&window, "profile_delete", json!({ "id": copy["id"] })),
+    );
+    note(
+        "profiles_list (after)",
+        invoke(&window, "profiles_list", json!({})),
+    );
+    // the export is where the keys go, and the only place: the window got `{ saved }` and nothing more
+    assert!(
+        fs::read_to_string(&target).unwrap().contains(SECRET_MARK),
+        "the export has the keys"
+    );
+    for (what, text) in &seen {
+        assert!(
+            !text.contains(SECRET_MARK) && !text.contains("PRIVATE KEY"),
+            "{what} returned a secret: {text}"
+        );
+        assert!(
+            !text.contains(root.path().to_str().unwrap()),
+            "{what} returned a path of the machine: {text}"
+        );
+    }
+    assert_eq!(seen.len(), 13);
 }
 
 #[test]

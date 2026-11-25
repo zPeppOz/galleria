@@ -436,6 +436,94 @@ describe("the shell in the real window", () => {
     expect(await bodyText(b)).not.toContain("You have changes that are not saved.");
   });
 
+  // R1, R6: what the window writes is what the phase 1 reads. A profile is renamed and copied in the window; the `galleria`
+  // binary of the phase 1 (built in the image) lists them, with their new names, and nothing goes wrong.
+  const runCli = (...args: string[]) => execFileSync(env("GALLERIA_SMOKE_CLI"), args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const rowNames = async (b: Browser) => (await b.execute(() => [...document.querySelectorAll('[role="listbox"] [role="option"] span.profile-name')].map((el) => (el.textContent ?? "").trim()))) as string[];
+  async function renameFirstProfile(b: Browser, name: string) {
+    await waitFor(b, async () => (await rowNames(b)).length === 5, "the list never showed the five profiles");
+    await b.$('input[name="name"]').click();
+    await press(b, "Control", "a");
+    await press(b, ...Array.from(name));
+    await b.$("button=Save").click();
+    await waitForBody(b, "Profile saved.", "the notice of the save never showed");
+  }
+  async function duplicateFromTheMenu(b: Browser) {
+    await b.$("button=More actions").click();
+    await (await byText(b, "[role=menuitem]", "Duplicate")).click();
+    await waitForBody(b, "Duplicated as", "the notice of the copy never showed");
+  }
+
+  it("cli_lists_what_the_gui_saved", async () => {
+    const b = await openShell();
+    await renameFirstProfile(b, "Sede");
+    await duplicateFromTheMenu(b);
+    await waitFor(b, async () => (await rowNames(b)).includes("Sede (copy)"), "the list did not show the copy");
+    const listed = runCli("list");
+    const names = listed.trim().split("\n").map((line) => line.split(" ").slice(1).join(" ").replace(/ "?(Open[Vv]pn|Wire[Gg]uard)"?$/, ""));
+    expect(names.sort(), `galleria list says: ${listed}`).toEqual(["Cliente Rossi", "Datacenter Milano", "Homelab", "Sede", "Sede (copy)", "VPS Hetzner"]);
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
+  // R1, §5: the rubrica is read and written with the daemon stopped. The first-run panel is there, and so is the list: a
+  // profile is renamed, copied and deleted, and the files on the disk follow.
+  it("rubrica_works_with_the_daemon_stopped", async () => {
+    daemon("stop");
+    const b = await openApp();
+    await waitForBody(b, START_THE_SERVICE, "the «Start the service» panel never appeared");
+    await renameFirstProfile(b, "Sede");
+    expect(await title(b)).toBe("Sede");
+    await duplicateFromTheMenu(b);
+    await waitFor(b, async () => (await rowNames(b)).length === 6, "the copy is not in the list");
+    expect(await title(b)).toBe("Sede (copy)");
+    // delete the copy: the window asks, the answer «Delete» removes it, and the focus stays in the list
+    await b.$("button=More actions").click();
+    await (await byText(b, "[role=menuitem]", "Delete")).click();
+    await waitForBody(b, "Delete Sede (copy)?", "the confirmation never appeared");
+    await (await byText(b, '[role="alertdialog"] button', "Delete")).click();
+    await waitFor(b, async () => (await rowNames(b)).length === 5, "the copy is still in the list");
+    await waitForBody(b, "Deleted", "the notice of the delete never showed");
+    expect(await activeRole(b), "the focus after the delete is in the list").toBe("option");
+    const dir = join(env("XDG_CONFIG_HOME"), "galleria", "profiles");
+    const files = readdirSync(dir).map((name) => readFileSync(join(dir, name), "utf8"));
+    expect(files).toHaveLength(5);
+    expect(files.filter((text) => text.includes('name = "Sede"')), "the renamed one is on the disk").toHaveLength(1);
+    expect(files.some((text) => text.includes("(copy)")), "the copy is gone from the disk").toBe(false);
+    expect(await bodyText(b)).toContain("Start the service");
+  });
+
+  it("no_csp_violation_during_the_rubrica_tour", async () => {
+    const b = await openShell();
+    // search, the raw editor, a save, the groups dialog, a copy, the export that asks and the delete that asks
+    await b.$('input[type="search"]').setValue("milano");
+    await waitFor(b, async () => (await rowNames(b)).join() === "Datacenter Milano", "the search did not narrow the list");
+    await press(b, "Escape");
+    await waitFor(b, async () => (await rowNames(b)).length === 5, "the list did not come back");
+    await (await byText(b, "[role=tab]", "Configuration")).click();
+    const area = await b.$('textarea[name="openvpn_config"]');
+    await area.waitForDisplayed({ timeout: TEN_SECONDS });
+    await area.click();
+    await press(b, "Control", "Home");
+    await press(b, ...Array.from("# tour"), "Enter");
+    await b.$("button=Save").click();
+    await waitForBody(b, "Profile saved.", "the notice of the save never showed");
+    await b.$("button=Manage groups").click();
+    await b.$('input[name="new-group"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    await press(b, "Escape");
+    await waitFor(b, async () => (await b.$$('[role="dialog"]')).length === 0, "the groups dialog did not close");
+    await duplicateFromTheMenu(b);
+    await b.$("button=More actions").click();
+    await (await byText(b, "[role=menuitem]", "Export")).click();
+    await waitForBody(b, "The file will contain the private keys", "the export did not ask first");
+    await press(b, "Escape");
+    await b.$("button=More actions").click();
+    await (await byText(b, "[role=menuitem]", "Delete")).click();
+    await waitForBody(b, "This cannot be undone", "the delete did not ask first");
+    await (await byText(b, '[role="alertdialog"] button', "Delete")).click();
+    await waitForBody(b, "Deleted", "the notice of the delete never showed");
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
   it("shell_is_navigable_with_the_seeded_rubrica", async () => {
     const b = await openShell();
     expect(await bodyText(b)).not.toContain("Sample data");

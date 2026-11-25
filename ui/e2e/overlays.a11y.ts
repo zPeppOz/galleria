@@ -50,6 +50,8 @@ describe("menu and dialog under a screen reader", () => {
   it("M1_trigger_exposes_haspopup_and_expanded", async () => {
     const mark = speechMark();
     await key("Tab");
+    await waitForTree((t) => focusedName(t) === "Import…", "the Import button focused");
+    await key("Tab");
     const tree = await waitForTree((t) => focusedName(t) === "Menu", "the Menu button focused");
     const trigger = focusedNode(tree);
     expect(trigger?.states.has("has-popup")).toBe(true);

@@ -1,0 +1,4 @@
+/* «Import profile»: only variables of tokens.css. */
+.import { display: flex; flex-direction: column; gap: var(--sp-6); min-width: 0; }
+.import-form { display: flex; flex-direction: column; gap: var(--sp-6); }
+.import-error { border-radius: var(--r-md); }

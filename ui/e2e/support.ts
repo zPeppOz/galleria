@@ -200,3 +200,18 @@ export function orcaDebugLines(pattern: RegExp): string[] {
 export function seedRubrica(kind: "seeded" | "empty" = "seeded"): void {
   execFileSync(`${env("GALLERIA_SMOKE_BIN")}/rubrica-seed`, kind === "empty" ? ["--empty"] : [], { stdio: "inherit" });
 }
+
+/**
+ * Writes the files an import is tried on (`.ovpn`, `.conf` and the files they refer to, the malicious profile of the
+ * laboratory) into a folder of the run and answers with their paths by name: `inline`, `separate`, `malicious`, `dns`,
+ * `outside`, `office`, `server`. The folder is outside the rubrica, so seeding it again does not touch them.
+ */
+export function importFixtures(): Record<string, string> {
+  const out = execFileSync(`${env("GALLERIA_SMOKE_BIN")}/import-fixtures`, [], { encoding: "utf8" });
+  return Object.fromEntries(
+    out
+      .split("\n")
+      .filter((line) => line.includes("="))
+      .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
+  );
+}

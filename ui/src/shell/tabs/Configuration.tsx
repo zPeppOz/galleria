@@ -1,15 +1,10 @@
 import { useRef } from "react";
 import { Field } from "../../design/Field";
 import { useT, type MessageKey, type Translate } from "../../i18n";
+import { SCRIPT_DIRECTIVES } from "../../rubrica/scripts";
 import type { RawIssue, RawIssueKind } from "../../rubrica/types";
 import "./Configuration.css";
 import { secretLabel, type TabProps } from "./tab";
-
-/**
- * The directives that run a script of the profile (D19): they get the sentence of D19. The other directives that the
- * check calls dangerous (`log`, `user`, `auth-user-pass file`…) get a text of their own, because they do not run one.
- */
-const SCRIPT_DIRECTIVES = new Set(["up", "down", "route-up", "route-pre-down", "ipchange", "tls-verify", "client-connect", "client-disconnect", "learn-address", "auth-user-pass-verify", "plugin", "up-restart", "dns-updown"]);
 
 const KIND_TEXT: Record<RawIssueKind, MessageKey> = {
   syntax: "config.issue.syntax",

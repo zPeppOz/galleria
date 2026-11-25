@@ -15,6 +15,7 @@ describe("AppMenu", () => {
     const user = userEvent.setup();
     render(<App lang="en" />);
     await screen.findByText(/App 9\.8\.7/);
+    await user.tab(); // «Import…» comes first
     await user.tab();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }));
     await user.keyboard("{Enter}");
@@ -36,6 +37,7 @@ describe("AppMenu", () => {
     const user = userEvent.setup();
     render(<App lang="en" />);
     await screen.findByText(/App 9\.8\.7/);
+    await user.tab(); // «Import…» comes first
     await user.tab();
     await user.keyboard("{Enter}");
     await screen.findByRole("menu");

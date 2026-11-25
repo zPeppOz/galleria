@@ -1,15 +1,15 @@
 import { InlineAlert } from "../design/InlineAlert";
+import { Button } from "../design/Button";
 import { errorText, hasKey, useT } from "../i18n";
 import type { Rubrica } from "../rubrica/store";
-import { IMPORT_PROFILE } from "../daemon/commands";
 import { CommandRow } from "./CommandRow";
 import "./RubricaNotices.css";
 
 /**
  * What the rubrica has to say apart from the profiles: the store that cannot be read (with the command to fix it, when
- * there is one), the files that were skipped, and the empty rubrica with the command to import a profile.
+ * there is one), the files that were skipped, and the empty rubrica with the button to import a profile.
  */
-export function RubricaNotices({ rubrica }: { rubrica: Rubrica }) {
+export function RubricaNotices({ rubrica, onImport }: { rubrica: Rubrica; onImport: () => void }) {
   const t = useT();
   const { error, view } = rubrica;
   const skipped = view?.skipped ?? [];
@@ -46,7 +46,7 @@ export function RubricaNotices({ rubrica }: { rubrica: Rubrica }) {
         <section className="rubrica-notice" aria-labelledby="rubrica-empty-title">
           <h1 id="rubrica-empty-title" className="rubrica-empty-title">{t("rubrica.empty.title")}</h1>
           <p className="rubrica-notice-text">{t("rubrica.empty.body")}</p>
-          <CommandRow command={IMPORT_PROFILE} />
+          <div><Button variant="primary" onClick={onImport}>{t("import.empty")}</Button></div>
         </section>
       ) : null}
     </>

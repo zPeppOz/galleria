@@ -61,7 +61,9 @@ describe("App", () => {
     const write = vi.spyOn(navigator.clipboard, "writeText");
     render(<App lang="it" />);
     await ready();
-    await user.tab(); // the menu button of the title bar comes first
+    await user.tab(); // «Importa…» of the title bar comes first
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Importa…" }));
+    await user.tab(); // then the menu button
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }));
     await user.tab(); // then the search field, the sort order (one stop) and the list (one stop)
     expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Cerca connessioni" }));

@@ -279,7 +279,7 @@ describe("the form of a profile under a screen reader", () => {
     expect(focusedNode(back)?.role).toBe("entry");
   });
 
-  it("R5c_empty_rubrica_says_how_to_import", async () => {
+  it("R5c_empty_rubrica_offers_the_import_button", async () => {
     await closeApp();
     b = await openApp(false, "empty");
     await waitForBody(b, "No connections yet", "the empty rubrica did not say so");
@@ -288,7 +288,7 @@ describe("the form of a profile under a screen reader", () => {
     record("R5c the empty rubrica", [], tree);
     // the heading is a node with its name; the paragraph that follows has its text in the text interface of the node
     expect(tree.some((n) => n.role === "heading" && n.name === "No connections yet"), "the heading is in the tree").toBe(true);
-    expect(await bodyText(b), "the command to import is text of the page").toContain("galleria import");
+    expect(tree.some((n) => n.role === "push button" && n.name === "Import a profile…"), "the button to import is in the tree").toBe(true);
   });
 
   /** The tabs of the profile: from the list to the strip, then the arrows to the tab. */

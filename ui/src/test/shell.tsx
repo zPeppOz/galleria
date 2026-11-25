@@ -5,10 +5,11 @@ import type { DaemonView } from "../daemon/types";
 import type { Announce } from "../design/Toast";
 import { Preferences } from "../prefs";
 import { arrange } from "../rubrica/arrange";
+import type { ImportActions } from "../import/types";
 import type { Rubrica } from "../rubrica/store";
 import type { CmdError, GroupActions, ProfileActions, ProfileDetail, ProfilePatch, ProfileSummary, RawCheck, RubricaView } from "../rubrica/types";
 import { Shell } from "../shell/Shell";
-import { applyPatch, makeDetail, makeInfo, makeRubricaView, makeView } from "./fixtures";
+import { applyPatch, makeDetail, makeInfo, makePreview, makeRubricaView, makeSummary, makeView } from "./fixtures";
 
 interface Options {
   lang?: "en" | "it";
@@ -27,6 +28,8 @@ interface Options {
   groups?: GroupActions;
   /** Duplicate, export and delete; by default a copy joins the list, a deleted profile leaves it and the selection moves, as in the app. */
   actions?: ProfileActions;
+  /** The import; by default any text makes the preview of a clean profile, and saving it adds the profile to the list, as the backend would. */
+  importer?: ImportActions;
 }
 
 /** The shell with a rubrica that answers at once and keeps its own selection and sort order: no app behind it, nothing to wait for. */
@@ -70,6 +73,16 @@ function Harness({ view, options }: { view: DaemonView | null; options: Options 
       select((current) => (current !== id ? current : ids.length === 0 ? null : ids[Math.min(before.indexOf(id), ids.length - 1)]));
     },
   };
+  const imports = useRef(0);
+  const importActions: ImportActions = {
+    fromText: async () => makePreview({ id: `import-${(imports.current += 1)}` }),
+    commit: async (_id, name, group) => {
+      const made: ProfileSummary = makeSummary({ id: `imported-${imports.current}`, name, protocol: "openvpn", group, server: "vpn.fixture.example:1194", modified: "2026-11-26T10:00:00Z" });
+      setKept((now) => (now ? { ...now, profiles: [...now.profiles, made] } : now));
+      return made;
+    },
+    discard: async () => undefined,
+  };
   const rubrica: Rubrica = {
     loaded: list !== null || Boolean(options.error),
     view: list,
@@ -85,7 +98,7 @@ function Harness({ view, options }: { view: DaemonView | null; options: Options 
     groups: options.groups ?? groupActions,
   };
   return (
-    <Shell view={view} info={view ? makeInfo() : null} onRetry={options.onRetry ?? (() => undefined)} announce={options.announce} rubrica={rubrica} sort={sort} onSortChange={setSort} />
+    <Shell view={view} info={view ? makeInfo() : null} onRetry={options.onRetry ?? (() => undefined)} announce={options.announce} rubrica={rubrica} importer={options.importer ?? importActions} sort={sort} onSortChange={setSort} />
   );
 }
 

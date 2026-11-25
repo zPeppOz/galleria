@@ -81,12 +81,12 @@ describe("keyboard on the whole shell", () => {
     show(firstRun());
     const stops = await tabStops(user);
     const seen = stops.map((el) => `${roleOf(el)}:${nameOf(el)}`);
-    // The menu button, the search field, the sort order (one stop: the chosen radio), the list (one stop: the chosen row),
+    // «Import…», the menu button, the search field, the sort order (one stop: the chosen radio), the list (one stop: the chosen row),
     // «Manage groups» (the foot of the column), the first-run panel («Copy», «Try again»), the star, «More actions», the tab
     // strip (one stop: the chosen tab) and then the panel itself and its first control.
-    expect(seen.slice(0, 9)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Manage groups", "button:Copy", "button:Try again", "button:Favourite", "button:More actions"]);
-    expect(seen[9]).toBe("tab:General");
-    const rest = seen.slice(10);
+    expect(seen.slice(0, 10)).toEqual(["button:Import…", "button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Manage groups", "button:Copy", "button:Try again", "button:Favourite", "button:More actions"]);
+    expect(seen[10]).toBe("tab:General");
+    const rest = seen.slice(11);
     // After the strip comes the panel of the chosen tab (Base UI makes it a stop) or straight its first control; the
     // first control is the name field either way.
     expect(rest.some((s) => s === "input:Name")).toBe(true);
@@ -97,7 +97,7 @@ describe("keyboard on the whole shell", () => {
     const user = userEvent.setup();
     show();
     const seen = (await tabStops(user)).map((el) => `${roleOf(el)}:${nameOf(el)}`);
-    expect(seen.slice(0, 8)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Manage groups", "button:Favourite", "button:More actions", "tab:General"]);
+    expect(seen.slice(0, 9)).toEqual(["button:Import…", "button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Manage groups", "button:Favourite", "button:More actions", "tab:General"]);
     expect(seen).not.toContain("button:Copy");
   });
 
@@ -171,6 +171,7 @@ describe("keyboard on the whole shell", () => {
     const here = (name: string) => expect(`${roleOf(active())}:${nameOf(active())}`, "where the focus is").toBe(name);
 
     // the app menu: Escape, then a choice
+    await user.tab(); // «Import…» comes first
     await user.tab();
     here("button:Menu");
     await user.keyboard("{Enter}");
@@ -238,7 +239,8 @@ describe("keyboard on the whole shell", () => {
     show();
     const active = () => document.activeElement as HTMLElement;
     const title = () => screen.getByRole("heading", { level: 1 }).textContent;
-    // a profile: Menu → search → sort order → list → the arrows move the choice
+    // a profile: Import… → Menu → search → sort order → list → the arrows move the choice
+    await user.tab();
     await user.tab();
     await user.tab();
     await user.tab();
@@ -392,6 +394,37 @@ describe("keyboard on the whole shell", () => {
     await noticeSaid("Deleted “Datacenter Milano (copy)”.");
     expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(5);
     expect(roleOf(active()), "the focus after the delete is in the list").toBe("option");
+  });
+
+  it("an_import_from_text_needs_no_pointer", async () => {
+    const user = userEvent.setup();
+    const announce = vi.fn();
+    renderShell(makeView(), { announce });
+    const active = () => document.activeElement as HTMLElement;
+    const reach = async (role: string, name: string) => {
+      for (let step = 0; step < 20 && `${roleOf(active())}:${nameOf(active())}` !== `${role}:${name}`; step++) await user.tab();
+      expect(`${roleOf(active())}:${nameOf(active())}`, "where the focus is").toBe(`${role}:${name}`);
+    };
+    // Ctrl+O opens the window and the focus is on the text
+    await user.keyboard("{Control>}o{/Control}");
+    await screen.findByRole("dialog", { name: "Import profile" });
+    await waitFor(() => expect(`${roleOf(active())}:${nameOf(active())}`).toBe("textarea:Paste the text of the profile"));
+    await user.keyboard("client");
+    // Tab goes to «Preview», Enter on it makes the preview and the focus goes to the name
+    await reach("button", "Preview");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(`${roleOf(active())}:${nameOf(active())}`).toBe("input:Name"));
+    // the name is written, the group is a stop of the Tab key, and «Import» is the next one
+    await user.clear(active());
+    await user.keyboard("Casa");
+    await reach("select", "Group");
+    await reach("button", "Import");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(announce).toHaveBeenCalledWith("Imported “Casa”.", false));
+    // the new profile is the chosen one and has the focus: the arrows go on from there
+    await waitFor(() => expect(`${roleOf(active())}:${nameOf(active())}`).toMatch(/^option:Casa/));
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Casa");
   });
 
   it("every_control_of_every_tab_and_of_the_new_dialogs_is_reachable", async () => {

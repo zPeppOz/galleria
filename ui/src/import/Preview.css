@@ -1,0 +1,9 @@
+/* The preview of an import: only variables of tokens.css. */
+.import-preview { display: flex; flex-direction: column; gap: var(--sp-5); }
+.import-summary { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4); }
+.import-file { font-family: var(--mono); overflow-wrap: anywhere; }
+.import-server { color: var(--muted); overflow-wrap: anywhere; }
+.import-found { margin: 0; color: var(--muted); }
+.import-subtitle { margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-strong); letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+.import-notices { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-3); }
+.import-notice code { font-family: var(--mono); }

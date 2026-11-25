@@ -47,6 +47,8 @@ describe("the shell under a screen reader", () => {
   it("S1_list_is_a_named_listbox_and_the_focused_row_is_spoken", async () => {
     const mark = speechMark();
     await key("Tab");
+    await waitForTree(focusedIs("Import…"), "the Import button focused");
+    await key("Tab");
     await waitForTree(focusedIs("Menu"), "the Menu button focused");
     // Menu → the search field → the sort order → the list: Tab until the chosen row has the focus
     const tree = await reach("Ufficio Napoli", ["Tab"], 8);

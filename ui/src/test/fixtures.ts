@@ -1,4 +1,5 @@
 import type { AppInfo, DaemonView, Status } from "../daemon/types";
+import type { ImportPreview } from "../import/types";
 import type { ProfileDetail, ProfilePatch, ProfileSummary, RubricaView } from "../rubrica/types";
 
 export function makeStatus(over: Partial<Status> = {}): Status {
@@ -117,5 +118,24 @@ export function applyPatch(detail: ProfileDetail, patch: ProfilePatch): ProfileD
     wireguard: wireguard ?? detail.wireguard,
     openvpn: openvpn_config !== undefined && detail.openvpn ? { ...detail.openvpn, config: openvpn_config } : detail.openvpn,
     modified: `${detail.modified}+`,
+  };
+}
+
+/** What the backend answers to a text that is a clean OpenVPN profile with a key in it; a test changes what it needs. */
+export function makePreview(over: Partial<ImportPreview> = {}): ImportPreview {
+  return {
+    id: "import-1",
+    origin: "text",
+    file_name: null,
+    suggested_name: "",
+    protocol: "openvpn",
+    server: "vpn.fixture.example:1194",
+    auth: { certificate: true, user_pass: true, otp: false },
+    found: ["openvpn.block.key", "openvpn.block.tls-crypt"],
+    notices: [],
+    removed: 0,
+    groups: ["Lavoro", "Personale", "Clienti"],
+    expires_in_secs: 600,
+    ...over,
   };
 }

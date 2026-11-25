@@ -5,8 +5,11 @@ import { Button } from "../design/Button";
 import { ConfirmDialog } from "../design/ConfirmDialog";
 import { ToastProvider, type Announce } from "../design/Toast";
 import { useLang, useT } from "../i18n";
+import { ImportDialog } from "../import/ImportDialog";
+import type { ImportActions } from "../import/types";
 import { arrange } from "../rubrica/arrange";
 import type { Rubrica } from "../rubrica/store";
+import type { ProfileSummary } from "../rubrica/types";
 import { GroupsDialog } from "./GroupsDialog";
 import { ProfileDetail, type Guard } from "./ProfileDetail";
 import { ProfileList, type ListGroup } from "./ProfileList";
@@ -30,13 +33,18 @@ export function Shell(props: {
   onRetry: () => void;
   announce?: Announce;
   rubrica: Rubrica;
+  /** What the window can do with an import: the preview of a text, saving it, letting it go. */
+  importer: ImportActions;
   sort: SortOrder;
   onSortChange: (sort: SortOrder) => void;
 }) {
-  const { view, info, onRetry, announce, rubrica, sort, onSortChange } = props;
+  const { view, info, onRetry, announce, rubrica, importer, sort, onSortChange } = props;
   const t = useT();
   const lang = useLang();
   const [query, setQuery] = useState("");
+  const [importing, setImporting] = useState(false);
+  // A profile was imported: the focus goes to its row once the rubrica has been read again and the selection has moved to it.
+  const [imported, setImported] = useState<string | null>(null);
   const list = useRef<{ focus: () => void }>(null);
   // The form of the chosen profile says whether it has edits that are not saved; the list asks before it moves away.
   const guard = useRef<Guard | null>(null);
@@ -59,6 +67,25 @@ export function Shell(props: {
     }
     setDeleted(null);
   }, [deleted, profiles, selected]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === "o") {
+        event.preventDefault();
+        setImporting(true);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+  useEffect(() => {
+    if (imported === null || rubrica.selectedId !== imported) return undefined;
+    // After the window of the import has given the focus back to where it was
+    const timer = setTimeout(() => {
+      list.current?.focus();
+      setImported(null);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [imported, rubrica.selectedId]);
   const choose = (id: string) => {
     if (id !== rubrica.selectedId && guard.current?.dirty) setLeaving(id);
     else rubrica.select(id);
@@ -76,6 +103,13 @@ export function Shell(props: {
       // The save was refused: the dialog gave the focus back to the list, and the field with the error takes it again.
       setTimeout(() => guard.current?.focusError(), 0);
     }
+  };
+
+  const wasImported = (profile: ProfileSummary) => {
+    // a search that hides the new profile would leave the focus nowhere
+    setQuery("");
+    setImported(profile.id);
+    choose(profile.id);
   };
 
   // The session of the service shows on the row of its profile, when the profile is in the rubrica: a session that
@@ -106,7 +140,7 @@ export function Shell(props: {
   return (
     <ToastProvider closeLabel={t("toast.close")} announce={announce}>
       <div className="shell">
-        <TopBar info={info} daemonVersion={view?.daemon_version ?? null} />
+        <TopBar info={info} daemonVersion={view?.daemon_version ?? null} onImport={() => setImporting(true)} />
         <div className="shell-body">
           <aside className="shell-aside" aria-label={t("shell.profiles")}>
             {profiles && profiles.length > 0 ? (
@@ -128,7 +162,7 @@ export function Shell(props: {
           </aside>
           <main className="shell-main">
             <ServiceArea view={view} info={info} onRetry={onRetry} />
-            <RubricaNotices rubrica={rubrica} />
+            <RubricaNotices rubrica={rubrica} onImport={() => setImporting(true)} />
             {selected ? (
               <ProfileDetail
                 profile={selected}
@@ -150,6 +184,7 @@ export function Shell(props: {
         </div>
         <StatusBar view={view} info={info} />
         <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
+        <ImportDialog open={importing} onClose={() => setImporting(false)} actions={importer} onImported={wasImported} />
         <ConfirmDialog
           open={leaving !== null}
           title={t("leave.title")}
@@ -159,7 +194,10 @@ export function Shell(props: {
           cancelLabel={t("leave.cancel")}
           onConfirm={() => void leave("save")}
           onAlternate={() => void leave("discard")}
-          onCancel={() => setLeaving(null)}
+          onCancel={() => {
+            setLeaving(null);
+            setImported(null);
+          }}
         />
       </div>
     </ToastProvider>

@@ -52,13 +52,17 @@ describe("Shell", () => {
     expect(within(screen.getByRole("main")).getByText("casa.example:51820")).toBeTruthy();
   });
 
-  it("empty_rubrica_explains_how_to_import", () => {
+  it("empty_rubrica_offers_the_import_button", async () => {
+    const user = userEvent.setup();
     renderShell(makeView(), { rubrica: makeRubricaView({ profiles: [], groups: [] }) });
     expect(screen.getByRole("heading", { level: 1, name: "No connections yet" })).toBeTruthy();
-    expect(screen.getByText("galleria import <file>")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+    // from B4 the window is enough: no command to copy into a terminal
+    expect(document.body.textContent).not.toMatch(/galleria\s+import/);
+    expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(screen.queryByRole("tab")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Import a profile…" }));
+    expect(await screen.findByRole("dialog", { name: "Import profile" })).toBeTruthy();
   });
 
   it("skipped_profiles_are_listed_by_file_name", () => {

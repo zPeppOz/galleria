@@ -1,4 +1,4 @@
 /* The top bar: only variables of tokens.css. */
 .top-bar { display: flex; align-items: center; gap: var(--sp-5); min-height: var(--h-control-lg); padding: var(--sp-2) var(--sp-5) var(--sp-2) var(--sp-6); border-bottom: 1px solid var(--line); background: var(--panel); }
 .top-bar-brand { font-weight: var(--fw-strong); letter-spacing: 0.2px; }
-.top-bar-actions { margin-left: auto; }
+.top-bar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--sp-3); }

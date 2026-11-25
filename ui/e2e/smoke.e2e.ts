@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseColour, tintOver, toHex, type Rgb } from "../src/design/color";
-import { bodyText, closeApp, daemon, env, openApp, readState, TEN_SECONDS, waitForBody, type Browser } from "./support";
+import { bodyText, closeApp, daemon, env, importFixtures, openApp, readState, TEN_SECONDS, waitForBody, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 const DISCONNECTED = /Disconnected|Disconnesso/;
@@ -296,14 +296,6 @@ describe("the shell in the real window", () => {
     expect(await title(b)).toBe("Ufficio Napoli");
   });
 
-  it("empty_rubrica_shows_the_import_hint", async () => {
-    daemon("stop");
-    const b = await openApp(false, "empty");
-    await waitForBody(b, "No connections yet", "the empty rubrica did not say so");
-    await waitForBody(b, "galleria import <file>", "the empty rubrica does not show the command to import a profile");
-    expect(await b.$$('[role="option"]')).toHaveLength(0);
-  });
-
   // R1, D32: the search narrows the list and the sort order chosen comes back after a restart. Every key goes through the
   // real window: the search field is typed in, the sort order is chosen with a click and read back from state.toml.
   it("search_filters_the_list_and_sort_order_survives_a_restart", async () => {
@@ -533,8 +525,8 @@ describe("the shell in the real window", () => {
     expect(names).toEqual(["Ufficio Napoli", "Datacenter Milano", "Homelab", "VPS Hetzner", "Cliente Rossi"]);
     expect(await title(b)).toBe("Ufficio Napoli");
 
-    // Menu, the search field, the sort order, then the list: one stop for the chosen row; ↓ moves the choice and the detail follows
-    for (let step = 0; step < 4; step++) await press(b, "Tab");
+    // Import…, Menu, the search field, the sort order, then the list: one stop for the chosen row; ↓ moves the choice and the detail follows
+    for (let step = 0; step < 5; step++) await press(b, "Tab");
     expect(await activeRole(b)).toBe("option");
     await press(b, "ArrowDown");
     await waitFor(b, async () => (await title(b)) === "Datacenter Milano", "↓ in the list did not change the title of the detail");
@@ -630,5 +622,121 @@ describe("the shell in the real window", () => {
     await chooseFromMenu(b, "Scuro");
     await chooseFromMenu(b, "Chiaro");
     expect(await cspViolations(b)).toEqual([]);
+  });
+});
+
+// T2 (plan B4, I1, I2): a profile is pasted as text in the real window. The text is put in the field in one go with
+// the setter of the browser and an `input` event, which is what a paste does (the keyboard of WebDriver loses letters).
+describe("the import in the real window", () => {
+  const watchCsp = (b: Browser) =>
+    b.execute(() => {
+      const w = window as unknown as { __csp: string[] };
+      w.__csp = [];
+      document.addEventListener("securitypolicyviolation", (e) => w.__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
+    });
+  const cspViolations = (b: Browser) => b.execute(() => (window as unknown as { __csp: string[] }).__csp);
+  const waitFor = (b: Browser, check: () => Promise<boolean>, timeoutMsg: string) => b.waitUntil(check, { timeout: TEN_SECONDS, interval: 250, timeoutMsg });
+  const rowNames = async (b: Browser) => (await b.execute(() => [...document.querySelectorAll('[role="listbox"] [role="option"] span.profile-name')].map((el) => (el.textContent ?? "").trim()))) as string[];
+  const runCli = (...args: string[]) => execFileSync(env("GALLERIA_SMOKE_CLI"), args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  const configDir = () => join(env("XDG_CONFIG_HOME"), "galleria");
+
+  /** Every file under the folder of the profiles, with its bytes: what must stay as it is until «Import». */
+  const onDisk = (): string => {
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true })
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .flatMap((entry) => (entry.isDirectory() ? walk(join(dir, entry.name)) : [`${join(dir, entry.name)}\n${readFileSync(join(dir, entry.name), "utf8")}`]));
+    return walk(configDir()).join("\n---\n");
+  };
+
+  async function openShell(rubrica: "seeded" | "empty" = "seeded"): Promise<Browser> {
+    daemon("start");
+    const b = await openApp(false, rubrica);
+    await waitForBody(b, CONNECTED, "the bar never showed the active link");
+    await watchCsp(b);
+    return b;
+  }
+
+  /** Opens the window of the import with the button of the bar and pastes the text of the file. */
+  async function pasteFile(b: Browser, path: string): Promise<void> {
+    await b.$("button=Import…").click();
+    const field = await b.$('textarea[name="import-text"]');
+    await field.waitForDisplayed({ timeout: TEN_SECONDS });
+    await b.execute(
+      (selector: string, value: string) => {
+        const el = document.querySelector(selector) as HTMLTextAreaElement;
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+        setter?.call(el, value);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      },
+      'textarea[name="import-text"]',
+      readFileSync(path, "utf8"),
+    );
+    await b.$("button=Preview").click();
+    await b.$('input[name="import-name"]').waitForDisplayed({ timeout: TEN_SECONDS });
+  }
+
+  it("a_profile_pasted_as_text_is_imported", async () => {
+    const files = importFixtures();
+    const b = await openShell();
+    await waitFor(b, async () => (await rowNames(b)).length === 5, "the list never showed the five profiles");
+    await pasteFile(b, files.inline);
+    const shown = await bodyText(b);
+    expect(shown).toContain("Found: private key, TLS encryption key. They will be saved in the secrets archive.");
+    expect(shown, "the secrets are named and never shown").not.toContain("SEED-SECRET-");
+    await b.$("button=Import").click();
+    await waitForBody(b, "Imported “Imported profile”.", "the notice of the import never showed");
+    await waitFor(b, async () => (await rowNames(b)).includes("Imported profile"), "the list did not show the new profile");
+    expect(await b.$("h1").getText()).toBe("Imported profile");
+    // the files are on the disk, private, with the secrets in the archive
+    const profiles = readdirSync(join(configDir(), "profiles")).map((name) => readFileSync(join(configDir(), "profiles", name), "utf8"));
+    expect(profiles).toHaveLength(6);
+    expect(profiles.filter((text) => text.includes('name = "Imported profile"'))).toHaveLength(1);
+    expect(readdirSync(join(configDir(), "secrets"))).toHaveLength(6);
+    // and the CLI of the phase 1 lists it
+    expect(runCli("list")).toContain("Imported profile");
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
+  it("nothing_is_written_before_import", async () => {
+    const files = importFixtures();
+    const b = await openShell();
+    await waitFor(b, async () => (await rowNames(b)).length === 5, "the list never showed the five profiles");
+    const before = onDisk();
+    await pasteFile(b, files.inline);
+    expect(onDisk(), "the preview is in memory: the folder is as it was").toBe(before);
+    await b.$("button=Cancel").click();
+    await waitFor(b, async () => (await b.$$('[role="dialog"]')).length === 0, "the window did not close");
+    expect(onDisk(), "after «Cancel» the folder is as it was").toBe(before);
+    expect(await rowNames(b)).toHaveLength(5);
+  });
+
+  it("the_malicious_profile_shows_the_d19_text_and_runs_nothing", async () => {
+    const files = importFixtures();
+    const b = await openShell();
+    await pasteFile(b, files.malicious);
+    const items = (await b.execute(() => [...document.querySelectorAll(".import-notice")].map((el) => (el.textContent ?? "").trim()))) as string[];
+    const script = "Galleria does not run the scripts of profiles. If the profile depends on it, it may not work fully.";
+    expect(items.find((line) => line.includes(" up ")), `the notices were ${JSON.stringify(items)}`).toContain(script);
+    expect(items.find((line) => line.includes(" plugin "))).toContain(script);
+    // the five directives the import of the phase 1 reports; the ones of the service (`script-security`, `management`…) go without a word
+    expect(items).toHaveLength(5);
+    await b.$("button=Import").click();
+    await waitForBody(b, "Imported “Imported profile”. 5 directives removed.", "the notice with the number of directives never showed");
+    // nothing was run: the script of the profile would have made these files
+    expect(readdirSync("/tmp").filter((name) => name.startsWith("PWNED-"))).toEqual([]);
+    // what was saved has none of the dropped lines
+    const saved = readdirSync(join(configDir(), "profiles")).map((name) => readFileSync(join(configDir(), "profiles", name), "utf8")).find((text) => text.includes('name = "Imported profile"')) ?? "";
+    expect(saved).not.toMatch(/PWNED|script-security|plugin/);
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
+  it("empty_rubrica_offers_the_import_button", async () => {
+    daemon("stop");
+    const b = await openApp(false, "empty");
+    await waitForBody(b, "No connections yet", "the empty rubrica did not say so");
+    await waitForBody(b, "Import a profile…", "the empty rubrica does not offer the import");
+    expect(await bodyText(b), "no command to copy: the window is enough").not.toMatch(/galleria\s+import/);
+    expect(await b.$$('[role="option"]')).toHaveLength(0);
   });
 });

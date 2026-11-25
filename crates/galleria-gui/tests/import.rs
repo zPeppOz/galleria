@@ -962,3 +962,27 @@ fn fixture_matches_the_lab_malicious_profile() {
         assert!(ours.contains(&line), "the fixture lacks {line:?}");
     }
 }
+
+#[test]
+fn the_script_directives_are_the_same_in_rust_and_in_the_page() {
+    let page = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/src/rubrica/scripts.ts"),
+    )
+    .unwrap();
+    let list = page
+        .split("SCRIPT_DIRECTIVES: ReadonlySet<string> = new Set([")
+        .nth(1)
+        .expect("scripts.ts lists the directives")
+        .split("]);")
+        .next()
+        .unwrap();
+    let mut page: Vec<&str> = list
+        .split(',')
+        .map(|name| name.trim().trim_matches('"'))
+        .filter(|name| !name.is_empty())
+        .collect();
+    let mut rust: Vec<&str> = galleria_gui::import::SCRIPT_DIRECTIVES.to_vec();
+    page.sort_unstable();
+    rust.sort_unstable();
+    assert_eq!(page, rust);
+}

@@ -9,6 +9,8 @@
 #   scripts/gui.sh smoke          build the app and the fake daemon, then the WebDriver smoke test (lab/tests/gui-smoke.sh)
 #   scripts/gui.sh pnpm-version   print the pnpm version pinned in package.json (for CI)
 #
+# GUI_UID / GUI_GID set the user of the container (default: the invoking user), to try a uid the image does not know.
+#
 # Like lab/build.sh: the host Rust toolchain is mounted read-only, the build runs as the invoking user (rootless
 # Docker maps container root to that user), and nothing is written outside the repository and the cargo registry.
 set -euo pipefail
@@ -40,8 +42,19 @@ run_in_image() {
   local user
   user="$(id -u):$(id -g)"
   if docker info --format '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless; then user=0:0; fi
-  mkdir -p "$HOME/.cargo/registry" target/gui-home
-  local -a opts=(--rm --user "$user" -v "$PWD:/work" -w /work
+  # GUI_UID / GUI_GID force the user of the container, to try a runner whose user is not in the image (CI: 1001).
+  user="${GUI_UID:-${user%%:*}}:${GUI_GID:-${user##*:}}"
+  mkdir -p "$HOME/.cargo/registry" target/gui-home target/gui-etc
+  local -a opts=(--rm --user "$user" -v "$PWD:/work" -w /work)
+  # dbus-run-session (and so the smoke test) refuses to start for a user missing from /etc/passwd, and the uid of a
+  # CI runner (1001) is not in the image: give the container a passwd and a group with an entry for the user it runs as.
+  if [[ ${user%%:*} != 0 ]]; then
+    printf 'root:x:0:0:root:/root:/bin/bash\ngui:x:%s:%s:Galleria GUI:/work/target/gui-home:/bin/bash\n' \
+      "${user%%:*}" "${user##*:}" > target/gui-etc/passwd
+    printf 'root:x:0:\ngui:x:%s:\n' "${user##*:}" > target/gui-etc/group
+    opts+=(-v "$PWD/target/gui-etc/passwd:/etc/passwd:ro" -v "$PWD/target/gui-etc/group:/etc/group:ro")
+  fi
+  opts+=(
     -v "${RUSTUP_HOME:-$HOME/.rustup}:/opt/rustup:ro"
     -v "$HOME/.cargo/bin:/opt/cargo/bin:ro" -v "$HOME/.cargo/registry:/cargo-registry"
     -e HOME=/work/target/gui-home -e RUSTUP_HOME=/opt/rustup -e CARGO_HOME=/work/target/gui-home/cargo

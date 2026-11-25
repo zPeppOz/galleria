@@ -11,11 +11,17 @@ use galleria_gui::{
     supervisor::RelinkPolicy,
     ui_state::UiStateFile,
 };
-use galleria_profile::ProfileStore;
+use galleria_profile::{ProfileStore, StoreError};
 use rstest::rstest;
 use seed::{GROUPS, SECRET_MARK, seed};
 use serde_json::{Value, json};
-use std::{fs, path::Path, sync::Arc, time::Duration};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    sync::Arc,
+    time::Duration,
+};
 use tauri::{
     WebviewWindow, WebviewWindowBuilder,
     ipc::{CallbackFn, InvokeBody},
@@ -199,8 +205,9 @@ fn rename_moves_every_member_and_keeps_the_position() {
 #[test]
 fn rename_is_resumable_after_a_failure() {
     // A rename writes the profiles first and the list last, so a failure in between leaves some profiles with the new name
-    // while the list still has the old one. This is that state (made by hand: a failing write cannot be forced the same way
-    // for every user the tests run as); the same call finishes the work and does not complain about the new name.
+    // while the list still has the old one. This is that state, made by hand; the order itself is held by
+    // `rename_writes_the_profiles_before_the_list` and `delete_writes_the_profiles_before_the_list`. The same call finishes
+    // the work and does not complain about the new name.
     let root = tempfile::tempdir().unwrap();
     let galleria = root.path().join("galleria");
     let seeded = seed(&galleria, false);
@@ -231,6 +238,150 @@ fn rename_is_resumable_after_a_failure() {
         rubrica.group_rename("Lavoro", "Ufficio"),
         Err(RubricaError::GroupNotFound)
     ));
+}
+
+// ---- the order of the writes -----------------------------------------------------------------------------------------
+//
+// «The profiles first, the list last» is what makes a rename or a delete that stops half way resumable. A failing write
+// cannot be forced with permissions (the tests also run as root, where they do not stop anything), so the failure is the
+// size of a file: the test runs itself again in a child process under `ulimit -f`, a limit that a profile fits in and
+// the list of groups (made long on purpose) does not. The write of the list fails with the real error of the system and
+// the child looks at what the failure left behind: with the order turned round the profiles would be as they were.
+
+/// Set for the child process: the folder that holds the rubrica prepared by the parent.
+const CHILD_ROOT: &str = "GALLERIA_TEST_FSIZE_ROOT";
+/// The limit given to `ulimit -f`: 8 blocks, which are 4 KiB for `dash` and 8 KiB for `bash`.
+const BLOCKS: usize = 8;
+
+/// A rubrica whose list of groups is too long to be written under the limit, while its profiles are not.
+fn rubrica_with_a_long_list(root: &Path) {
+    let galleria = root.join("galleria");
+    seed(&galleria, false);
+    let store = ProfileStore::open(&galleria).unwrap();
+    let mut settings = store.settings().unwrap();
+    settings
+        .groups
+        .extend((0..300).map(|i| format!("Group number {i:03} {}", "x".repeat(24))));
+    store.save_settings(&settings).unwrap();
+    let size = |path: PathBuf| fs::metadata(path).unwrap().len();
+    let longest_profile = fs::read_dir(galleria.join("profiles"))
+        .unwrap()
+        .map(|e| size(e.unwrap().path()))
+        .max()
+        .unwrap();
+    assert!(
+        longest_profile < 4096,
+        "a profile ({longest_profile} bytes) must fit in the limit of either shell"
+    );
+    assert!(
+        size(galleria.join("galleria.toml")) > 8192 + 512,
+        "the list must not fit in the limit of either shell"
+    );
+}
+
+/// Runs the test `name` again as a child that cannot write a file longer than the limit (and gets an error, not a
+/// signal, when it tries). Fails with what the child said when the child fails.
+fn run_under_the_file_limit(name: &str, root: &Path) {
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(format!(
+            "trap '' XFSZ; ulimit -f {BLOCKS} && exec \"$0\" \"$@\""
+        ))
+        .arg(std::env::current_exe().unwrap())
+        .args(["--exact", name, "--test-threads=1"])
+        .env(CHILD_ROOT, root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "the child failed ({}):\n{}\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // the child really ran the test: `--exact` with a name that is not there would pass with zero tests
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+        "the child ran no test: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+fn group_of_profile(galleria: &Path, name: &str) -> Option<String> {
+    let (profiles, _) = ProfileStore::open(galleria)
+        .unwrap()
+        .list_lenient()
+        .unwrap();
+    profiles.into_iter().find(|p| p.name == name).unwrap().group
+}
+
+#[test]
+fn rename_writes_the_profiles_before_the_list() {
+    let Some(root) = std::env::var_os(CHILD_ROOT).map(PathBuf::from) else {
+        let root = tempfile::tempdir().unwrap();
+        rubrica_with_a_long_list(root.path());
+        return run_under_the_file_limit("rename_writes_the_profiles_before_the_list", root.path());
+    };
+    let galleria = root.join("galleria");
+    let (rubrica, _) = rubrica_in(&root);
+    let error = rubrica.group_rename("Lavoro", "Ufficio").unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            RubricaError::Store {
+                source: StoreError::Io(_),
+                ..
+            }
+        ),
+        "the list could not be written, so the call fails: {error:?}"
+    );
+    // the profiles were written before the list was tried...
+    for name in ["Ufficio Napoli", "Datacenter Milano"] {
+        assert_eq!(
+            group_of_profile(&galleria, name).as_deref(),
+            Some("Ufficio"),
+            "{name}"
+        );
+    }
+    // ...and the list is as it was, with the old name: the same call can finish the work
+    let groups = ProfileStore::open(&galleria)
+        .unwrap()
+        .settings()
+        .unwrap()
+        .groups;
+    assert_eq!(groups[0], "Lavoro");
+    assert!(!groups.iter().any(|g| g == "Ufficio"));
+}
+
+#[test]
+fn delete_writes_the_profiles_before_the_list() {
+    let Some(root) = std::env::var_os(CHILD_ROOT).map(PathBuf::from) else {
+        let root = tempfile::tempdir().unwrap();
+        rubrica_with_a_long_list(root.path());
+        return run_under_the_file_limit("delete_writes_the_profiles_before_the_list", root.path());
+    };
+    let galleria = root.join("galleria");
+    let (rubrica, _) = rubrica_in(&root);
+    let error = rubrica.group_delete("Lavoro").unwrap_err();
+    assert!(
+        matches!(
+            &error,
+            RubricaError::Store {
+                source: StoreError::Io(_),
+                ..
+            }
+        ),
+        "the list could not be written, so the call fails: {error:?}"
+    );
+    for name in ["Ufficio Napoli", "Datacenter Milano"] {
+        assert_eq!(group_of_profile(&galleria, name), None, "{name}");
+    }
+    let groups = ProfileStore::open(&galleria)
+        .unwrap()
+        .settings()
+        .unwrap()
+        .groups;
+    assert_eq!(groups[0], "Lavoro", "the list still has the group");
 }
 
 #[test]

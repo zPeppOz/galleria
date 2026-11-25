@@ -834,9 +834,11 @@ WireGuard con più peer nella finestra vera (provato in jsdom e con le prove Rus
 
 Scostamenti dal piano, da sapere:
 
-- `rename_is_resumable_after_a_failure` **non forza** una scrittura che fallisce a metà: nell'immagine (e in locale) le prove girano come root, per cui togliere i permessi di scrittura non impedisce niente, e non c'è un altro
-  modo pulito di far fallire il secondo profilo e non il primo. La prova mette a mano lo stato che un fallimento lascia (un profilo già col nome nuovo, l'elenco ancora col vecchio) e controlla che la stessa chiamata
-  lo finisca. Che una scrittura che fallisce restituisca un errore è già coperto da `store_errors_map_to_gui_codes` e dalle prove di T5.
+- `rename_is_resumable_after_a_failure` mette a mano lo stato che un fallimento a metà lascia (un profilo già col nome nuovo, l'elenco ancora col vecchio) e controlla che la stessa chiamata
+  lo finisca. Non vede l'ordine delle scritture: lo tengono `rename_writes_the_profiles_before_the_list` e `delete_writes_the_profiles_before_the_list`, che forzano un fallimento
+  vero della scrittura dell'elenco senza permessi (le prove girano come root, dove togliere i permessi non ferma niente): la prova rilancia se stessa in un processo figlio sotto `ulimit -f`,
+  un limite in cui un profilo sta e l'elenco dei gruppi (reso lungo apposta) no; la scrittura dell'elenco fallisce con l'errore vero del sistema (`EFBIG`) e il figlio guarda cosa è rimasto: i profili
+  già spostati e l'elenco col vecchio nome. Con l'ordine invertito (elenco prima) le due prove sono rosse. Che una scrittura che fallisce restituisca un errore è già coperto da `store_errors_map_to_gui_codes` e dalle prove di T5.
 - Un profilo che non si legge (saltato da `list_lenient`) non è spostato da una rinomina o eliminazione: tiene il vecchio nome di gruppo (si vede finché è saltato).
 - Il piano diceva che la finestra «offre “Aggiungi all'elenco”»: lo fa con `group_create` (quello è anche il modo), niente comando in più.
 

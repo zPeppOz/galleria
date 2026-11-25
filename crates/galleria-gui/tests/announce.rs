@@ -194,10 +194,22 @@ mod atk {
         glib::{self, StaticType, object::ObjectExt, subclass::SignalId},
         prelude::Cast,
     };
-    use std::sync::{Arc, Mutex};
+    use std::sync::{Arc, Mutex, MutexGuard};
+
+    /// Every test of this module takes it first. GLib registers the ATK types (`AtkNoOpObject` and its interfaces) the
+    /// first time one is asked for, and that is not safe from two threads at once: the tests run on one thread each,
+    /// and two of them at the same time make `g_type_add_interface_static` fail and `NoOpObject::new` panic (about 1
+    /// run in 10). The app is not exposed: it only touches ATK on the main thread of GTK (`AtkAnnouncer`).
+    /// A test that panicked while holding it leaves the lock poisoned, and the next ones must still run.
+    static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+
+    fn one_at_a_time() -> MutexGuard<'static, ()> {
+        ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner())
+    }
 
     #[test]
     fn a_missing_signal_is_skipped_without_a_panic() {
+        let _one = one_at_a_time();
         // A plain GObject has neither `announcement` nor `notification`, like the accessible of a system with an
         // ATK older than 2.46: `emit_by_name` would panic, so the signal is looked up first (S19).
         let plain = glib::Object::new::<glib::Object>();
@@ -210,6 +222,7 @@ mod atk {
 
     #[test]
     fn the_signal_atk_has_is_emitted_with_the_text_and_the_urgency() {
+        let _one = one_at_a_time();
         // A real AtkObject, no display needed. The signal names and arguments are those of ATK ≥ 2.50 (the image has 2.52).
         let accessible = NoOpObject::new(&glib::Object::new::<glib::Object>());
         assert!(
@@ -244,6 +257,7 @@ mod atk {
 
     #[test]
     fn the_type_of_an_atk_object_is_not_a_plain_gobject() {
+        let _one = one_at_a_time();
         // control for the test above: it is the lookup on the type that tells the two apart
         assert_ne!(NoOpObject::static_type(), glib::Object::static_type());
     }

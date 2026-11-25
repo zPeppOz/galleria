@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",
+    "test:e2e": "vitest run --config e2e/vitest.config.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.5",
@@ -19,13 +20,15 @@
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.13",
+    "@types/node": "26.6.10",
     "@types/react": "19.3.2",
-    "axe-core": "4.14.1",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
+    "axe-core": "4.14.1",
     "jsdom": "31.0.1",
     "typescript": "7.0.2",
     "vite": "8.3.8",
-    "vitest": "5.1.2"
+    "vitest": "5.1.2",
+    "webdriverio": "10.2.0"
   }
 }

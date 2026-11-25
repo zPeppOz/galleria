@@ -1,12 +1,13 @@
 # Build and test environment for galleria-gui: Ubuntu 24.04 with the Tauri 2 prerequisites for Debian and Ubuntu
-# (https://v2.tauri.app/start/prerequisites/), the Node version pinned in .nvmrc and pnpm.
+# (https://v2.tauri.app/start/prerequisites/), what the WebDriver smoke test needs (webkit2gtk-driver, Xvfb, xclip), the
+# Node version pinned in .nvmrc and pnpm. tauri-driver is a Rust tool: scripts/gui.sh installs it under target/gui-tools.
 # Built by scripts/gui.sh, which passes NODE_VERSION and PNPM_VERSION from .nvmrc and package.json.
 FROM ubuntu:24.04
 ARG NODE_VERSION
 ARG PNPM_VERSION
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential pkg-config ca-certificates curl wget file git xz-utils xvfb dbus fonts-dejavu-core \
+        build-essential pkg-config ca-certificates curl wget file git xz-utils xvfb xauth xclip dbus fonts-dejavu-core webkit2gtk-driver iproute2 \
         libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN set -eux; \

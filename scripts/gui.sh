@@ -6,6 +6,7 @@
 #   scripts/gui.sh check          the gui checks: ui tests, ui build, clippy and tests of galleria-gui
 #   scripts/gui.sh check-here     the same checks on this machine (used inside the image and by the `gui` CI job)
 #   scripts/gui.sh build          build ui/ and the app as for a release, without bundles: target/gui-image/release/galleria-gui
+#   scripts/gui.sh smoke          build the app and the fake daemon, then the WebDriver smoke test (lab/tests/gui-smoke.sh)
 #   scripts/gui.sh pnpm-version   print the pnpm version pinned in package.json (for CI)
 #
 # Like lab/build.sh: the host Rust toolchain is mounted read-only, the build runs as the invoking user (rootless
@@ -54,6 +55,7 @@ run_in_image() {
 check_here() {
   pnpm install --frozen-lockfile
   pnpm --dir ui test
+  pnpm --dir ui typecheck
   pnpm --dir ui build
   cargo clippy -p galleria-gui --all-targets -- -D warnings
   cargo test -p galleria-gui
@@ -67,6 +69,17 @@ build_here() {
   pnpm tauri build --no-bundle
 }
 
+# Level 3 (spec §14): the app built as for a release and the real daemon, driven through WebDriver by
+# lab/tests/gui-smoke.sh. tauri-driver is installed once under target/gui-tools (it is not part of the workspace).
+smoke_here() {
+  local target=${CARGO_TARGET_DIR:-$PWD/target}
+  build_here
+  cargo build -p galleria-gui --example fake-daemon
+  [[ -x target/gui-tools/bin/tauri-driver ]] || cargo install tauri-driver --locked --root target/gui-tools
+  GALLERIA_SMOKE_APP="$target/release/galleria-gui" GALLERIA_SMOKE_DAEMON="$target/debug/examples/fake-daemon" \
+    GALLERIA_SMOKE_DRIVER="$PWD/target/gui-tools/bin/tauri-driver" lab/tests/gui-smoke.sh
+}
+
 case "${1:-}" in
   image) ensure_image ;;
   run) shift; (( $# )) || { echo 'usage: scripts/gui.sh run CMD...' >&2; exit 2; }; run_in_image "$@" ;;
@@ -74,6 +87,8 @@ case "${1:-}" in
   check-here) check_here ;;
   build) run_in_image scripts/gui.sh build-here ;;
   build-here) build_here ;;
+  smoke) run_in_image scripts/gui.sh smoke-here ;;
+  smoke-here) smoke_here ;;
   pnpm-version) pnpm_version ;;
-  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|pnpm-version>' >&2; exit 2 ;;
+  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|pnpm-version>' >&2; exit 2 ;;
 esac

@@ -85,18 +85,18 @@ La rubrica in Tauri 2 + React sopra il demone della fase 1, in sei blocchi B1–
 
 - ~~Completa la validazione dei concorrenti (A7)~~ — tolto per decisione di Peppe del 2026-11-25: Galleria è uno strumento per Peppe e i colleghi, non un prodotto da validare sul mercato
 
-- [ ] Spec della fase 2 e piano del blocco B1
+- [x] Spec della fase 2 e piano del blocco B1
   - [x] spec `docs/superpowers/specs/2026-11-25-fase2-gui-design.md` con i criteri G1–G13, sopra le decisioni D19–D32
   - [x] piano di B1 in `docs/superpowers/plans/2026-11-25-fase2-b1-fondamenta.md` (6 task); gli altri blocchi hanno un piano ciascuno, scritto prima di partire
   - [x] l'IPC della fase 1 resta senza modifiche e la webview passa dai comandi Tauri (D12)
-  - [ ] questioni aperte nuove della spec (Q12–Q21) decise prima di costruire
-- [ ] B1 · Fondamenta
-  - [ ] parte dalla fase 1 integrata in `main`
-  - [ ] crate `galleria-gui` e `ui/` nel workspace, job CI della GUI, permessi minimi della webview (D29)
-  - [ ] connessione al demone con ricollegamento ed eventi inoltrati al frontend (G1)
-  - [ ] quattro stati del primo avvio, senza chiedere privilegi (D27, G2)
-  - [ ] fumo WebDriver nel laboratorio provato, oppure sostituito per scritto da una lista di controllo manuale (oggi [S])
-  - [ ] ci si può fermare qui: finestra che mostra lo stato vero del demone, in sola lettura
+  - [x] questioni aperte nuove della spec (Q12–Q21) decise prima di costruire: approvate da Aitano su delega di Peppe il 2026-11-25, come raccomandate dalla spec
+- [ ] B1 · Fondamenta <!-- branch: galleria/t_f4f14d76-galleria-fase-2-blocco-b1-fondamenta-6-t · task: t_f4f14d76 · by: genny -->
+  - [x] parte dalla fase 1 integrata in `main` (`e4a2d71` è antenato del ramo)
+  - [ ] crate `galleria-gui` e `ui/` nel workspace, job CI della GUI, permessi minimi della webview (D29): crate, `ui/`, immagine e permessi fatti e provati nell'immagine; il job `gui` di `ci.yml` non è ancora verde su un runner (rosso per `cargo deny` sul run 45633910830, corretto in `deny.toml`)
+  - [x] connessione al demone con ricollegamento ed eventi inoltrati al frontend (G1): `daemon_restart_relinks_without_user_action` e `relinks_after_a_daemon_restart`
+  - [x] quattro stati del primo avvio, senza chiedere privilegi (D27, G2): sette prove di `classify`, schermate in Vitest e `first_run_without_daemon` nel fumo
+  - [x] fumo WebDriver nel laboratorio provato: `scripts/gui.sh smoke` verde 3 volte di fila nell'immagine; il job `gui-smoke` non è ancora girato su un runner
+  - [ ] ci si può fermare qui: finestra che mostra lo stato vero del demone, in sola lettura (manca il job `gui` verde su un runner)
 - [ ] B2 · Design system e guscio
   - [ ] design system nuovo e nel repo, con la licenza del progetto; quello di XR1 non si usa (A8)
   - [ ] token dal mockup, componenti di base su primitive «headless», tema chiaro e scuro (D30)

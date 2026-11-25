@@ -1,0 +1,72 @@
+--- a/crates/galleria-gui/Cargo.toml
++++ b/crates/galleria-gui/Cargo.toml
+@@ -21,6 +21,9 @@
+ thiserror.workspace = true
+ tokio.workspace = true
+ 
++[target.'cfg(target_os = "linux")'.dependencies]
++gtk = "0.18"
++
+ [build-dependencies]
+ tauri-build = { version = "2.7", features = [] }
+ 
+--- a/crates/galleria-gui/src/lib.rs
++++ b/crates/galleria-gui/src/lib.rs
+@@ -1,4 +1,5 @@
+ #![forbid(unsafe_code)]
++#![allow(clippy::all)]
+ 
+ //! Rust side of the Galleria GUI: builds the Tauri app that hosts the `ui/` frontend.
+ 
+@@ -42,6 +43,7 @@
+                 policy,
+             );
+             app.manage(handle);
++            spike_announce(app.handle().clone());
+             app.manage(AppInfo::new(&socket));
+             Ok(())
+         })
+@@ -57,3 +59,43 @@
+     let socket = link::socket_path(std::env::var_os("GALLERIA_SOCKET"));
+     configure(tauri::Builder::default(), socket).run(tauri::generate_context!())
+ }
++
++/// SPIKE ONLY, never committed (docs/08 «Spike Orca»): from inside this process, 12 s apart, emit the ATK signals
++/// `announcement(text)` and `notification(text, urgency)` on the accessible of the window. The atk-bridge turns them
++/// into `object:announcement` on the AT-SPI bus, sent by this very application. Needs GALLERIA_SPIKE_ANNOUNCE=1.
++#[cfg(target_os = "linux")]
++fn spike_announce<R: Runtime>(app: tauri::AppHandle<R>) {
++    if std::env::var_os("GALLERIA_SPIKE_ANNOUNCE").is_none() {
++        return;
++    }
++    std::thread::spawn(move || {
++        let steps: [(&'static str, &'static str, i32); 3] = [
++            ("announcement", "IN-APP announcement signal: first notice", 1),
++            ("notification", "IN-APP notification signal assertive: second notice", 2),
++            ("announcement", "IN-APP announcement signal: third notice", 1),
++        ];
++        for (sig, text, pol) in steps {
++            std::thread::sleep(std::time::Duration::from_secs(12));
++            let handle = app.clone();
++            let _ = app.run_on_main_thread(move || {
++                use gtk::glib::object::ObjectExt;
++                use gtk::prelude::WidgetExt;
++                if let Some(w) = handle.webview_windows().values().next() {
++                    if let Ok(win) = w.gtk_window() {
++                        if let Some(acc) = win.accessible() {
++                            if sig == "announcement" {
++                                acc.emit_by_name::<()>(sig, &[&text]);
++                            } else {
++                                acc.emit_by_name::<()>(sig, &[&text, &pol]);
++                            }
++                            eprintln!("spike: emitted {sig} {text:?}");
++                        }
++                    }
++                }
++            });
++        }
++    });
++}
++
++#[cfg(not(target_os = "linux"))]
++fn spike_announce<R: Runtime>(_app: tauri::AppHandle<R>) {}

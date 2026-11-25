@@ -1,0 +1,71 @@
+/* Design tokens of Galleria: the colours of the two themes, and the scales of radius, space, height and type.
+   The mockup (design/mockup/Rubrica.html) has the look; the values that did not pass WCAG AA are corrected, with the
+   proposal of the plan B2 (Q23: C1–C7, R1, P1, F1–F4). Only this file may contain a colour: ui/src/design/css-rules.test.ts.
+   Contrast is proved from these values by tokens.test.ts; the oklch() colours are proved against their sRGB hex
+   (the table in color.ts) and painted by the real window in the smoke test (S8). */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces and lines */
+  --bg: #141518; --panel: #1b1c20; --panel-2: #222328;
+  --line: #2c2e34;          /* separators only */
+  --line-strong: #73757e;   /* the border of a control and of the dialog: 3:1 on the surfaces */
+
+  /* Text */
+  --ink: #ecebe7; --muted: #a6a6a2; --faint: #8e8f8c;
+
+  /* Accent: fills, the indicator of a tab, the focus ring; never a text colour */
+  --accent: oklch(0.76 0.14 62); --accent-ink: #1a1206;
+
+  /* States and protocols */
+  --ok: oklch(0.76 0.15 150); --warn: oklch(0.8 0.14 85); --err: oklch(0.68 0.19 25);
+  --wg: oklch(0.74 0.11 200); --ovpn: oklch(0.75 0.12 40);
+
+  /* Tint of a state or a protocol: color-mix(in oklch, var(--ok) var(--tint), transparent). Text on a tint is --ink. */
+  --tint: 14%;
+
+  /* Veil and shadows, the same in both themes */
+  --scrim: #0008;
+  --shadow-md: 0 10px 30px #0009;
+  --shadow-lg: 0 20px 50px #000a;
+
+  /* Focus ring: 2 px, 2 px away from the control */
+  --focus-ring: 2px solid var(--accent);
+  --focus-offset: 2px;
+
+  /* Radius */
+  --r-xs: 4px;     /* protocol tags, kbd */
+  --r-sm: 6px;     /* buttons, fields, segmented control, list rows */
+  --r-md: 8px;     /* panels, toast */
+  --r-lg: 12px;    /* dialog, menu */
+  --r-full: 999px; /* switch */
+
+  /* Space */
+  --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 12px; --sp-6: 16px; --sp-7: 20px; --sp-8: 24px; --sp-9: 28px;
+
+  /* Heights */
+  --h-control: 36px; --h-control-lg: 42px; --h-row: 44px;
+
+  /* Type: the fonts of the system only. `system-ui` is left out on purpose (S17): in WebKitGTK 2.52.6 it does not follow
+     the desktop font (it stayed on the default sans with `gtk-font-name` set to a serif), so the list of the mockup stays. */
+  --font: "Segoe UI Variable Text", "Segoe UI", Cantarell, "Ubuntu", "Noto Sans", ui-sans-serif, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", "DejaVu Sans Mono", monospace;
+  --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-base: 14px; --fs-lg: 16px; --fs-xl: 22px;
+  --fw-regular: 400; --fw-medium: 500; --fw-strong: 600;
+  --lh: 1.45; --lh-mono: 1.6;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #eeede9; --panel: #f7f6f3; --panel-2: #ffffff;
+  --line: #dddbd5; --line-strong: #85837b;
+
+  --ink: #1c1c1a; --muted: #55544f; --faint: #696862;
+
+  --accent: oklch(0.62 0.15 55); --accent-ink: #1a1206;
+
+  --ok: oklch(0.47 0.13 150); --warn: oklch(0.48 0.095 75); --err: oklch(0.5 0.19 27);
+  --wg: oklch(0.46 0.075 215); --ovpn: oklch(0.48 0.14 40);
+}

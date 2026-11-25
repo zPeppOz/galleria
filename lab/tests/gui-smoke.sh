@@ -34,4 +34,5 @@ export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 WEBKIT_DISABLE_DMABUF_RENDERER
 gui_start_driver
 
 cd "$GALLERIA_SMOKE_REPO"
-pnpm --dir ui test:e2e
+# GALLERIA_SMOKE_FILTER runs only the tests whose name matches (a vitest -t pattern), to work on one test.
+pnpm --dir ui test:e2e ${GALLERIA_SMOKE_FILTER:+-t "$GALLERIA_SMOKE_FILTER"}

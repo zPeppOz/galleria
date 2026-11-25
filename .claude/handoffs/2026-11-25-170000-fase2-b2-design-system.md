@@ -13,6 +13,7 @@
 | Task | Contenuto |
 | --- | --- |
 | T1 | Q12 verificata: **Base UI 1.9.0 regge** (nessuna condizione di stop scattata, niente Radix). `design/{Dialog,Menu,icons}.tsx`, `app/{AppMenu,AboutDialog}.tsx`, controllo licenze JS, `scripts/gui.sh a11y` con Orca + AT-SPI, `ui/e2e/{support,overlays.a11y}.ts` |
+| T2 | `design/{tokens.css,base.css,theme.ts,color.ts}`, prove di contrasto/tema/regole CSS; S8 verde nella finestra vera, S17 falso (via `system-ui`) |
 
 ## Scelte da sapere (T1)
 
@@ -29,3 +30,14 @@
 - `AppMenu` tiene la lingua scelta nello stato di `App` (il T3 la sposta in `prefs`).
 - Strumenti di sessione: heredoc e `python3 -c` sono bloccati in modalità non presidiata: i file si scrivono con gli strumenti
   di file; per Docker `scripts/gui.sh run` fa da tramite (con `GUI_CONTAINER_NAME=t_fa55d26a-…`).
+
+## Scelte da sapere (T2)
+
+- WebKitWebDriver: `takeScreenshot` di un elemento restituisce **tutta la pagina**. Per i colori si fotografa la finestra e si legge
+  il pixel di un riquadro messo in alto a sinistra (`paint()` in `smoke.e2e.ts`); prima del clic si aspettano due `requestAnimationFrame`.
+- `system-ui` non segue il carattere del desktop in WebKitGTK 2.52.6 (provato con `gtk-font-name` serif): tolto da `--font` (F3).
+- In questa immagine WebKitGTK dichiara `prefers-color-scheme: light`: con «Sistema» l'app parte chiara.
+- `GALLERIA_SMOKE_FILTER='nome'` fa girare una sola prova del fumo (pattern `-t` di vitest); comodo con `scripts/gui.sh run`
+  e i binari già costruiti (`target/gui-image/release/galleria-gui`, `target/gui-image/debug/examples/fake-daemon`).
+- `styles.css` resta con le misure di B1 (eccezione per nome in `css-rules.test.ts`); sparisce al T6.
+- `--tint` è `14%`: le tinte si scrivono `color-mix(in oklch, var(--ok) var(--tint), transparent)`, testo `--ink` sopra.

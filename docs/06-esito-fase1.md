@@ -9,7 +9,8 @@ Piano e requisiti: [piano](superpowers/plans/2026-11-10-fase1-demone.md),
 T13–T16 completati. I criteri E1–E7 sono verificati localmente sui tre client.
 Le prove riportate come locali sono eseguite in Docker su WSL2,
 con WireGuard nel kernel e tun già disponibili. Nessun modprobe o cambiamento di rete sull'host.
-Nessun push: i job GitHub `check`, `coverage`, `lab` e `lab-dco` sono scritti ma **mai eseguiti**.
+I job GitHub `check`, `coverage` e `lab` sono stati eseguiti sul run 43707067359 e sono verdi (vedi S2 in §4);
+anche `lab-dco` (client 27 e 79) è verde sul run 45625594806 (vedi S2 in §4).
 Non sono state usate VM, Windows o NetworkManager desktop. Questi limiti non sono criteri dichiarati chiusi.
 
 ## 2. Criteri E1–E7
@@ -63,7 +64,7 @@ verdi dopo il fix. Nessuna modifica di sysctl sull'host.
 | Punto | Stato e prova |
 | --- | --- |
 | S1 | Locale, T8: creazione/configurazione/lettura/rimozione WireGuard dietro WgDevice. |
-| S2 | **Aperto per GitHub**. Il laboratorio locale funziona; il runner non è mai stato eseguito. |
+| S2 | **Chiuso**. Run [43707067359](https://github.com/zPeppOz/galleria/actions/runs/43707067359) (ramo `t_17a7470c`, `e4a2d71`): `check`, `coverage` e `lab` 26/27/79 verdi. `lab-dco` rosso all'installazione di `openvpn-dco-dkms`. Causa provata: il runner è ubuntu-26.04 con kernel `7.0.0-1019-azure`; il pacchetto `0.0+git20251017` (modulo fuori albero `ovpn-dco-v2`) non compila su quel kernel. Ripetuta la compilazione a mano contro gli header del kernel 7.0.0-1019-azure: `tcp.c:482` e `udp.c:346/356` falliscono per tipi incompatibili (il kernel 7.0 ha tolto il parametro `int *addr_len` da `proto.recvmsg` e fa prendere `struct sock *` a `setup_udp_tunnel_sock`; il modulo usa ancora le firme vecchie), cioè API del kernel cambiate. Non è un problema di header mancanti. Il kernel `-azure` ha già il modulo in albero: `CONFIG_OVPN=m` e `ovpn.ko` in `linux-modules-7.0.0-1019-azure`. OpenVPN 2.7 parla solo l'API del modulo `ovpn` (`Changes.rst` 2.7.0), OpenVPN 2.6 solo quella vecchia: il client 26 non può provare il DCO su questo kernel. Rimedio in CI: `modprobe ovpn` e `lab-dco` sui client 27 e 79. Provato su GitHub: run [45625594806](https://github.com/zPeppOz/galleria/actions/runs/45625594806) (`b38215a`), tutto verde, compresi `lab-dco (27)` e `lab-dco (79)`: DCO con il modulo `ovpn` del kernel 7.0 del runner, client OpenVPN 2.7.0 e 2.7.9, `ovpn_dco_state_and_bytecount ... ok` (il test controlla nei log del demone «DCO device … opened»). Il job `lab-dco` ora è bloccante (senza `continue-on-error`). |
 | S3 | Locale, T9: tabella 51820, fwmark e regole apply/teardown. |
 | S4 | Locale, T9: zero IPv6 fisico e ripiego immediato con WireGuard. |
 | S5 | Locale, T9/T12/T14: kill -9, cleanup prima della prima hello. |
@@ -127,6 +128,5 @@ separatamente), Q8 (journald/buffer invece di file di log), Q9 (management Unix 
 solo Windows), Q10 (controllo e visibilità condivisi tra membri del gruppo), Q11 (traduzioni nei client).
 Nessuna nuova decisione è stata presa. Q3, Q6 e Q7 sono risolte nella spec.
 
-La parte Linux di D15 e i rimandi collegati in `docs/01-analisi.md` restano da aggiornare da Aitano con la frase
-della spec §13: un solo blocco IPv6 con rotte unreachable nel modulo comune, anche per OpenVPN. I documenti
-00–05 non sono stati modificati in questa delega.
+La parte Linux di D15 è già allineata da `556b89e`: un solo blocco IPv6 con rotte unreachable nel modulo comune,
+anche per OpenVPN, come nella frase della spec §13. I documenti 00–05 non sono stati modificati in questa delega.

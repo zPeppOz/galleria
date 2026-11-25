@@ -196,3 +196,27 @@ il gruppo «Tema» (Sistema · Chiaro · Scuro) accanto a «Lingua».
 - Fumo: `language_switches_without_a_restart` (dal menu «Italiano» compare «Avvia il servizio», «English» → «Start the
   service», stessa sessione WebDriver). `scripts/gui.sh smoke`: 8 prove su 8.
 - `overlays.a11y.ts` (T1) aggiornata: il menu ha due gruppi a scelta singola, i radio sono sei e i segnati due. `a11y`: 11 su 11.
+
+### Controlli di base (T4)
+
+`ui/src/design/{icons,Button,Field,Switch,Segmented,Tabs}.tsx`, ciascuno con il suo `.css` (solo token) e la sua `.test.tsx`;
+nove icone nostre (`more`, `close`, `check`, `warning`, `error`, `info`, `star`, `chevron`, `copy`), nascoste alla tecnologia
+assistiva. Nessun componente contiene un testo visibile: arrivano tutti come proprietà.
+
+- Dietro: HTML nativo per `Button` (`<button type="button">`; senza testo il tipo pretende `aria-label`, e la prova lo verifica
+  con `@ts-expect-error`), `Field` (`<label for>`, `aria-describedby`, `aria-invalid`; `select` nativo, in sola lettura mostra
+  solo la voce scelta), `Switch` (`<button role="switch">` dentro una `<label>`: Spazio, Invio e clic sull'etichetta) e
+  `Segmented` (radio nativi: frecce e una sola sosta del Tab gratis, `aria-readonly` + cambio ignorato in sola lettura);
+  `@base-ui/react/tabs` per `Tabs` (frecce, Home, End e selezione al fuoco; solo il pannello scelto è disegnato).
+- Per `Tabs` Base UI rende il pannello stesso raggiungibile con Tab (`tabindex="0"`), come nel modello WAI-ARIA: dalla lista il
+  Tab va al pannello e poi al suo contenuto; la prova `tablist_is_one_tab_stop` lo dice così.
+- L'indicatore della scheda (`Tabs.Indicator`) imposta le sue misure con `style` da script, non con un `<style>` né con lo
+  script di pre-idratazione (`renderBeforeHydration` resta spento): non dovrebbe violare la CSP. **Non verificato nella finestra
+  vera**: il componente non è ancora usato dall'app; lo si prova al T7 con il guscio (`no_csp_violation…` esteso).
+- Bersagli: ogni controllo ha almeno 24 × 24 px (WCAG 2.5.8); l'interruttore è 38 × 22 e la sua `<label>` ne copre l'area (24 di
+  altezza minima).
+- Colore: il pulsante primario usa `--accent` solo come riempimento (`--accent-ink` per il testo), il pericolo `--err` come testo,
+  il bordo dei controlli `--line-strong`: `css-rules.test.ts` verde sui file nuovi.
+- Verifiche: 155 prove Vitest (T3: 121), tutte verdi; `scripts/gui.sh check` verde. Axe passa su ogni componente in jsdom, il
+  contrasto non lo vede (jsdom): resta alla prova sui token (T2). `smoke` e `a11y` non rilanciati dopo T4: i componenti non
+  sono ancora nel bundle dell'app.

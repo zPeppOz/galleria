@@ -15,6 +15,7 @@
 | T1 | Q12 verificata: **Base UI 1.9.0 regge** (nessuna condizione di stop scattata, niente Radix). `design/{Dialog,Menu,icons}.tsx`, `app/{AppMenu,AboutDialog}.tsx`, controllo licenze JS, `scripts/gui.sh a11y` con Orca + AT-SPI, `ui/e2e/{support,overlays.a11y}.ts` |
 | T2 | `design/{tokens.css,base.css,theme.ts,color.ts}`, prove di contrasto/tema/regole CSS; S8 verde nella finestra vera, S17 falso (via `system-ui`) |
 | T3 | `i18n/{en,it}.json` (74 chiavi, con `error.*` per i 19 codici), `i18n/index.tsx`, `prefs.tsx` (lingua e tema in memoria, Q25), `tests/catalogs.rs` + `GUI_CODES` in `error.rs` (G8), gruppo «Tema» nel menu, fumo `language_switches_without_a_restart` |
+| T4 | `design/{icons,Button,Field,Switch,Segmented,Tabs}.tsx` + css + prove (axe e tastiera per ciascuno); HTML nativo salvo `Tabs` (Base UI) |
 
 ## Scelte da sapere (T1)
 
@@ -42,3 +43,15 @@
   e i binari già costruiti (`target/gui-image/release/galleria-gui`, `target/gui-image/debug/examples/fake-daemon`).
 - `styles.css` resta con le misure di B1 (eccezione per nome in `css-rules.test.ts`); sparisce al T6.
 - `--tint` è `14%`: le tinte si scrivono `color-mix(in oklch, var(--ok) var(--tint), transparent)`, testo `--ink` sopra.
+
+## Scelte da sapere (T3–T4)
+
+- `errorText(t, code, fallback)`: il codice sconosciuto mostra il messaggio inglese del demone (D22). `StatusView` lo usa.
+- `GUI_CODES` in `error.rs` è vuoto: ogni codice `gui_…`/`import_…` va aggiunto lì e nei due cataloghi nello stesso commit
+  (`tests/catalogs.rs` lo pretende, anche cercando i letterali nei sorgenti).
+- Per aggiungere una variante a `ErrorCode`/`SessionErrorCode`/`State`/`LinkState`: `tests/catalogs.rs` non compila finché non è
+  nell'elenco della macro `every_variant!`.
+- `Tabs.Panel` di Base UI ha `tabindex="0"`: dalla lista il Tab va al pannello. Il `Tabs.Indicator` non è ancora provato nella
+  finestra vera (T7).
+- Restano T5 (avvisi, conferma, schermate B1 sui componenti), T6 (guscio) e T7 (tastiera, fumo, Orca, esito, roadmap): card
+  successive già create. `styles.css` sparisce al T6.

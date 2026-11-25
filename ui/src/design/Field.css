@@ -1,0 +1,13 @@
+.gx-field { display: grid; gap: var(--sp-2); }
+.gx-field-label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--muted); }
+.gx-control {
+  width: 100%; min-height: var(--h-control); padding: var(--sp-3) var(--sp-5);
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--panel-2); color: var(--ink);
+  font: inherit; font-size: var(--fs-base);
+}
+textarea.gx-control { resize: vertical; line-height: var(--lh-mono); }
+.gx-control.gx-mono { font-family: var(--mono); font-size: var(--fs-md); }
+.gx-control[readonly] { background: var(--panel); }
+.gx-control[aria-invalid="true"] { border-color: var(--err); }
+.gx-field-hint { margin: 0; font-size: var(--fs-sm); color: var(--faint); }
+.gx-field-error { margin: 0; font-size: var(--fs-sm); color: var(--err); }

@@ -392,7 +392,7 @@ Il numero dei task di B2–B6 resta la stima di `docs/07` §5; quello definitivo
 | B1 · Fondamenta | 6 (piano scritto) | crate e `ui/`, CI, collegamento con ricollegamento, eventi, permessi minimi, primo avvio (D27), prova del fumo WebDriver | fase 1 in `main` | G1, G2 | finestra che mostra lo stato vero del demone, sola lettura |
 | B2 · Design system e guscio | 6 | token, componenti di base, disposizione lista + dettaglio, temi, cataloghi con la prova dei codici (D22), tastiera | B1 | G8, G12 | guscio navigabile con dati finti, nelle due lingue |
 | B3 · Rubrica e profili | 9 (piano scritto, in quattro gruppi) | lista, gruppi, ricerca, preferiti, ordinamento; schede secondo D26; editor raw; duplica, esporta, elimina; `state.toml` (D32) con lingua e tema (Q25); comando `announce` e primo uso di Q27 | B2 | G12 per la parte degli annunci | rubrica completa sui profili importati dalla CLI |
-| B4 · Import | 5 | file, trascinamento, testo; anteprima con il testo di D19; associazione di `.ovpn` e istanza unica (D31) | B3 | G3 | si importa dalla GUI e si connette dalla CLI |
+| B4 · Import | 7 (piano scritto, in tre gruppi) | file, trascinamento, testo; anteprima con il testo di D19; associazione di `.ovpn` e istanza unica (D31) | B3 | G3 | si importa dalla GUI e si connette dalla CLI |
 | B5 · Connessione | 8 | archivio dei segreti (D25); connetti, disconnetti, sostituisci (D28); stati e statistiche; credenziali su `needs_input`; errori tradotti; Log con «Esporta log…» (D20); sessione estranea (D21) | B3 (B4 per il giro completo) | G4, G5, G6, G7, G9 | **uso quotidiano possibile** |
 | B6 · Tray, versione, chiusura | 6 | tray, chiusura nella tray, avviso di versione (D16), fumo completo, prove manuali, `docs/08-esito-fase2.md` | B5 | G10, G11, G13 | fase 2 chiusa |
 
@@ -468,6 +468,11 @@ Le questioni da Q28 in poi stanno nel piano del blocco che le apre (B3: `docs/su
 | Q32 | Severità dell'editor raw | **Approvata (a)**: OpenVPN si salva solo senza problemi, WireGuard in sola lettura | B3-T7 |
 | Q33 | Quando si scrive sul disco | **Approvata (a)**: «Salva/Annulla» per i campi di testo, subito per interruttori e stella | B3-T5 |
 | Q34 | Posizione della finestra in `state.toml` (§6) | **Approvata (a)**: si salvano solo dimensione e «massimizzata»; riduzione rispetto al §6 | B3-T1 |
+| Q35 | Chiusura della finestra con modifiche non salvate (aperta dall'esito di B3, T5) | **Decisa: va in B6.** Riportata qui dalla card `t_73168fca`: il testo della decisione non era ancora nel repo | B6 |
+
+Q36–Q41 (istanza unica, laboratorio di G3, percorsi del trascinamento, riconoscimento del formato, più file insieme,
+associazione dei `.ovpn`) sono **aperte**, con la raccomandazione, nel piano di B4:
+`docs/superpowers/plans/2026-11-25-fase2-b4-import.md`.
 
 ## 19. Cosa non ho verificato
 

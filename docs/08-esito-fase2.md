@@ -56,6 +56,23 @@ che invoca; Node 26.12.1 e pnpm 12.15.0 come in `.nvmrc` e `package.json`.
   `deny.toml`. Le versioni nuove avvisano che `RUSTSEC-2024-0370` «non è stato incontrato»: è un avviso, non un errore.
 - `ui/`: `pnpm typecheck` ora controlla anche `ui/e2e/` e fa parte di `check-here`.
 
+### Correzioni dopo la review di B1 (`t_5b760fb5`)
+
+- **Permesso negato al secondo livello (G2).** Rosso prima del verde: `daemon_closing_right_after_accept_is_permission_denied`
+  falliva al primo tentativo («Connection reset by peer», `DaemonNotRunning`); con `classify_hello` passa, e passa
+  anche 5 volte di fila. Il demone vero chiude senza leggere `hello`: il client vede `BrokenPipe` o `ConnectionReset`
+  (la review ne ha contati 191 e 9 su 200, nessun `Closed`).
+- **Nessuna attesa dopo `subscribe`.** Rosso prima del verde: `daemon_closing_right_after_subscribe_is_not_hammered`
+  contava 3731 tentativi in circa un secondo con la politica predefinita; con la correzione sono al più 5 (il primo
+  ritentativo resta immediato, poi attese di 0,5 s, 1 s, 2 s). `tests/supervisor.rs` verde 10 volte di fila. Una
+  connessione che dura quanto la prima attesa della politica o più azzera il conteggio. La vista resta «collegato»
+  durante l'attesa che segue una connessione caduta subito dopo `subscribe`: l'evento `galleria:link` esce una volta
+  per ciclo, non a ogni tentativo.
+- **Risposta di `daemon_view` contro un evento arrivato nel frattempo (osservazione di Nello).** Riprodotta: due prove
+  in `ui/src/daemon/store.test.ts` con una risposta lenta e un evento in mezzo, entrambe rosse («connected» al posto
+  di «daemon_not_running»; stato «disconnected» al posto di «connecting»). `useDaemon` ora scarta lo snapshot se è
+  arrivato un `galleria:link` mentre aspettava, e ne sovrascrive lo stato se è arrivato un `galleria:state`.
+
 ### Non verificato
 
 - Il job `gui` e il job `gui-smoke` di `.github/workflows/ci.yml` non sono mai girati verdi su un runner: il `gui`

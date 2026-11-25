@@ -14,6 +14,7 @@ custom-protocol = ["tauri/custom-protocol"]
 [dependencies]
 anyhow.workspace = true
 galleria-ipc = { workspace = true, features = ["client"] }
+nix.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tauri = { version = "2.12", features = [] }
@@ -27,8 +28,8 @@ tauri-build = { version = "2.7", features = [] }
 [dev-dependencies]
 galleria-backend = { workspace = true, features = ["fake"] }
 galleriad = { path = "../galleriad" }
-nix.workspace = true
 rstest.workspace = true
+tauri = { version = "2.12", features = ["test"] }
 tempfile.workspace = true
 tokio-util.workspace = true
 

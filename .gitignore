@@ -6,3 +6,4 @@ dist/
 lab/pki/
 lab/out/
 crates/galleria-gui/gen/
+crates/galleria-gui/permissions/

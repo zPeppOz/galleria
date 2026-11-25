@@ -6,7 +6,13 @@ use std::path::PathBuf;
 
 /// Every permission the main window may hold. A permission added to `capabilities/main.json` must be added here
 /// on purpose, in the same commit.
-const ALLOWED: &[&str] = &["core:event:allow-listen", "core:event:allow-unlisten"];
+const ALLOWED: &[&str] = &[
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-daemon-view",
+    "allow-daemon-retry",
+    "allow-app-info",
+];
 
 fn crate_file(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(name)
@@ -84,4 +90,34 @@ fn no_plugin_is_configured() {
     let plugins = &conf["plugins"];
     let empty = plugins.is_null() || plugins.as_object().is_some_and(|o| o.is_empty());
     assert!(empty, "plugins must be absent or empty: {plugins}");
+}
+
+/// The command names in the `COMMANDS` constant of `build.rs`, which it passes to `AppManifest::commands`.
+fn commands_in_build_rs() -> Vec<String> {
+    let text = std::fs::read_to_string(crate_file("build.rs")).unwrap();
+    let after = text
+        .split("const COMMANDS: &[&str] = &[")
+        .nth(1)
+        .expect("build.rs must declare `const COMMANDS: &[&str] = &[...]`");
+    let list = after.split("];").next().unwrap();
+    list.split(',')
+        .map(|name| name.trim().trim_matches('"').to_owned())
+        .filter(|name| !name.is_empty())
+        .collect()
+}
+
+#[test]
+fn every_registered_command_has_a_permission() {
+    let mut declared: Vec<String> = commands_in_build_rs()
+        .iter()
+        .map(|name| format!("allow-{}", name.replace('_', "-")))
+        .collect();
+    let mut permitted: Vec<String> = ALLOWED
+        .iter()
+        .filter(|p| !p.contains(':'))
+        .map(|p| (*p).to_owned())
+        .collect();
+    declared.sort();
+    permitted.sort();
+    assert_eq!(declared, permitted);
 }

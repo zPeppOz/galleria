@@ -93,18 +93,20 @@ describe("the shell under a screen reader", () => {
     await waitForTree(focusedIs("General"), "«General» focused again");
   });
 
-  // KNOWN GAP (docs/08-esito-fase2.md, «Campi di testo»): the tree is right (entry «Name», labelled-by) and Orca 46 with
-  // WebKitGTK 2.52.6 says the value and «selected», not the name. Only the wait for the speech is turned upside down:
-  // the focus and the tree are asserted as usual, so a failure to get there is a failure, not the gap. The day Orca
-  // says «Name» the last line fails, and the gap can be closed in the outcome document.
+  // KNOWN GAP OF THIS IMAGE ONLY (docs/08-esito-fase2.md, «Buco 1» and «Spike Orca»): the tree is right (entry «Name»,
+  // labelled-by) and Orca 46.1 in the image says the value and «selected», not the name. On a real GNOME session Orca
+  // 50.3 (Ubuntu 26.04) and 51.1 (Fedora 45) do say «Name» «entry», so this is not a gap of the product there. Only the
+  // wait for the speech is turned upside down: the focus and the tree are asserted as usual, so a failure to get there
+  // is a failure, not the gap. The day the image gets an Orca that says «Name» the last line fails, and the test turns
+  // into a positive one.
   it("S4b_text_field_name_is_spoken_by_orca", async () => {
     const mark = speechMark();
     const tree = await reach("Name", ["Tab"]);
     const field = focusedNode(tree) as AtNode;
     expect(field.role).toBe("entry");
     expect(field.relations.some((r) => r.startsWith("labelled-by"))).toBe(true);
-    await expect(waitForSpeech(mark, /\bName\b/, 2500), "known gap: Orca does not say the name of a text field").rejects.toThrow(/Orca never said/);
-    record("S4b text field reached (Orca does not say the name)", speechSince(mark), tree);
+    await expect(waitForSpeech(mark, /\bName\b/, 2500), "known gap of the image (Orca 46.1): the name of a text field is not said; on real GNOME (Orca 50.3, 51.1) it is").rejects.toThrow(/Orca never said/);
+    record("S4b text field reached (Orca 46.1 in the image does not say the name)", speechSince(mark), tree);
   });
 
   it("S4_switch_state_is_exposed_and_spoken", async () => {
@@ -169,8 +171,10 @@ describe("the shell under a screen reader", () => {
     record("S6 notice after «Duplicate»", speechSince(mark), tree);
   });
 
-  // KNOWN GAP (see docs/08-esito-fase2.md, «Avviso a scomparsa»): Orca 46 with WebKitGTK 2.52.6 receives the
+  // KNOWN GAP (see docs/08-esito-fase2.md, «Buco 2» and «Spike Orca»): Orca 46 with WebKitGTK 2.52.6 receives the
   // `children-changed:add` of the region and says nothing, whatever the form of the live region (the control below).
+  // Confirmed on real GNOME with Orca 50.3 and 51.1. Q27: outcomes go through the ATK announcement emitted by the Rust
+  // side; plan B3 T2 turns this test into a positive one («Orca says the outcome»).
   // Only the wait for the speech is turned upside down: opening the menu and showing the notice are asserted as usual,
   // so a failure of either is a failure, not the gap. The day Orca says it, the last line fails.
   it("S6b_notice_is_spoken_by_orca", async () => {
@@ -183,7 +187,9 @@ describe("the shell under a screen reader", () => {
   });
 
   // Controls for the two gaps, in the style of `control_how_webkitgtk_exposes_a_plain_popup_button`: bare elements put
-  // in the page, nothing of ours. They assert what Orca does today, so the day it changes the run says so.
+  // in the page, nothing of ours. They assert what Orca does today in this image, so the day it changes the run says so.
+  // The text field gap is of the image only (Orca 46.1); the live region gap is also there on real GNOME (docs/08,
+  // «Spike Orca»).
   const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   async function said(act: () => Promise<unknown>, ms: number): Promise<string> {
     const mark = speechMark();
@@ -194,7 +200,8 @@ describe("the shell under a screen reader", () => {
 
   it("control_orca_does_not_say_the_name_of_a_bare_text_field", async () => {
     // One field at a time, reached with Tab from a bare button, in nine forms. The tree has the right name for every
-    // one of them. Without anything of ours Orca says the value and «selected» (or «Text unselected.»), not the name.
+    // one of them. Without anything of ours Orca 46.1 says the value and «selected» (or «Text unselected.»), not the name.
+    // Image only: Orca 50.3 and 51.1 on real GNOME say the name of our fields (bare fields were not tried there).
     const forms = ["aria-label empty", "aria-label", "label for", "label wrapping", "aria-labelledby", "textarea", "readonly", "password", "aria-describedby"] as const;
     const words = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india"];
     for (const [n, form] of forms.entries()) {

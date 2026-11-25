@@ -303,7 +303,7 @@ Le regioni vive dei toast portano ora anche `aria-live` e `aria-atomic` scritti 
 |---|---|---|---|
 | U1 | Guscio navigabile con dati finti, nelle due lingue | fumo nella finestra vera: `shell_is_navigable_with_sample_data` (cinque profili, «Sample data», `↓`/`End`/`Home` nella lista cambiano il titolo, frecce fino a «Log»), `shell_works_in_both_languages` («Dati di esempio», «Generale», «Altre azioni», ritorno a «English»), `both_themes_render`; in jsdom `Shell.test.tsx` | **verde** (13/13 al fumo, tre volte di fila) |
 | G8 | Ogni codice d'errore del demone ha testo `en` e `it`; la lingua cambia senza riavvio | `tests/catalogs.rs` (7 prove: 11 `ErrorCode`, 8 `SessionErrorCode`, `GUI_CODES`, stati e barra); `prefs.test.tsx::switching_language_changes_every_visible_text`; fumo `language_switches_without_a_restart` e `shell_works_in_both_languages` (stessa sessione WebDriver) | **verde** |
-| G12 (B2) | Guscio e componenti da tastiera; ruoli giusti per finestra modale, menu, schede, lista e interruttore | axe e tastiera per ogni componente (T1, T4–T6) e `keyboard.test.tsx` sul guscio; ruoli e parole nella finestra vera con Orca e AT-SPI (`overlays.a11y.ts`, `shell.a11y.ts`) | **verde, con due buchi**: Orca non pronuncia il nome di un campo di testo e non pronuncia nessuna regione viva, quindi nemmeno l'avviso a scomparsa (sotto). Tutto il resto è verde; il giudizio è della piattaforma (Orca con WebKitGTK), il nostro albero AT-SPI è giusto |
+| G12 (B2) | Guscio e componenti da tastiera; ruoli giusti per finestra modale, menu, schede, lista e interruttore | axe e tastiera per ogni componente (T1, T4–T6) e `keyboard.test.tsx` sul guscio; ruoli e parole nella finestra vera con Orca e AT-SPI (`overlays.a11y.ts`, `shell.a11y.ts`) | **verde, con due buchi misurati nell'immagine**: Orca 46.1 non pronuncia il nome di un campo di testo e non pronuncia nessuna regione viva, quindi nemmeno l'avviso a scomparsa (sotto). Tutto il resto è verde; il giudizio è della piattaforma (Orca con WebKitGTK), il nostro albero AT-SPI è giusto. **Correzione dopo lo spike (`t_b81c3909`, sezione «Spike Orca»)**: su GNOME vero (Orca 50.3 e 51.1) il nome dei campi **si sente**, quindi il buco 1 esiste solo nell'immagine; il buco 2 è confermato e ha una strada decisa (Q27) |
 | Q12 | Libreria «headless» regge finestra modale e menu con lo screen reader | tabella del T1 | **verde con Base UI 1.9.0** (rimasto invariato) |
 | S8 | `oklch()` e `color-mix()` giusti da WebKitGTK | `tokens_paint_the_expected_srgb`; in più `both_themes_render` (pixel dello sfondo del guscio contro `--bg` nei due temi) | **vero** su WebKitGTK 2.52.6 (differenza massima 1,30 per canale); aperto su Ubuntu 26.04 e Fedora |
 | CSP | Nessuna violazione con il guscio | `no_csp_violation_during_the_tour` (lista, schede, interruttore, menu, finestra, conferma, avviso, lingua e tema) e `X3` nel giro con Orca; la prova di controllo `control_the_csp_listener_sees_a_violation` inserisce un `<style>` e il listener lo sente | **verde**: anche l'indicatore delle schede (`Tabs.Indicator`, misure con `style` da script) non viola la CSP |
@@ -319,7 +319,7 @@ Ambiente: Orca 46.1, AT-SPI 2.52, WebKitGTK 2.52.6, nell'immagine `galleria-gui-
 | `↓` nella lista | «Datacenter Milano.» · «gw.dc-mi.example:443 OpenVPN.» |
 | `Tab` `Tab` alle schede | «General page tab.» |
 | `→` sulle schede | «Authentication page tab.» (`selected`, `focused`; cambia anche il pannello) |
-| `Tab` fino all'interruttore | «General scroll pane.» · «Datacenter Milano» «selected» (il campo «Nome»: **il nome non c'è**, solo il valore, buco 1 sotto) · «Group combo box.» «Work.» · «gw.dc-mi.example:443» «selected» (il campo «Server», di nuovo senza nome) · «Transport panel.» «TCP.» «selected radio button» «leaving panel.» · «Reconnect automatically toggle button pressed.» · «Try again by itself when the connection drops.» |
+| `Tab` fino all'interruttore | «General scroll pane.» · «Datacenter Milano» «selected» (il campo «Nome»: **il nome non c'è**, solo il valore, buco 1 sotto: solo nell'immagine) · «Group combo box.» «Work.» · «gw.dc-mi.example:443» «selected» (il campo «Server», di nuovo senza nome) · «Transport panel.» «TCP.» «selected radio button» «leaving panel.» · «Reconnect automatically toggle button pressed.» · «Try again by itself when the connection drops.» |
 | `Spazio` sull'interruttore (spento, poi acceso) | «not pressed» · «pressed» (Orca dice solo il nuovo stato) |
 | «Elimina» dal menu «Altre azioni» | «alert Delete Datacenter Milano?» · «These are sample data: nothing is deleted, whatever you choose.» · «Cancel push button.» |
 | `Esc` sulla conferma | «More actions combo box.» «opens popup» (il fuoco è tornato sul pulsante) |
@@ -349,7 +349,11 @@ Cose da sapere, tutte di WebKitGTK o di Orca e non del nostro codice:
 - **L'interruttore (`role="switch"`) è un `toggle button`**: Orca dice «pressed/not pressed», non «on/off». Il nome e il testo di aiuto
   si sentono. Non l'ho cambiato: un `<button role="switch">` è la forma giusta e l'esportazione è della piattaforma.
 - **I gruppi della lista sono `panel`** con il nome del gruppo (come il gruppo del menu in T1), non `group`.
-- **Buco 1 · Il nome di un campo di testo NON è pronunciato.** Con `Tab` su «Name» Orca dice «General scroll pane.» «Datacenter
+- **Buco 1 · Il nome di un campo di testo NON è pronunciato, ma solo nell'immagine (Orca 46.1).** Su GNOME vero, Ubuntu 26.04
+  con Orca 50.3 e Fedora 45 con Orca 51.1, Orca dice «Name» «entry» e poi il valore, con `Tab` e con `Shift+Tab` (sezione
+  «Spike Orca», punto 2): non è un difetto del prodotto né un limite da dichiarare per quelle due distribuzioni. Resta
+  non provato Orca 46 su un desktop vero (Ubuntu 24.04, Q28 del piano di B3). Quello che segue è la misura nell'immagine,
+  e lì resta vera. Con `Tab` su «Name» Orca dice «General scroll pane.» «Datacenter
   Milano» «selected»: il valore e basta; con `Shift+Tab` nulla. L'albero AT-SPI è giusto (`entry «Name»`, `labelled-by`, `S4b` lo
   asserisce) e non dipende dal nostro markup: la prova di controllo `control_orca_does_not_say_the_name_of_a_bare_text_field`
   mette nella pagina campi nudi, senza niente di nostro, e li raggiunge con `Tab` da un pulsante. Con un valore dentro Orca dice solo
@@ -378,7 +382,8 @@ Cose da sapere, tutte di WebKitGTK o di Orca e non del nostro codice:
   **Conseguenza**: oggi l'unico avviso è «Dati di esempio: nessuna modifica» (informazione, non errore), ma da B3 in poi gli esiti
   di salvataggio ed eliminazione, e da B5 i cambi di stato della connessione, passano da regioni vive. Con questa piattaforma nessuna
   correzione di markup basta: come far arrivare a Orca un esito è una decisione da prendere prima del piano di B3 (non qui), da
-  confermare su un desktop vero (sotto, «Non verificato»).
+  confermare su un desktop vero (sotto, «Non verificato»). **Deciso dopo lo spike: Q27** (sezione «Spike Orca»): il buco è
+  confermato su GNOME vero e gli esiti passano dal segnale ATK emesso dal lato Rust, a partire da B3.
 
 #### Numeri per livello
 
@@ -398,7 +403,9 @@ Cose da sapere, tutte di WebKitGTK o di Orca e non del nostro codice:
 - **Il tema del sistema su un desktop vero**: nell'immagine WebKitGTK dichiara `prefers-color-scheme: light` e basta.
 - **L'aspetto a occhio in una finestra** al di là delle fotografie del T6: sotto 860 px, la scheda «Log», la finestra di conferma
   non guardate; il carattere che esce dall'elenco su un desktop vero (S17).
-- **I due buchi di Orca su un desktop vero**: misurati solo nell'immagine, senza gestore di finestre e senza audio (Orca 46.1,
+- **I due buchi di Orca su un desktop vero** *(chiuso dallo spike `t_b81c3909`, sezione «Spike Orca»: le regioni vive sono mute
+  anche su GNOME vero, il nome dei campi invece si sente; la strada degli annunci è Q27. Il testo che segue è quello di
+  prima dello spike)*: misurati solo nell'immagine, senza gestore di finestre e senza audio (Orca 46.1,
   WebKitGTK 2.52.6). Non so se una sessione GNOME vera (Ubuntu 26.04, Fedora 45) li riproduca; la decisione se anticipare la
   passata di Q22 sulle VM di S14/S15 è di Aitano e Peppe. Non so nemmeno se dipendano dallo script `WebKitGtk` di Orca o da
   WebKitGTK. Come far arrivare gli esiti a Orca (per esempio il segnale AT-SPI `announcement` dal lato Rust, le notifiche del
@@ -533,6 +540,13 @@ lettori (NVDA e Narrator sono di Windows, fase 3); l'effetto della doppia voce s
 cominciassero a leggere le regioni vive.
 
 ### Proposta di Q27 · come far arrivare a Orca gli esiti e i cambi di stato
+
+**Q27 è approvata** da Aitano il 25/11/2026 su delega di Peppe, come raccomandata qui sotto: alternativa 1 per esiti non
+bloccanti e cambi di stato (*polite* di norma, *assertive* per gli errori), alternativa 3 per conferme ed errori che
+chiedono una risposta, alternativa 4 per tutto il resto; niente `aria-live` come unico canale, niente notifiche del
+desktop. Il testo di riferimento è nella spec (§12.1 e §18); il primo uso è nel piano di B3
+(`docs/superpowers/plans/2026-11-25-fase2-b3-rubrica.md`, T2). Delle due cose «da decidere insieme» in fondo: il comando
+entra in B3; la VM Ubuntu 24.04 è la Q28 di quel piano.
 
 **Domanda.** Orca non pronuncia nessuna regione viva di WebKitGTK (confermato su GNOME 50/51: 10 forme iniettate nella
 review, più l'avviso, la barra di stato e la pagina «Start the service» qui). Gli esiti di salvataggio ed eliminazione

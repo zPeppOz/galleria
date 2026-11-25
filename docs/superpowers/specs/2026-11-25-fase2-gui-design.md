@@ -37,7 +37,7 @@ blocco lo chiude (§15).
 | G9 | Sessione estranea: con una connessione avviata da un altro utente del gruppo la GUI la mostra e chiede conferma prima di chiuderla (D21) | prove dei comandi con un profilo che non è in rubrica; fumo con due utenti | B5 |
 | G10 | Tray: stato, preferiti, connetti e disconnetti dal solo menu; chiudere la finestra non chiude la connessione | **manuale** su Ubuntu 24.04 e 26.04 (GNOME con AppIndicator) e Fedora, lista di controllo nell'esito | B6 |
 | G11 | Avviso di nuova versione: una sola richiesta, senza identificativi, niente richiesta se disattivato (D16, A11) | prova con un server finto che conta le richieste e ne controlla le intestazioni | B6 |
-| G12 | Tutta la rubrica si usa da tastiera; finestre e schede hanno i ruoli corretti | prove dei componenti con un controllo automatico di accessibilità; passata manuale con lo screen reader, annotata | B2, poi ogni blocco per i suoi componenti |
+| G12 | Tutta la rubrica si usa da tastiera; finestre e schede hanno i ruoli corretti; **gli esiti e i cambi di stato arrivano allo screen reader come dice Q27** (§12.1): annuncio ATK dal lato Rust per quelli non bloccanti, fuoco spostato per conferme ed errori che chiedono una risposta | prove dei componenti con un controllo automatico di accessibilità; nell'immagine, Orca e AT-SPI sulla finestra vera (Q22), con la prova che Orca pronuncia l'annuncio emesso da `galleria-gui`; passata manuale con lo screen reader, annotata (B6) | B2, poi ogni blocco per i suoi componenti; annunci da B3 |
 | G13 | Avvio a freddo della GUI sotto 1 s sulla macchina di Peppe (obiettivo [S] dell'analisi §8) | **manuale**, tre misure annotate nell'esito; non blocca la chiusura della fase, ma il numero va scritto | B6 |
 
 ## 2. Fuori scope
@@ -156,7 +156,7 @@ Elenco di riferimento; nomi e campi definitivi nel piano di ogni blocco.
 
 | Blocco | Comandi | Metodi IPC usati |
 |---|---|---|
-| B3 | `profiles_list`, `profile_get`, `profile_update`, `profile_validate_raw`, `profile_duplicate`, `profile_export`, `profile_delete`, `groups_get`, `groups_set`, `ui_state_get`, `ui_state_set` | nessuno: file dell'utente (`galleria-profile`, `state.toml`) |
+| B3 | `profiles_list`, `profile_get`, `profile_update`, `profile_validate_raw`, `profile_duplicate`, `profile_export`, `profile_delete`, `groups_get`, `groups_set`, `ui_state_get`, `ui_state_set`, `announce` (Q27, §12.1) | nessuno: file dell'utente (`galleria-profile`, `state.toml`) |
 | B4 | `import_pick_file`, `import_from_text`, `import_commit`, `import_discard` | nessuno |
 | B5 | `connect_profile(id, replace)`, `disconnect`, `provide_input(session, request, values, remember)`, `forget_credentials(id)`, `logs_get(after, limit)`, `logs_export`, `secret_store_status` | `connect`, `disconnect`, `provide_input`, `logs` |
 | B6 | `settings_get`, `settings_set`, `update_check`, `app_quit` | nessuno |
@@ -306,6 +306,32 @@ le due lingue; B2 li sposta nei cataloghi.
   dall'elenco di `deny.toml` (B2).
 - Niente emoji nei pulsanti e nelle icone: SVG nostri (nel fumo senza schermo le emoji non si disegnano).
 
+### 12.1 Annunci per lo screen reader (Q27)
+
+Fatti, dallo spike `t_b81c3909` (`docs/08-esito-fase2.md`, «Spike Orca»): Orca non pronuncia **nessuna** regione viva di
+WebKitGTK, né nell'immagine (Orca 46.1) né su GNOME vero (Orca 50.3 su Ubuntu 26.04, Orca 51.1 su Fedora 45), `role="alert"`
+compreso **[V]**; pronuncia invece il segnale ATK `announcement` o `notification` emesso dal processo `galleria-gui`
+sull'oggetto accessibile della finestra, nelle tre versioni **[V]**. Il nome dei campi di testo, muto nell'immagine, su
+GNOME vero si sente **[V]**: non è un limite del prodotto.
+
+Regole (Q27, approvata):
+
+1. **Esiti non bloccanti e cambi di stato** (salvato, duplicato, eliminato; da B5 gli stati della connessione) passano
+   dal segnale ATK, emesso dal lato Rust: *polite* di norma, *assertive* per gli errori. Il testo è quello dei
+   cataloghi, già tradotto. Gli esiti che nascono nella webview usano il comando `announce`; i cambi di stato che
+   nascono in Rust (B5) li emette lo stesso codice che manda `galleria:state`, senza passare dalla webview.
+2. **Conferme ed errori che chiedono una risposta** spostano il fuoco (finestra di conferma, finestra modale): è il
+   fuoco a farli leggere, come oggi.
+3. **Tutto il resto è un limite dichiarato**, scritto nell'esito e nel README: altri lettori di schermo, sistemi con un
+   ATK senza il segnale (`announcement` esiste da ATK 2.46, `notification` da 2.50 **[V: feature `v2_46` e `v2_50` del
+   crate `atk` 0.18.2]**), testo che cambia nella pagina senza un esito (per esempio la barra di stato).
+4. **Niente `aria-live` come unico canale** e **niente notifiche del desktop**. Le regioni vive restano nel markup, che è
+   giusto e serve agli altri lettori, ma nessun esito dipende solo da loro.
+
+L'avviso a scomparsa è l'unico punto della webview che annuncia: chi mostra un avviso ottiene anche l'annuncio, e
+nessun componente chiama `announce` per conto suo. Le prove di controllo sulle regioni vive restano: il giorno in cui
+Orca le legge diventano rosse e l'annuncio si toglie, per non sentire due volte la stessa frase.
+
 ## 13. Tray e avviso di versione (D16)
 
 - Tray: stato, preferiti, connetti e disconnetti, «Apri Galleria», «Esci». Su Linux l'evento di click
@@ -365,7 +391,7 @@ Il numero dei task di B2–B6 resta la stima di `docs/07` §5; quello definitivo
 |---|---|---|---|---|---|
 | B1 · Fondamenta | 6 (piano scritto) | crate e `ui/`, CI, collegamento con ricollegamento, eventi, permessi minimi, primo avvio (D27), prova del fumo WebDriver | fase 1 in `main` | G1, G2 | finestra che mostra lo stato vero del demone, sola lettura |
 | B2 · Design system e guscio | 6 | token, componenti di base, disposizione lista + dettaglio, temi, cataloghi con la prova dei codici (D22), tastiera | B1 | G8, G12 | guscio navigabile con dati finti, nelle due lingue |
-| B3 · Rubrica e profili | 7 | lista, gruppi, ricerca, preferiti, ordinamento; schede secondo D26; editor raw; duplica, esporta, elimina; `state.toml` (D32) | B2 | — | rubrica completa sui profili importati dalla CLI |
+| B3 · Rubrica e profili | 9 (piano scritto, in quattro gruppi) | lista, gruppi, ricerca, preferiti, ordinamento; schede secondo D26; editor raw; duplica, esporta, elimina; `state.toml` (D32) con lingua e tema (Q25); comando `announce` e primo uso di Q27 | B2 | G12 per la parte degli annunci | rubrica completa sui profili importati dalla CLI |
 | B4 · Import | 5 | file, trascinamento, testo; anteprima con il testo di D19; associazione di `.ovpn` e istanza unica (D31) | B3 | G3 | si importa dalla GUI e si connette dalla CLI |
 | B5 · Connessione | 8 | archivio dei segreti (D25); connetti, disconnetti, sostituisci (D28); stati e statistiche; credenziali su `needs_input`; errori tradotti; Log con «Esporta log…» (D20); sessione estranea (D21) | B3 (B4 per il giro completo) | G4, G5, G6, G7, G9 | **uso quotidiano possibile** |
 | B6 · Tray, versione, chiusura | 6 | tray, chiusura nella tray, avviso di versione (D16), fumo completo, prove manuali, `docs/08-esito-fase2.md` | B5 | G10, G11, G13 | fase 2 chiusa |
@@ -429,6 +455,9 @@ Numerazione che continua Q1–Q11 della spec della fase 1. Ognuna ha la mia racc
 | Q24 | Barra del titolo | (a) decorazioni del sistema più una barra nostra sotto · (b) barra disegnata da noi | **Approvata (a)** da Aitano il 2026-11-25 su delega di Peppe: nessun permesso nuovo per la finestra | B2-T6 |
 | Q25 | Dove si salvano lingua e tema scelti a mano | (a) in B2 solo in memoria, in B3 in `state.toml` · (b) `localStorage` · (c) un comando nuovo in B2 | **Approvata (a)** da Aitano il 2026-11-25 su delega di Peppe | B2-T3 |
 | Q26 | Dove finisce nel guscio la vista di B1 (stato vero del demone) | (a) fascia in cima al dettaglio · (b) riga fissa in cima alla lista · (c) toglierla fino a B5 | **Approvata (a)** da Aitano il 2026-11-25 su delega di Peppe | B2-T6 |
+| Q27 | Come arrivano a Orca gli esiti e i cambi di stato, visto che le regioni vive di WebKitGTK restano mute (spike `t_b81c3909`) | (1) segnale ATK `announcement`/`notification` dal lato Rust · (2) notifiche del desktop · (3) spostare il fuoco · (4) limite dichiarato · (5) altro `aria-live` | **Approvata** da Aitano il 2026-11-25 su delega di Peppe, come raccomanda lo spike: **(1)** per esiti non bloccanti e cambi di stato, *polite* di norma e *assertive* per gli errori; **(3)** per conferme ed errori che chiedono una risposta; **(4)** per tutto il resto; niente `aria-live` come unico canale, niente notifiche del desktop (§12.1) | B3-T2 |
+
+Le questioni da Q28 in poi stanno nel piano del blocco che le apre (B3: `docs/superpowers/plans/2026-11-25-fase2-b3-rubrica.md`).
 
 ## 19. Cosa non ho verificato
 

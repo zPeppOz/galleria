@@ -90,3 +90,173 @@ che invoca; Node 26.12.1 e pnpm 12.15.0 come in `.nvmrc` e `package.json`.
 - Clone pulito (`scripts/gui.sh check` da un clone) non provato.
 - Le versioni dei pacchetti npm nuove (`webdriverio` 10.2.0, `@types/node` 26.6.10) sono sotto `minimumReleaseAge` di
   pnpm 12: `@types/node` è in `minimumReleaseAgeExclude`. Il comportamento di pnpm 12 su un runner pulito è da vedere.
+
+## Spike Orca · regioni vive e campi di testo in una sessione GNOME vera
+
+Card `t_b81c3909`, richiesta dalla review di B2 (`t_5e8d80a7`): i due buchi di Orca con WebKitGTK erano misurati solo
+nell'immagine Docker (Xvfb, nessun gestore di finestre, nessun audio). Qui sono ripetuti su due desktop veri, con l'app di
+B2 a `93c309a` (nessun codice di prodotto toccato; la prova dentro il processo è un patch in `lab/vm/`, non applicato).
+Anticipa una parte della passata di Q22 (prevista in B6): è la sola parte fatta, **senza audio** (Orca scrive il testo
+che pronuncia nel file di debug, come nell'immagine; nessuno ha ascoltato la voce).
+
+### Ambiente
+
+| | Immagine Docker (riferimento, dalla review) | VM Ubuntu 26.04.1 | VM Fedora 45 |
+| --- | --- | --- | --- |
+| Sessione | Xvfb, nessun gestore di finestre | **GNOME Shell 50.1, Wayland**, login automatico GDM | **GNOME Shell 51.1** (mutter 51.1), **Wayland**, login automatico GDM |
+| Orca | 46.1 | **50.3** | **51.1** |
+| WebKitGTK | 2.52.6 | 2.52.6 (`libwebkit2gtk-4.1-0 2.52.6-0ubuntu0.26.04.2`) | **2.54.2** (`webkit2gtk4.1`) |
+| at-spi2-core | 2.52.0 | 2.60.4 | 2.62.1 |
+| GTK | 3.24 | 3.24.52 | 3.24.52 |
+| Kernel | – | 7.0.0-43 | 7.2.11 |
+
+Stesso binario in tutte e due le VM: `galleria-gui` (release) e `fake-daemon` compilati nell'immagine `galleria-gui-dev`
+da un `git archive 93c309a` in `/mnt/b/vm/build/src` (`scripts/gui.sh build`, poi `cargo build -p galleria-gui --example
+fake-daemon`); `ldd` non trova librerie mancanti né su Ubuntu né su Fedora. Il ramo `t_43cd01da` non era chiuso.
+
+### Come è stato fatto
+
+Tutto in `/mnt/b/vm` (dischi, build, log, fotografie in `/mnt/b/vm/spike/`). Script nuovi in `lab/vm/`:
+
+```
+DISPLAY_OPT=vnc=127.0.0.1:1 lab/vm/vmctl.sh start ubuntu     # :2 per fedora; il monitor qemu è /mnt/b/vm/<vm>.mon
+~/spike/orca-spike-vm.sh orca        # in VM: Orca con --debug-file (a righe), via systemd-run --user nella sessione
+~/spike/orca-spike-vm.sh app         # in VM: demone finto + finestra di Galleria nella sessione
+python3 lab/vm/orca-spike-run.py <vm> fields|toast|statusbar|all
+python3 lab/vm/vncshot.py 5901 foto.png                       # fotografia dal VNC (5902 per fedora)
+```
+
+- **I tasti sono veri**: `sendkey` del monitor qemu, quindi tastiera virtuale → Mutter → Orca, non WebDriver. Dopo ogni tasto
+  0,6 s, poi 2,5 s di attesa del parlato (come `S4b` di Nello).
+- **Il parlato** sono le righe `SPEECH OUTPUT` del file di debug di Orca (`lab/vm/orca-line-buffered.py`, copia di quello
+  di `lab/tests/`). Orca fa l'eco dei tasti («tab», «left shift», «return»): è rumore, non parlato dell'app.
+- **Il fuoco** è letto da AT-SPI a ogni passo (`atspi-dump.py`) e scritto accanto al parlato.
+- `qemu screendump` restituisce il vecchio schermo di avvio con `virtio-vga` + GNOME: le fotografie vengono dal VNC.
+- Trappole incontrate, tutte nostre: GNOME blocca lo schermo dopo 5 minuti (su Ubuntu serve `gsettings set
+  org.gnome.desktop.session idle-delay 0`, `…screensaver lock-enabled false` e `loginctl unlock-session`); su Fedora, al
+  primo accesso, la panoramica (Overview) resta aperta, l'app nasce senza il fuoco e Orca dice «Main stage»: `Esc` e poi
+  riavviare l'app. Il primo giro Fedora fatto così non vale e non è riportato.
+
+### Esito
+
+| # | Problema | Ubuntu 26.04 (Orca 50.3) | Fedora 45 (Orca 51.1) |
+| --- | --- | --- | --- |
+| 1 | Regioni vive mute (avviso a scomparsa, barra di stato) | **SI CONFERMA** | **SI CONFERMA** |
+| 2 | Il nome dei campi di testo non si sente con `Tab` e `Shift+Tab` | **NON SI CONFERMA** | **NON SI CONFERMA** |
+
+**1 · Regioni vive: confermato su entrambe.** L'avviso c'è (fotografia in `/mnt/b/vm/spike/*-toast.png`: «Sample data:
+nothing was changed», in basso, con il pulsante di chiusura) e Orca non dice niente:
+
+```
+Enter su «Duplicate» (fuoco su «More actions», avviso a schermo, attesa 6 s)       Ubuntu                     Fedora
+  SPEECH OUTPUT: 'return'                                                      'return'                   'return'
+  SPEECH OUTPUT: 'More actions' 'combo box.' 'opens menu'  (il fuoco che torna)   sì                         sì
+  …l'avviso: niente
+Demone fermato → la pagina diventa «Start the service», la barra di stato «No connection state» / «The service is not running»
+  parlato: (niente)                                                            (niente)                   (niente)
+```
+
+Nel file di debug di Orca 50.3 l'avviso è un solo evento: `object:children-changed:add` sulla regione (`status bar`,
+`live:polite, atomic:true, xml-roles:status, container-live:polite`) con il pulsante «Dismiss the notice» come dato; lo
+tratta lo script dell'applicazione (`toolkits.gtk`, «script handles events when inactive») e non pronuncia nulla. Vale
+per l'avviso, per la barra di stato e per la sostituzione della pagina quando il demone si ferma. L'albero AT-SPI è
+giusto (`status bar`, `landmark «Start the service»`). **La sola correzione rispetto alla review è l'ambiente: è così anche
+su Orca 50/51, WebKitGTK 2.52/2.54 e Wayland, quindi non è un effetto di Xvfb o dell'assenza del gestore di finestre.**
+
+**2 · Campi di testo: non si conferma.** Con `Tab` e con `Shift+Tab` Orca dice il nome del campo, il ruolo, il valore e
+«selected» (parlato, eco dei tasti tolta; Ubuntu e Fedora uguali salvo i punti finali):
+
+```
+Tab sul campo «Name»        Ubuntu: 'Name' 'entry' 'Datacenter Milano' 'selected.' 'Focus mode'
+                            Fedora: 'Name' 'entry' 'Datacenter Milano' 'selected'  'Focus mode'
+Tab sul campo «Server»      'Server' 'entry' 'gw.dc-mi.example:443' 'selected(.)'
+Tab su «Group»              'Group' 'combo box' 'Work(.)'
+Shift+Tab su «Name»         'Name' 'entry' 'Datacenter Milano' 'selected(.)'      (nessun «niente»: il nome si sente)
+Shift+Tab su «Group»        'Group' 'combo box' 'Work(.)'
+```
+
+Riprodotto due volte su Ubuntu e due su Fedora, stesso risultato. Una sola differenza minore: `Shift+Tab` che torna sul
+pannello della scheda (`scroll pane «General»`) è muto su Ubuntu e su Fedora dice «General scroll pane» «Browse mode».
+**Cosa non so**: l'immagine ha Orca 46.1, quella di Ubuntu 24.04 LTS; i buchi del campo di testo potrebbero essere dello
+script `WebKitGtk` di Orca 46 e non di Xvfb. Una VM Ubuntu 24.04 desktop lo dice (non era nel perimetro dello spike).
+
+### Strada provata: l'evento AT-SPI `announcement` (tempo impiegato: circa 30 minuti, sotto l'ora)
+
+Orca ha un gestore di `object:announcement` (`scripts/default.py::_on_announcement`) che pronuncia l'`any_data` se è una
+stringa; la priorità dipende da `detail1` (assertive → più alta, polite → alta). Il segnale D-Bus è
+`org.a11y.atspi.Event.Object.Announcement` (`siiva{sv}`). Nella pila provata (ATK 2.52–2.62) lo emette l'atk-bridge quando un oggetto
+accessibile emette il segnale GObject `announcement(testo)` o `notification(testo, urgenza)`. I quattro modi provati
+(`lab/vm/orca-spike-announce.sh`, `atspi-announce.py`, `gtk-announce.py`), uguali su Ubuntu e Fedora:
+
+| | Chi emette | Orca lo dice? | Perché |
+| --- | --- | --- | --- |
+| A | programma fuori dall'app, connessione nuova sul bus AT-SPI, percorso `/org/a11y/atspi/accessible/root` | **No** | il mittente di un segnale D-Bus non si falsifica: la sorgente per Orca è `:1.N`, un oggetto che non esiste. Log: `Ignoring defunct object: [DEAD …]` |
+| B | programma fuori dall'app, che si registra come applicazione AT-SPI minima (`Socket.Embed`) e poi emette | **Sì**: `'B: from a registered probe application'` | la sorgente è viva. Orca non guarda il fuoco né l'app: la dice anche con il fuoco in Galleria |
+| C | finestra GTK3 (stessa pila di Galleria) che emette `announcement(testo)` sul proprio oggetto accessibile | **Sì** | il mittente è l'app stessa |
+| D | come C, `notification(testo, 2)` (assertive) | **Sì**, priorità più alta (Ubuntu 2, Fedora HIGHEST) | idem |
+
+**E poi la prova decisiva, dentro Galleria.** Un patch non committato (`lab/vm/orca-spike-inapp.patch`: 40 righe in
+`lib.rs`, `gtk = "0.18"` nel `Cargo.toml`, già nell'albero di tauri) emette dal processo `galleria-gui`, 12 s dopo l'avvio e
+poi ogni 12 s, `announcement`, `notification` assertive, `announcement` sull'oggetto accessibile della finestra
+(`WebviewWindow::gtk_window()` → `accessible()` → `emit_by_name`, nel thread principale GTK con `run_on_main_thread`).
+Orca le dice tutte e tre, con il fuoco in Galleria:
+
+```
+Ubuntu  SPEECH OUTPUT: 'IN-APP announcement signal: first notice' · 'IN-APP notification signal assertive: second notice' · 'IN-APP announcement signal: third notice'
+Fedora  (le stesse tre)
+        EVENT MANAGER: Dequeued object:announcement for [frame: 'Galleria'] in galleria-gui-spike (gtk 3.24.52) (2, 0, IN-APP notification signal assertive: second notice) priority: …
+```
+
+**Anche l'immagine Docker (Orca 46.1, at-spi2-core 2.52, Xvfb) le dice** (`lab/vm/docker-announce.sh`, prove C e D):
+`'Docker C: atk announcement from a GTK3 window'`, `'Docker D: atk notification assertive'`. Quindi il gate a11y di Q22
+potrebbe provarla senza VM.
+
+Cosa **non** è provato: l'annuncio dall'app **con** il testo dell'avviso dopo un'azione reale dell'utente (il patch
+emette a tempo, non da un comando chiamato dalla pagina); la voce (nessun audio); Orca 46 su un desktop vero; altri
+lettori (NVDA e Narrator sono di Windows, fase 3); l'effetto della doppia voce se un giorno Orca o WebKitGTK
+cominciassero a leggere le regioni vive.
+
+### Proposta di Q27 · come far arrivare a Orca gli esiti e i cambi di stato
+
+**Domanda.** Orca non pronuncia nessuna regione viva di WebKitGTK (confermato su GNOME 50/51: 10 forme iniettate nella
+review, più l'avviso, la barra di stato e la pagina «Start the service» qui). Gli esiti di salvataggio ed eliminazione
+(B3) e i cambi di stato della connessione (B5) devono arrivare a chi usa Orca. Come?
+
+**Alternative.**
+
+1. **Segnale ATK `announcement`/`notification` dal lato Rust** (provato dentro Galleria: Orca 50.3 e 51.1, e in Docker 46.1).
+   Un comando Tauri nuovo (`announce(text, urgenza)`) che chiama `run_on_main_thread` e `emit_by_name` sulla finestra;
+   per i cambi di stato della connessione, che nascono già in Rust (il supervisor), niente comando: li emette lo
+   stesso codice che manda `galleria:state`. *Pro*: è l'evento che Orca già gestisce; nessun permesso, nessun processo
+   in più; il testo è quello dei cataloghi (la UI passa la stringa già tradotta); verificabile nel gate a11y con lo stesso
+   `SPEECH OUTPUT`. *Contro*: codice solo Linux (`cfg`), un comando e una dipendenza esplicita (`gtk` è già nel `Cargo.lock`
+   tramite tauri, `cargo deny` da riguardare); la sorgente è la finestra, non l'elemento; richiede un ATK/at-spi2-core
+   recenti (provati dalla 2.52 in su; su un sistema più vecchio il segnale potrebbe non esserci: cade nel limite dichiarato); l'avviso esiste due volte, nel DOM e
+   nel segnale: se Orca o WebKitGTK cominciano a leggere le regioni vive, si sentirebbe due volte.
+2. **Notifiche del desktop** (libnotify/portale). Orca le legge, ma sono un'altra cosa: finiscono nel centro notifiche, «non
+   disturbare» le silenzia, serve un crate e il portale, e un avviso a scomparsa di 4 s non è una notifica. **Non provata.**
+3. **Spostare il fuoco sull'avviso**, come la conferma (S5 è verde). Funziona, ma ruba il fuoco dal campo in cui si sta
+   scrivendo: giusto per errori che bloccano, sbagliato per un «Salvato».
+4. **Limite dichiarato**: l'avviso e la barra di stato restano visibili e raggiungibili con la tastiera, ma Orca non li
+   dice da solo. Nessun codice, nessuna regressione, ma un esito di eliminazione che non si sente è un buco di G12.
+5. **Altro `aria-live`**: scartata, le dieci forme iniettate dalla review e la prova di qui sono mute.
+
+**Raccomandazione**: **1** per gli esiti non bloccanti e i cambi di stato (urgenza *polite*; *assertive* solo per
+errori), **3** solo per le conferme e gli errori che già chiedono una risposta (come oggi), **4** scritto come limite
+per tutto il resto (altri lettori, sistemi con un ATK senza il segnale). Scartare **5**; **2** si riprende solo se la 1 cade su
+un'altra distro. Per B3: il comando `announce` entra con il primo esito vero (salvataggio) e ha una prova nel gate a11y
+(il vecchio `S6b`, che oggi è `it.fails`, diventa una prova positiva: «Orca dice l'esito»); le prove di controllo
+sulle regioni vive di Nello restano, così il giorno che Orca le legge la prova lo dice e l'annuncio si toglie. La passata
+a orecchio di B6 (Q22) resta, su VM, con voce.
+
+**Da decidere insieme** (per Aitano e Peppe): il comando va nel perimetro di B3 o prima, come micro-blocco; Orca 46.1 è la
+versione di Ubuntu 24.04 LTS, e il campo 2 non è stato provato lì: se interessa chiuderlo si apre una VM Ubuntu 24.04
+(una card piccola).
+
+### Non verificato (spike)
+
+- Nessun ascolto: tutto è letto dal file di debug di Orca, non dalla voce. Il patch in-process emette a tempo; il
+  comando chiamato dalla pagina non è scritto.
+- Orca 46 su desktop vero (Ubuntu 24.04), GNOME su X11, KDE/Plasma e Orca su altre distro.
+- Il comportamento della coda di Orca se gli annunci sono molti e ravvicinati (urgenza, interruzioni).
+- Le due VM sono «Cloud» con il desktop aggiunto sopra (come in `t_4a5ce3ed`): non sono installazioni da ISO.

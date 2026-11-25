@@ -214,7 +214,7 @@ Rispetto a Pritunl/Eddie/Defguard (dettagli in `00-mercato-e-concorrenti.md`):
 | Windows | 11 x64 | obbligatoria | installer ufficiale, ultima 2.7 (D14) | anche l'ultima 2.6 ma best effort |
 | Debian | 13 (stabile) | best effort | 2.6.14 **[V]** | utile per resolvconf |
 | KDE Plasma | su una delle distro sopra | best effort | — | tray nativa |
-| Arch | rolling | best effort | — | solo community (AUR in fase 3), nessuna garanzia |
+| Arch | rolling | best effort | — | solo community (AUR solo con trazione), nessuna garanzia |
 | Windows 10, ARM64 | — | best effort | — | Windows 10 fuori supporto Microsoft dal 2025-10-14 **[V]** |
 
 ## 9. Licenza

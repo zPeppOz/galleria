@@ -101,9 +101,9 @@ La rubrica in Tauri 2 + React sopra il demone della fase 1, in sei blocchi B1–
 - [ ] B2 · Design system e guscio <!-- branch: galleria/t_b510159d-galleria-b2-task-t7-tastiera-fumo-screen · task: t_b510159d · by: genny -->
   - [x] design system nuovo e nel repo, con la licenza del progetto; quello di XR1 non si usa (A8): `ui/src/design/`, nessun file fuori da lì importa la libreria (`boundary.test.ts`)
   - [x] token dal mockup, componenti di base su primitive «headless», tema chiaro e scuro (D30): Base UI 1.9.0 (Q12 verde con lo screen reader), token con S8 vero su WebKitGTK 2.52.6 (aperto su Ubuntu 26.04 e Fedora)
-  - [ ] disposizione lista + dettaglio e navigazione da tastiera (G12): tastiera e ruoli verdi in jsdom e nella finestra vera con Orca; manca la pronuncia dell'avviso a scomparsa (Orca tace, `S6b` è un `it.fails`, vedi `docs/08` «Avviso a scomparsa»)
+  - [ ] disposizione lista + dettaglio e navigazione da tastiera (G12): tastiera e ruoli verdi in jsdom e nella finestra vera con Orca; restano due buchi di Orca con WebKitGTK, non del markup: il nome di un campo di testo non viene pronunciato (`S4b`) e nessuna regione viva viene pronunciata, `role="alert"` compreso (`S6b`); vedi `docs/08` «Buco 1» e «Buco 2»
   - [x] cataloghi `en` e `it` con il test dei codici del demone (D22, G8): `tests/catalogs.rs` e cambio di lingua a caldo nel fumo
-  - [x] ci si può fermare qui: guscio navigabile con dati finti, nelle due lingue (U1: fumo 13/13 tre volte, `a11y` 18 + 1 `it.fails` due volte)
+  - [x] ci si può fermare qui: guscio navigabile con dati finti, nelle due lingue (U1: fumo 13/13 tre volte, `a11y` 22 prove verdi due volte, con i due buchi di G12 registrati come prove)
 - [ ] B3 · Rubrica e profili
   - [ ] lista con gruppi, ricerca, preferiti, ordinamento e icona di stato; gruppi in `galleria.toml`
   - [ ] schede Generale, Autenticazione e Rete: campi veri per WireGuard, sola lettura più interruttori per OpenVPN (D26)

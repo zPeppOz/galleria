@@ -93,6 +93,20 @@ describe("the shell under a screen reader", () => {
     await waitForTree(focusedIs("General"), "«General» focused again");
   });
 
+  // KNOWN GAP (docs/08-esito-fase2.md, «Campi di testo»): the tree is right (entry «Name», labelled-by) and Orca 46 with
+  // WebKitGTK 2.52.6 says the value and «selected», not the name. Only the wait for the speech is turned upside down:
+  // the focus and the tree are asserted as usual, so a failure to get there is a failure, not the gap. The day Orca
+  // says «Name» the last line fails, and the gap can be closed in the outcome document.
+  it("S4b_text_field_name_is_spoken_by_orca", async () => {
+    const mark = speechMark();
+    const tree = await reach("Name", ["Tab"]);
+    const field = focusedNode(tree) as AtNode;
+    expect(field.role).toBe("entry");
+    expect(field.relations.some((r) => r.startsWith("labelled-by"))).toBe(true);
+    await expect(waitForSpeech(mark, /\bName\b/, 2500), "known gap: Orca does not say the name of a text field").rejects.toThrow(/Orca never said/);
+    record("S4b text field reached (Orca does not say the name)", speechSince(mark), tree);
+  });
+
   it("S4_switch_state_is_exposed_and_spoken", async () => {
     const reached = speechMark();
     const tree = await reach(/Reconnect automatically/, ["Tab"]);
@@ -156,14 +170,186 @@ describe("the shell under a screen reader", () => {
   });
 
   // KNOWN GAP (see docs/08-esito-fase2.md, «Avviso a scomparsa»): Orca 46 with WebKitGTK 2.52.6 receives the
-  // `children-changed:add` of the region (politeness `polite`, atomic) and says nothing. `it.fails` keeps the gap in view:
-  // the day this starts to pass, the run says so and the gap can be closed in the outcome document.
-  it.fails("S6b_notice_is_spoken_by_orca", async () => {
+  // `children-changed:add` of the region and says nothing, whatever the form of the live region (the control below).
+  // Only the wait for the speech is turned upside down: opening the menu and showing the notice are asserted as usual,
+  // so a failure of either is a failure, not the gap. The day Orca says it, the last line fails.
+  it("S6b_notice_is_spoken_by_orca", async () => {
     await key("Enter");
     await waitForTree(focusedIs("Duplicate"), "the menu open on «Duplicate»");
     const mark = speechMark();
     await key("Enter");
-    await waitForSpeech(mark, /Sample data: nothing was changed/, 4000);
+    await waitForTree((t) => !!findNode(t, "push button", "Dismiss the notice") && focusedIs("More actions")(t), "the notice shown and the focus on «More actions»");
+    await expect(waitForSpeech(mark, /Sample data: nothing was changed/, 4000), "known gap: Orca does not say a live region").rejects.toThrow(/Orca never said/);
+  });
+
+  // Controls for the two gaps, in the style of `control_how_webkitgtk_exposes_a_plain_popup_button`: bare elements put
+  // in the page, nothing of ours. They assert what Orca does today, so the day it changes the run says so.
+  const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  async function said(act: () => Promise<unknown>, ms: number): Promise<string> {
+    const mark = speechMark();
+    await act();
+    await settle(ms);
+    return speechSince(mark).join(" | ");
+  }
+
+  it("control_orca_does_not_say_the_name_of_a_bare_text_field", async () => {
+    // One field at a time, reached with Tab from a bare button, in nine forms. The tree has the right name for every
+    // one of them. Without anything of ours Orca says the value and «selected» (or «Text unselected.»), not the name.
+    const forms = ["aria-label empty", "aria-label", "label for", "label wrapping", "aria-labelledby", "textarea", "readonly", "password", "aria-describedby"] as const;
+    const words = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india"];
+    for (const [n, form] of forms.entries()) {
+      const name = `Probe ${words[n]}`;
+      await b.execute(
+        (form: string, name: string) => {
+          const box = document.createElement("div");
+          box.id = "control-field";
+          const before = document.createElement("button");
+          before.id = "control-before";
+          before.textContent = "Before the field";
+          box.append(before);
+          const input = document.createElement(form === "textarea" ? "textarea" : "input");
+          input.id = "control-input";
+          input.value = form === "aria-label empty" ? "" : "Some value";
+          if (form === "password") (input as HTMLInputElement).type = "password";
+          if (form === "readonly") input.readOnly = true;
+          if (["aria-label empty", "aria-label", "textarea", "readonly", "password"].includes(form)) input.setAttribute("aria-label", name);
+          if (form === "label for" || form === "aria-describedby") {
+            const label = document.createElement("label");
+            label.htmlFor = input.id;
+            label.textContent = name;
+            box.append(label);
+          }
+          if (form === "aria-describedby") {
+            const hint = document.createElement("p");
+            hint.id = "control-hint";
+            hint.textContent = "A hint";
+            box.append(hint);
+            input.setAttribute("aria-describedby", hint.id);
+          }
+          if (form === "aria-labelledby") {
+            const label = document.createElement("span");
+            label.id = "control-label";
+            label.textContent = name;
+            box.append(label);
+            input.setAttribute("aria-labelledby", label.id);
+          }
+          if (form === "label wrapping") {
+            const label = document.createElement("label");
+            label.append(name, input);
+            box.append(label);
+          } else box.append(input);
+          document.body.append(box);
+          before.focus();
+        },
+        form,
+        name,
+      );
+      await waitForTree(focusedIs("Before the field"), "the bare button focused");
+      await settle(800);
+      const mark = speechMark();
+      await key("Tab");
+      const tree = await waitForTree((t) => focusedName(t)?.includes(name) ?? false, `the bare field «${name}» focused (${form})`);
+      await settle(2500);
+      const heard = speechSince(mark);
+      await b.execute(() => document.getElementById("control-field")?.remove());
+      const names = heard.join(" ").includes(name);
+      record(`control: bare text field, ${form} (Orca ${names ? "says" : "does not say"} the name)`, heard, [focusedNode(tree) as AtNode]);
+      // The empty field is recorded and not asserted: Orca says its name on arrival in some runs («Probe alpha entry.»,
+      // «Probe alpha empty entry.» in the review) and nothing at all in others. The eight fields with a value are the
+      // gap: the name is never said (the textarea says nothing at all).
+      if (form !== "aria-label empty") expect(names, `${form}: Orca said ${JSON.stringify(heard)}`).toBe(false);
+    }
+  });
+
+  it("control_orca_does_not_say_any_form_of_live_region", async () => {
+    // Ten forms put in the page, none of ours. `children-changed:add` reaches Orca and its WebKitGtk script does not
+    // present it, `role=alert` included: the confirmation is heard because the focus goes into it.
+    const forms = [
+      "alert present, textContent", "alert new with text", "alert new with text and button", "alert empty, text after 300 ms",
+      "aria-live assertive, textContent", "status with p", "status aria-live polite", "aria-live polite, text of a span changed",
+      "log with p", "status aria-atomic with text and button",
+    ] as const;
+    for (const [n, form] of forms.entries()) {
+      const text = `Live notice number ${n + 1}`;
+      const heard = await said(
+        () =>
+          b.execute(
+            async (form: string, text: string) => {
+              const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+              const box = document.createElement("div");
+              box.id = "control-live";
+              document.body.append(box);
+              const make = (tag: string, attrs: Record<string, string>, parent: Element = box): HTMLElement => {
+                const el = document.createElement(tag);
+                for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+                parent.append(el);
+                return el;
+              };
+              const withButton = (el: HTMLElement) => {
+                el.append(text);
+                make("button", {}, el).textContent = "Dismiss";
+              };
+              if (form === "alert present, textContent") {
+                const el = make("div", { role: "alert" });
+                await wait(500);
+                el.textContent = text;
+              } else if (form === "alert new with text") make("div", { role: "alert" }).textContent = text;
+              else if (form === "alert new with text and button") withButton(make("div", { role: "alert" }));
+              else if (form === "alert empty, text after 300 ms") {
+                const el = make("div", { role: "alert" });
+                await wait(300);
+                el.textContent = text;
+              } else if (form === "aria-live assertive, textContent") {
+                const el = make("div", { "aria-live": "assertive" });
+                await wait(500);
+                el.textContent = text;
+              } else if (form === "status with p") {
+                const el = make("div", { role: "status" });
+                await wait(500);
+                make("p", {}, el).textContent = text;
+              } else if (form === "status aria-live polite") {
+                const el = make("div", { role: "status", "aria-live": "polite" });
+                await wait(500);
+                el.textContent = text;
+              } else if (form === "aria-live polite, text of a span changed") {
+                const el = make("div", { "aria-live": "polite" });
+                const span = make("span", {}, el);
+                span.textContent = "before";
+                await wait(500);
+                span.textContent = text;
+              } else if (form === "log with p") {
+                const el = make("div", { role: "log" });
+                await wait(500);
+                make("p", {}, el).textContent = text;
+              } else {
+                const el = make("div", { role: "status", "aria-atomic": "true" });
+                await wait(500);
+                withButton(make("div", {}, el));
+              }
+            },
+            form,
+            text,
+          ),
+        2500,
+      );
+      await b.execute(() => document.getElementById("control-live")?.remove());
+      record(`control: live region, ${form} (Orca ${heard.includes(text) ? "says" : "does not say"} it)`, heard ? heard.split(" | ") : []);
+      expect(heard, `${form}: Orca said ${JSON.stringify(heard)}`).not.toContain(text);
+    }
+    // The silence above means something only if Orca is still speaking: a bare button that takes the focus is heard.
+    const heardButton = await said(
+      () =>
+        b.execute(() => {
+          const button = document.createElement("button");
+          button.id = "control-live";
+          button.textContent = "Probe button";
+          document.body.append(button);
+          button.focus();
+        }),
+      1500,
+    );
+    await b.execute(() => document.getElementById("control-live")?.remove());
+    expect(heardButton, "Orca still speaks after the live regions").toContain("Probe button");
   });
 
   it("X3_no_csp_violation_in_the_shell_tour", async () => {

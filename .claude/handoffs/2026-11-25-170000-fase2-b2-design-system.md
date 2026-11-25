@@ -84,11 +84,21 @@
 ## Scelte da sapere (T7)
 
 - `keyboard.test.tsx` (9 prove, solo `user.tab()`/`user.keyboard()`), cinque prove nuove nel fumo (`the shell in the real window`) e
-  `ui/e2e/shell.a11y.ts` (8 prove con Orca). Il fumo ora legge i token a livello di modulo (`themes`), non dentro un `describe`.
+  `ui/e2e/shell.a11y.ts` (11 prove con Orca dopo la correzione di `t_43cd01da`; 8 al T7). Il fumo ora legge i token a livello di modulo (`themes`), non dentro un `describe`.
 - **Difetto corretto**: chiudere un avviso con la tastiera lasciava il fuoco sul `body`; `Toast` ora lo restituisce a chi lo aveva.
-- **Buco aperto**: Orca 46 + WebKitGTK 2.52.6 non pronuncia l'avviso a scomparsa (riceve `children-changed:add` sulla regione viva e
-  tace). `S6b_notice_is_spoken_by_orca` è un `it.fails`: diventa rosso quando Orca parla. In B5 gli errori sono avvisi: provare il ruolo
-  `alert` (gli `alert` che compaiono vengono pronunciati, come la conferma) o un messaggio in linea. Dettagli in `docs/08`.
+- **Due buchi aperti** (G12 resta `[ ]`; limiti di Orca 46 + WebKitGTK 2.52.6, non del markup: nessun componente è cambiato):
+  1. Orca non pronuncia il nome di un campo di testo (dice il valore e «selected»): `S4b_text_field_name_is_spoken_by_orca`.
+  2. Orca non pronuncia nessuna regione viva, `role="alert"` compreso (dieci forme provate): `S6b_notice_is_spoken_by_orca`. La
+     strada «provare `alert` in B5» che questo handoff indicava prima era sbagliata: la conferma si sente perché il fuoco ci entra.
+  `S4b` e `S6b` non sono più `it.fails`: la preparazione è asserita e solo l'attesa del parlato è rovesciata (`rejects.toThrow`,
+  «buco noto»); due prove di controllo (`control_orca_does_not_say_the_name_of_a_bare_text_field`,
+  `control_orca_does_not_say_any_form_of_live_region`) mettono nella pagina elementi nudi e asseriscono ciò che Orca dice oggi, così il
+  giorno che cambia la prova lo dice. Serve una decisione (Aitano e Peppe) prima del piano di B3: come far arrivare gli esiti a
+  Orca (segnale AT-SPI `announcement`, notifiche del desktop, limite dichiarato), e se confermarli su una sessione GNOME vera.
+- Dopo la review di B2: `AboutDialog` usava la classe `facts` (sparita con `styles.css`): ora `design/Facts.css` (`.gx-facts`, la
+  griglia di prima di `StatusView`) per le due; `overlays.css` aveva `padding: … 10px` fuori scala: ora `--sp-5`, e
+  `css-rules.test.ts::spacing_uses_the_scale` controlla `padding*`, `margin*` e `gap` (eccezione per nome: `margin: -1px` di
+  `.visually-hidden`).
 - L'interruttore è un `toggle button` per AT-SPI: Orca dice «pressed/not pressed». I gruppi della lista sono `panel`.
 - Nelle prove sul menu aspettare il fuoco *dentro* il menu (`menuOpen`) prima di premere `Home`/`End`/`Invio`: il fuoco entra un
   istante dopo la comparsa del menu e un tasto troppo presto va al pulsante.

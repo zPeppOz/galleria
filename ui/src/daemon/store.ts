@@ -12,16 +12,33 @@ export function useDaemon(): Daemon {
 
   useEffect(() => {
     let closed = false;
+    // What arrives while the snapshot is on its way is newer than the snapshot: the daemon_view answer reflects
+    // the moment it was taken, and an event emitted after that can reach the webview before the answer does.
+    let waiting = true;
+    let linkSeen = false;
+    let stateSeen: Status | null = null;
     const unlisten: UnlistenFn[] = [];
     const keep = (fn: UnlistenFn) => (closed ? fn() : unlisten.push(fn));
     void (async () => {
       try {
         // Listen first, then ask for the snapshot, so nothing that happens in between is lost.
-        keep(await listen<DaemonView>("galleria:link", (e) => setView(e.payload)));
-        keep(await listen<Status>("galleria:state", (e) => setView((v) => (v ? { ...v, status: e.payload } : v))));
+        keep(
+          await listen<DaemonView>("galleria:link", (e) => {
+            if (waiting) linkSeen = true;
+            setView(e.payload);
+          }),
+        );
+        keep(
+          await listen<Status>("galleria:state", (e) => {
+            if (waiting) stateSeen = e.payload;
+            setView((v) => (v ? { ...v, status: e.payload } : v));
+          }),
+        );
         const [first, app] = await Promise.all([invoke<DaemonView>("daemon_view"), invoke<AppInfo>("app_info")]);
+        waiting = false;
         if (!closed) {
-          setView(first);
+          // A link event carries the whole view, so it replaces the snapshot; a state event only its status.
+          if (!linkSeen) setView(stateSeen ? { ...first, status: stateSeen } : first);
           setInfo(app);
         }
       } catch (e) {

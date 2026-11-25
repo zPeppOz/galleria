@@ -100,16 +100,18 @@ describe("galleria-gui against the real daemon", () => {
   });
 });
 
+// The colour tokens, read from tokens.css: the dark theme is `:root`, the light one overrides it.
+const tokensCss = readFileSync(new URL("../src/design/tokens.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+const tokenBlock = (selector: string) => {
+  const start = tokensCss.indexOf(selector);
+  return tokensCss.slice(tokensCss.indexOf("{", start) + 1, tokensCss.indexOf("}", start));
+};
+const readTokens = (text: string) => Object.fromEntries([...text.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+const darkTokens = readTokens(tokenBlock(":root {"));
+const themes = { dark: darkTokens, light: { ...darkTokens, ...readTokens(tokenBlock(':root[data-theme="light"]')) } } as const;
+
 // T2: the colour tokens as the real window paints them (S8), and the theme on the root.
 describe("design tokens in the real window", () => {
-  const css = readFileSync(new URL("../src/design/tokens.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-  const block = (selector: string) => {
-    const start = css.indexOf(selector);
-    return css.slice(css.indexOf("{", start) + 1, css.indexOf("}", start));
-  };
-  const read = (text: string) => Object.fromEntries([...text.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-  const dark = read(block(":root {"));
-  const themes = { dark, light: { ...dark, ...read(block(':root[data-theme="light"]')) } } as const;
   const COLOURS = ["--bg", "--panel", "--panel-2", "--line", "--line-strong", "--ink", "--muted", "--faint", "--accent", "--accent-ink", "--ok", "--warn", "--err", "--wg", "--ovpn"];
   const TINTED = ["--ok", "--warn", "--err", "--wg", "--ovpn"];
 
@@ -175,5 +177,160 @@ describe("design tokens in the real window", () => {
     const b = await openApp();
     await waitForBody(b, START_THE_SERVICE, "the window never rendered");
     expect(["dark", "light"]).toContain(await b.execute(() => document.documentElement.dataset.theme));
+  });
+});
+
+// T7: the shell with its sample data, in the real window (plan B2, U1 and G8). The daemon is the fake one: the shell does
+// not ask it for anything, it only shows the link in the bar.
+describe("the shell in the real window", () => {
+  // Every `securitypolicyviolation` event from here on is kept; the tests below read them at the end.
+  const watchCsp = (b: Browser) =>
+    b.execute(() => {
+      const w = window as unknown as { __csp: string[] };
+      w.__csp = [];
+      document.addEventListener("securitypolicyviolation", (e) => w.__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
+    });
+  const cspViolations = (b: Browser) => b.execute(() => (window as unknown as { __csp: string[] }).__csp);
+
+  const press = (b: Browser, ...keys: string[]) => b.keys(keys);
+  const title = (b: Browser) => b.$("h1").getText();
+  const activeRole = (b: Browser) => b.execute(() => document.activeElement?.getAttribute("role") ?? document.activeElement?.tagName.toLowerCase() ?? "");
+  const waitFor = (b: Browser, check: () => Promise<boolean>, timeoutMsg: string) => b.waitUntil(check, { timeout: TEN_SECONDS, interval: 250, timeoutMsg });
+
+  /** The first element matching `css` whose text (or whose first line, for a row of the list) is `text`. */
+  const byText = (b: Browser, css: string, text: string) =>
+    b.waitUntil(
+      async () => {
+        for (const el of await b.$$(css)) {
+          const shown = (await el.getText()).trim();
+          if (shown === text || shown.startsWith(`${text}\n`)) return el;
+        }
+        return false;
+      },
+      { timeout: TEN_SECONDS, interval: 250, timeoutMsg: `no ${css} with the text «${text}»` },
+    );
+
+  async function chooseFromMenu(b: Browser, label: string) {
+    await b.$("button=Menu").click();
+    await (await byText(b, '[role="menuitemradio"]', label)).click();
+  }
+
+  async function openShell(): Promise<Browser> {
+    daemon("start");
+    const b = await openApp();
+    await waitForBody(b, CONNECTED, "the bar never showed the active link");
+    await watchCsp(b);
+    return b;
+  }
+
+  it("shell_is_navigable_with_sample_data", async () => {
+    const b = await openShell();
+    expect(await bodyText(b)).toContain("Sample data");
+    const names: string[] = [];
+    for (const row of await b.$$('[role="listbox"] [role="option"]')) names.push((await row.$("span.profile-name").getText()).trim());
+    expect(names).toEqual(["Ufficio Napoli", "Datacenter Milano", "Homelab", "VPS Hetzner", "Cliente Rossi"]);
+    expect(await title(b)).toBe("Ufficio Napoli");
+
+    // Menu, then the list: one stop for the chosen row; ↓ moves the choice and the detail follows
+    await press(b, "Tab");
+    await press(b, "Tab");
+    expect(await activeRole(b)).toBe("option");
+    await press(b, "ArrowDown");
+    await waitFor(b, async () => (await title(b)) === "Datacenter Milano", "↓ in the list did not change the title of the detail");
+    await press(b, "End");
+    await waitFor(b, async () => (await title(b)) === "Cliente Rossi", "End in the list did not choose the last profile");
+    await press(b, "Home");
+    await waitFor(b, async () => (await title(b)) === "Ufficio Napoli", "Home in the list did not choose the first profile");
+
+    // «More actions», then the tab strip: the arrows open the tabs, down to «Log»
+    await press(b, "Tab");
+    await press(b, "Tab");
+    expect(await activeRole(b)).toBe("tab");
+    for (let step = 0; step < 4; step++) await press(b, "ArrowRight");
+    const log = await byText(b, "[role=tab]", "Log");
+    await waitFor(b, async () => (await log.getAttribute("aria-selected")) === "true", "the arrows did not reach the «Log» tab");
+    expect(await bodyText(b)).toContain("This section arrives in a later release.");
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
+  it("shell_works_in_both_languages", async () => {
+    const b = await openShell();
+    expect(await bodyText(b)).toContain("Sample data");
+    await chooseFromMenu(b, "Italiano");
+    await waitForBody(b, "Dati di esempio", "the window did not switch to Italian");
+    const italian = await bodyText(b);
+    for (const text of ["Generale", "Altre azioni", "Collegato al servizio"]) expect(italian).toContain(text);
+    expect(italian).not.toContain("Sample data");
+    expect(await b.execute(() => document.documentElement.lang)).toBe("it");
+    await chooseFromMenu(b, "English");
+    await waitForBody(b, "Sample data", "the window did not switch back to English");
+    expect(await bodyText(b)).toContain("More actions");
+    expect(await bodyText(b)).not.toContain("Dati di esempio");
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
+  it("both_themes_render", async () => {
+    const b = await openShell();
+    // A spot of the real page where nothing but the body background shows: the content area, away from any control.
+    const spot = await b.execute(() => {
+      const x = window.innerWidth - 24;
+      for (let y = 260; y < window.innerHeight - 60; y += 8) {
+        if (document.elementFromPoint(x, y)?.classList.contains("shell-main")) return { x, y, width: window.innerWidth };
+      }
+      return null;
+    });
+    expect(spot, "an empty spot in the content area").not.toBeNull();
+    const seen: Record<string, Rgb> = {};
+    for (const [theme, label] of [["light", "Light"], ["dark", "Dark"]] as const) {
+      await chooseFromMenu(b, label);
+      await waitFor(b, async () => (await b.execute(() => document.documentElement.dataset.theme)) === theme, `the theme did not become ${theme}`);
+      await b.execute(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+      const png = PNG.sync.read(Buffer.from(await b.takeScreenshot(), "base64"));
+      const scale = png.width / (spot as { width: number }).width;
+      const at = (Math.round((spot as { y: number }).y * scale) * png.width + Math.round((spot as { x: number }).x * scale)) * 4;
+      const got: Rgb = [png.data[at], png.data[at + 1], png.data[at + 2]];
+      const want = parseColour(themes[theme]["--bg"]);
+      expect(got.every((v, i) => Math.abs(v - want[i]) <= 3), `${theme}: the body paints ${toHex(got)}, the token --bg is ${toHex(want)}`).toBe(true);
+      seen[theme] = got;
+    }
+    expect(toHex(seen.light)).not.toBe(toHex(seen.dark));
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
+  it("control_the_csp_listener_sees_a_violation", async () => {
+    // Without this, «no violation» could only mean that the listener hears nothing: a <style> element is what the CSP refuses.
+    const b = await openShell();
+    await b.execute(() => {
+      const style = document.createElement("style");
+      style.textContent = "body { outline: 1px solid red }";
+      document.head.append(style);
+    });
+    await waitFor(b, async () => (await cspViolations(b)).length > 0, "the listener heard no violation for an inline <style>");
+    expect((await cspViolations(b))[0]).toMatch(/style-src|default-src/);
+  });
+
+  it("no_csp_violation_during_the_tour", async () => {
+    const b = await openShell();
+    // the list, the tabs (the indicator of the strip sets its size with a script, not with a style element), the menu,
+    // the About dialog, the confirmation, the switch, a notice, both languages and both themes
+    await (await byText(b, "[role=option] span.profile-name", "Homelab")).click();
+    await waitFor(b, async () => (await title(b)) === "Homelab", "the list did not choose Homelab");
+    for (const tab of await b.$$('[role="tab"]')) await tab.click();
+    await (await byText(b, "[role=tab]", "General")).click();
+    await b.$('[role="switch"]').click();
+    await b.$("button=More actions").click();
+    await (await byText(b, "[role=menuitem]", "Delete")).click();
+    await b.$('[role="alertdialog"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    await (await byText(b, "[role=alertdialog] button", "Delete")).click();
+    await waitForBody(b, "Sample data: nothing was changed", "the notice never appeared");
+    await b.$("button=Menu").click();
+    await (await byText(b, "[role=menuitem]", "About Galleria")).click();
+    await b.$('[role="dialog"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    await press(b, "Escape");
+    await chooseFromMenu(b, "Italiano");
+    await waitForBody(b, "Dati di esempio", "the window did not switch to Italian");
+    await chooseFromMenu(b, "Scuro");
+    await chooseFromMenu(b, "Chiaro");
+    expect(await cspViolations(b)).toEqual([]);
   });
 });

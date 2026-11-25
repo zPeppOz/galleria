@@ -80,3 +80,17 @@
   della CSP con il guscio resta al T7 (`no_csp_violation_during_the_tour`).
 - Merge: il ramo di T5/T6 non era in avanzamento rapido sul ramo di T1–T4 (main aveva i commit delle VM): fatto un merge
   `bbb54e7` invece del `--ff-only`.
+
+## Scelte da sapere (T7)
+
+- `keyboard.test.tsx` (9 prove, solo `user.tab()`/`user.keyboard()`), cinque prove nuove nel fumo (`the shell in the real window`) e
+  `ui/e2e/shell.a11y.ts` (8 prove con Orca). Il fumo ora legge i token a livello di modulo (`themes`), non dentro un `describe`.
+- **Difetto corretto**: chiudere un avviso con la tastiera lasciava il fuoco sul `body`; `Toast` ora lo restituisce a chi lo aveva.
+- **Buco aperto**: Orca 46 + WebKitGTK 2.52.6 non pronuncia l'avviso a scomparsa (riceve `children-changed:add` sulla regione viva e
+  tace). `S6b_notice_is_spoken_by_orca` è un `it.fails`: diventa rosso quando Orca parla. In B5 gli errori sono avvisi: provare il ruolo
+  `alert` (gli `alert` che compaiono vengono pronunciati, come la conferma) o un messaggio in linea. Dettagli in `docs/08`.
+- L'interruttore è un `toggle button` per AT-SPI: Orca dice «pressed/not pressed». I gruppi della lista sono `panel`.
+- Nelle prove sul menu aspettare il fuoco *dentro* il menu (`menuOpen`) prima di premere `Home`/`End`/`Invio`: il fuoco entra un
+  istante dopo la comparsa del menu e un tasto troppo presto va al pulsante.
+- Tutto il resto del resoconto di B2 (tabelle U1, G8, G12, Q12, S8, trascrizione di Orca, numeri, «Non verificato») è in
+  `docs/08-esito-fase2.md`, «Tastiera, fumo, screen reader (T7)».

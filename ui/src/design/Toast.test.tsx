@@ -95,6 +95,8 @@ describe("Toast", () => {
     expect(document.activeElement).toBe(close);
     await user.keyboard("{Enter}");
     expect(screen.getByRole("status").textContent).toBe("");
+    // closing it from the keyboard gives the focus back to what had it, not to the page body
+    expect(document.activeElement).toBe(opener);
   });
 
   it("has_no_accessibility_violations", async () => {

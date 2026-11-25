@@ -279,3 +279,100 @@ soltanto il collegamento al demone (`useDaemon`) dentro `Shell`; `Shell` tiene i
   primo avvio, menu aperto): lista, dettaglio, striscia e schede si disegnano senza sovrapposizioni; la scheda «Trasporto»
   non aveva etichetta visibile (aggiunta). Le fotografie non sono nel repo. Non guardato: sotto 860 px, la scheda «Log» e la
   finestra di conferma nella finestra vera.
+
+### Tastiera, fumo, screen reader (T7)
+
+`ui/src/shell/keyboard.test.tsx` (9 prove, mai il puntatore), `ui/e2e/smoke.e2e.ts` (5 prove nuove nel blocco «the shell in the
+real window») e `ui/e2e/shell.a11y.ts` (8 prove con Orca e AT-SPI). Due difetti trovati dalle prove e corretti nei componenti:
+
+- **Il fuoco finiva sul `body` chiudendo un avviso dalla tastiera.** Il pulsante «Chiudi l'avviso» ha il fuoco, l'avviso sparisce e il
+  fuoco cade. Ora `Toast` ricorda l'elemento che aveva il fuoco prima di entrare nell'avviso e glielo restituisce (se non c'è più,
+  il primo punto di sosta della pagina fuori dagli avvisi). Prove: `a_notice_closed_from_the_keyboard_does_not_drop_the_focus_on_the_body`
+  (guscio) e `toast_can_be_dismissed_from_the_keyboard` (esteso).
+- **Le prove di tastiera sul menu erano instabili**: un tasto premuto appena il menu compare va al pulsante, perché il fuoco entra nel
+  menu un istante dopo. Le prove aspettano il fuoco dentro il menu (`menuOpen`). Non è un difetto del componente (un utente non preme
+  due tasti nello stesso millisecondo), ma è bene saperlo per le prove che verranno.
+
+Le regioni vive dei toast portano ora anche `aria-live` e `aria-atomic` scritti (WebKitGTK esporta così la cortesia della regione,
+`container-live:polite`); le prove di T5 non cambiano.
+
+#### Criteri di uscita di B2
+
+| # | Criterio | Prova | Esito |
+|---|---|---|---|
+| U1 | Guscio navigabile con dati finti, nelle due lingue | fumo nella finestra vera: `shell_is_navigable_with_sample_data` (cinque profili, «Sample data», `↓`/`End`/`Home` nella lista cambiano il titolo, frecce fino a «Log»), `shell_works_in_both_languages` («Dati di esempio», «Generale», «Altre azioni», ritorno a «English»), `both_themes_render`; in jsdom `Shell.test.tsx` | **verde** (13/13 al fumo, tre volte di fila) |
+| G8 | Ogni codice d'errore del demone ha testo `en` e `it`; la lingua cambia senza riavvio | `tests/catalogs.rs` (7 prove: 11 `ErrorCode`, 8 `SessionErrorCode`, `GUI_CODES`, stati e barra); `prefs.test.tsx::switching_language_changes_every_visible_text`; fumo `language_switches_without_a_restart` e `shell_works_in_both_languages` (stessa sessione WebDriver) | **verde** |
+| G12 (B2) | Guscio e componenti da tastiera; ruoli giusti per finestra modale, menu, schede, lista e interruttore | axe e tastiera per ogni componente (T1, T4–T6) e `keyboard.test.tsx` sul guscio; ruoli e parole nella finestra vera con Orca e AT-SPI (`overlays.a11y.ts`, `shell.a11y.ts`) | **verde, con un buco**: l'avviso a scomparsa non viene pronunciato da Orca (sotto). Tutto il resto è verde |
+| Q12 | Libreria «headless» regge finestra modale e menu con lo screen reader | tabella del T1 | **verde con Base UI 1.9.0** (rimasto invariato) |
+| S8 | `oklch()` e `color-mix()` giusti da WebKitGTK | `tokens_paint_the_expected_srgb`; in più `both_themes_render` (pixel dello sfondo del guscio contro `--bg` nei due temi) | **vero** su WebKitGTK 2.52.6 (differenza massima 1,30 per canale); aperto su Ubuntu 26.04 e Fedora |
+| CSP | Nessuna violazione con il guscio | `no_csp_violation_during_the_tour` (lista, schede, interruttore, menu, finestra, conferma, avviso, lingua e tema) e `X3` nel giro con Orca; la prova di controllo `control_the_csp_listener_sees_a_violation` inserisce un `<style>` e il listener lo sente | **verde**: anche l'indicatore delle schede (`Tabs.Indicator`, misure con `style` da script) non viola la CSP |
+
+#### Cosa dice Orca sul guscio (`SPEECH OUTPUT`, così come sono)
+
+Ambiente: Orca 46.1, AT-SPI 2.52, WebKitGTK 2.52.6, nell'immagine `galleria-gui-dev`, senza gestore di finestre; lo scarico è
+`target/gui-a11y/transcript.txt` (ignorato da git), identico in due giri di fila.
+
+| Passo | Parole di Orca |
+|---|---|
+| `Tab`, `Tab` dal pulsante «Menu» alla lista | «landmark Profile list» · «Connections list box» · «Ufficio Napoli.» · «Favourite vpn.ufficio.example:1194 OpenVPN.» |
+| `↓` nella lista | «Datacenter Milano.» · «gw.dc-mi.example:443 OpenVPN.» |
+| `Tab` `Tab` alle schede | «General page tab.» |
+| `→` sulle schede | «Authentication page tab.» (`selected`, `focused`; cambia anche il pannello) |
+| `Tab` fino all'interruttore | «General scroll pane.» · «Datacenter Milano» «selected» (il campo «Nome», testo selezionato) · «Group combo box.» «Work.» · «gw.dc-mi.example:443» «selected» · «Transport panel.» «TCP.» «selected radio button» «leaving panel.» · «Reconnect automatically toggle button pressed.» · «Try again by itself when the connection drops.» |
+| `Spazio` sull'interruttore (spento, poi acceso) | «not pressed» · «pressed» (Orca dice solo il nuovo stato) |
+| «Elimina» dal menu «Altre azioni» | «alert Delete Datacenter Milano?» · «These are sample data: nothing is deleted, whatever you choose.» · «Cancel push button.» |
+| `Esc` sulla conferma | «More actions combo box.» «opens popup» (il fuoco è tornato sul pulsante) |
+| «Duplica» (avviso «Sample data: nothing was changed») | **niente**: Orca dice solo «More actions combo box.» «opens popup» (il ritorno del fuoco) |
+
+Albero AT-SPI dei punti, con la stessa prova (righe `ruolo «nome» [stati]`):
+
+```
+landmark «Profile list»
+  list box «Connections»
+    panel «Work»
+      list item «Ufficio Napoli» [focusable,focused,selected,…] description=«Favourite vpn.ufficio.example:1194 OpenVPN»
+      list item «Datacenter Milano» [focusable,…]      description=«gw.dc-mi.example:443 OpenVPN»
+    panel «Personal»  (Homelab, VPS Hetzner)      panel «Clients»  (Cliente Rossi)
+page tab list «Profile sections»
+  page tab «General» [focused,selectable,selected,…] rel=label-for->General,controller-for->General
+  page tab «Authentication» · «Network» · «Configuration» · «Log»
+toggle button «Reconnect automatically» [checkable,checked,focused,…] description=«Try again by itself when the connection drops.»
+alert «Delete Datacenter Milano?» [focusable,…] description=«These are sample data: nothing is deleted, whatever you choose.»
+  heading «Delete Datacenter Milano?»   paragraph «»
+  push button «Cancel» [focused]   push button «Delete»
+status bar «»   notification «»      (le due regioni vive, vuote)
+```
+
+Cose da sapere, tutte di WebKitGTK o di Orca e non del nostro codice:
+
+- **L'interruttore (`role="switch"`) è un `toggle button`**: Orca dice «pressed/not pressed», non «on/off». Il nome e il testo di aiuto
+  si sentono. Non l'ho cambiato: un `<button role="switch">` è la forma giusta e l'esportazione è della piattaforma.
+- **I gruppi della lista sono `panel`** con il nome del gruppo (come il gruppo del menu in T1), non `group`.
+- **Avviso a scomparsa: NON pronunciato.** L'avviso compare nell'albero (`status bar` con il pulsante «Dismiss the notice», il fuoco
+  resta su «More actions»: la metà «senza spostare il fuoco» è verde), Orca riceve `object:children-changed:add` sulla regione (la
+  cortesia è esportata, `container-live:polite`, `container-atomic:true`) e non dice nulla. Provato anche con `aria-live`/`aria-atomic`
+  scritti e con il testo come sola modifica di una regione nascosta (nessun evento arriva a Orca in quel caso): invariato. Non so se
+  dipenda dallo script `WebKitGtk` di Orca 46 o da WebKitGTK; non ho approfondito. `ui/e2e/shell.a11y.ts::S6b_notice_is_spoken_by_orca`
+  è un `it.fails`: resta verde finché Orca tace e diventa rosso il giorno in cui parla, perché il buco non si perda. **Conseguenza**:
+  oggi l'unico avviso è «Dati di esempio: nessuna modifica» (informazione, non errore); in B5, dove gli errori sono avvisi, la
+  strada da provare è il ruolo `alert` (Orca pronuncia gli `alert` che compaiono: lo fa per la conferma), oppure un messaggio in
+  linea nel punto del fuoco. Da decidere in B5, non qui.
+
+#### Numeri per livello
+
+- Livello 1 (Vitest, jsdom): **247 prove in 28 file** (T6: 238; +9 di `keyboard.test.tsx`, più un'asserzione in `Toast.test.tsx`).
+  Rust: `scripts/gui.sh check` verde (7 di `tests/catalogs.rs`, `config.rs`, clippy e test di `galleria-gui`).
+- Livello 3, fumo: **13 prove** (5 di B1, `language_switches_without_a_restart`, 2 dei token, 5 nuove del guscio: tre prove,
+  la prova di controllo del listener della CSP e il giro con la CSP). Verde tre volte di fila; S8: differenza massima 1,30.
+- Livello 3, screen reader (`scripts/gui.sh a11y`): **19 prove** (11 di T1 + 8 di T7), 18 verdi più 1 `it.fails` (S6b); verde due volte di fila.
+
+#### Non verificato
+
+- **S8 su Ubuntu 26.04 e Fedora**: solo sull'immagine (Ubuntu 24.04, WebKitGTK 2.52.6). Resta a B6 (G10).
+- **La passata a orecchio (Q22)**: Orca ha girato senza scheda audio, con il testo che pronuncia scritto nel file di debug; nessuno
+  ha ascoltato la voce né provato con un lettore reale in uso quotidiano.
+- **Il tema del sistema su un desktop vero**: nell'immagine WebKitGTK dichiara `prefers-color-scheme: light` e basta.
+- **L'aspetto a occhio in una finestra** al di là delle fotografie del T6: sotto 860 px, la scheda «Log», la finestra di conferma
+  non guardate; il carattere che esce dall'elenco su un desktop vero (S17).
+- **L'avviso a scomparsa con Orca** (sopra) e il comportamento con altri lettori (NVDA e Narrator sono Windows, fase 3).
+- Un clone pulito (`scripts/gui.sh check` da un clone) non provato, come in B1.

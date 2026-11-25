@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { AppInfo, DaemonView } from "../daemon/types";
-import { ToastProvider } from "../design/Toast";
+import { ToastProvider, type Announce } from "../design/Toast";
 import { useT } from "../i18n";
 import { DEMO_GROUPS, DEMO_PROFILES } from "./demo-data";
 import { ProfileDetail } from "./ProfileDetail";
@@ -15,7 +15,7 @@ import { TopBar } from "./TopBar";
  * profiles are the sample data of `demo-data.ts`; the shell never asks the service for anything (the daemon link comes
  * in as `view`).
  */
-export function Shell({ view, info, onRetry }: { view: DaemonView | null; info: AppInfo | null; onRetry: () => void }) {
+export function Shell({ view, info, onRetry, announce }: { view: DaemonView | null; info: AppInfo | null; onRetry: () => void; announce?: Announce }) {
   const t = useT();
   const [selectedId, setSelectedId] = useState(DEMO_PROFILES[0].id);
   const profile = DEMO_PROFILES.find((p) => p.id === selectedId) ?? DEMO_PROFILES[0];
@@ -25,7 +25,7 @@ export function Shell({ view, info, onRetry }: { view: DaemonView | null; info: 
     [t],
   );
   return (
-    <ToastProvider closeLabel={t("toast.close")}>
+    <ToastProvider closeLabel={t("toast.close")} announce={announce}>
       <div className="shell">
         <TopBar info={info} daemonVersion={view?.daemon_version ?? null} />
         <div className="shell-body">

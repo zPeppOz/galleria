@@ -628,3 +628,45 @@ Scelte da sapere:
 Non verificato (T1): il cancellare `state.toml` a finestra aperta e la scelta successiva che lo ricrea («Fatto quando»), a
 mano: `update` rilegge e riscrive a ogni scelta e la prova `broken_toml_gives_the_defaults_and_the_next_write_replaces_it`
 copre il caso del file rotto, ma non l'ho fatto nella finestra vera.
+
+### Comando `announce` e prova con Orca nell'immagine (T2, Q27)
+
+`announce.rs` (senza `tauri` né `gtk`): `Urgency`, il tratto `Announcer`, `clean` (via i caratteri di controllo, gli spazi e gli
+a capo diventano uno spazio, al più 300 caratteri) e `pick_signal` (la tabella P3). `announce_atk.rs` (solo Linux) è l'unico
+file che tocca `gtk`: `emit_on` cerca i segnali con `SignalId::lookup` e solo dopo emette; `AtkAnnouncer` lo chiama dal thread
+principale (`run_on_main_thread`) sull'oggetto accessibile della finestra `main`. Il comando `announce(text, assertive)` pulisce
+il testo, chiama l'`Announcer` nello stato dell'app e non fallisce mai per un segnale assente. `ToastProvider` ha la proprietà
+`announce` e la chiama una volta per ogni avviso mostrato (`assertive` per il tono `error`); `app/announce.ts` è l'unico file
+che invoca il comando (prova `only_one_file_invokes_announce`) e ingoia un rifiuto. `App` passa la funzione a `Shell`.
+
+| # | Supposizione | Esito | Dove | Ripiego applicato |
+|---|---|---|---|---|
+| S18 | L'annuncio emesso da un comando chiamato dalla pagina, subito dopo un tasto, arriva a Orca e non è coperto dal parlato del fuoco che torna sul pulsante | **Vero, senza ritardo.** `S6b` (ora positiva): dopo «Duplicate» Orca dice «Sample data: nothing was changed» **una volta** (contate di nuovo dopo 1,5 s), il fuoco resta su «More actions». Subito dopo dice «More actions combo box.»: il fuoco che torna non copre l'avviso. 7 giri di `scripts/gui.sh a11y` con l'annuncio acceso: `S6b` verde in tutti e sette; con `announce` spento a mano (A/B, 3 giri) è rossa in tutti e tre, come deve | `ui/e2e/shell.a11y.ts` | nessuno: i ritardi di 200 e 500 ms del tetto non servono |
+| S19 | Un segnale ATK mancante non manda in panico l'app | **Vero.** `a_missing_signal_is_skipped_without_a_panic`: un `GObject` semplice non ha né `announcement` né `notification`, `emit_on` torna `None` senza emettere (e scrive una riga su stderr una volta sola). In più `the_signal_atk_has_is_emitted_with_the_text_and_the_urgency`, **con ATK vero** (2.52 nell'immagine, `NoOpObject`, senza display): `notification` arriva con il testo e `1`/`2` come urgenza | `tests/announce.rs` | nessuno |
+| S20 | Nel file di debug di Orca si legge che l'annuncio viene dal processo `galleria-gui` | **Vero.** Forma della riga in Orca 46.1: `EVENT MANAGER: Dequeued object:announcement for [frame: 'Galleria'] in [application: 'galleria-gui'] (1, 0, Sample data: nothing was changed)`; il primo numero è `Atk.Live` (1 = polite). `S6c` la cerca e verifica frame e applicazione | `ui/e2e/shell.a11y.ts` | nessuno |
+
+Altre verità e numeri:
+
+- **`gtk` 0.18** come dipendenza esplicita solo su Linux: `Cargo.lock` guadagna **una riga** (`"gtk"` tra le dipendenze di
+  `galleria-gui`), nessun crate o versione nuovi. `cargo deny check` sull'host: `advisories ok, bans ok, licenses ok, sources ok`,
+  come prima. Non eseguito nell'immagine né sul runner (job `gui`): lì `cargo deny` non c'è, resta da vedere alla prima CI.
+  `deny.toml`: aggiunta al motivo di `RUSTSEC-2024-0429` («`gtk` è diretto, per il solo annuncio»).
+- `gtk_is_the_one_tauri_uses` (una sola voce `gtk` in `Cargo.lock`, versione 0.18) e `no_glib_or_atk_direct_dependency`
+  tengono fermo il vincolo.
+- Le prove di controllo sulle regioni vive (`control_orca_does_not_say_any_form_of_live_region`) sono rimaste come erano e
+  verdi: l'avviso esiste due volte (nel DOM e nel segnale) e Orca ne dice una. Il giorno che dirà anche la regione viva, `S6b`
+  conterà due volte e diventerà rossa insieme al controllo.
+- Due righe `object:announcement` nel file di debug per lo stesso testo: sono i due «Duplicate» del giro (`S6` e `S6b`), non un
+  doppione.
+- **Controllo della `textarea` instabile (già prima di T2).** `control_orca_does_not_say_the_name_of_a_bare_text_field` è
+  fallita su `textarea` in 2 giri su 4 con l'annuncio acceso e in 1 su 3 con `announce` spento a mano (esperimento A/B, poi
+  tolto): Orca 46.1 qualche volta dice «Probe foxtrot entry Some value.» per una `textarea` nuda, altre volte tace. Non
+  dipende da noi. La forma `textarea` è ora **registrata e non asserita**, come già quella del campo vuoto; le altre sette forme
+  con un valore restano asserite («il nome non si sente»). Dopo la modifica: 2 giri di fila verdi, 23 prove su 23.
+- `shell_never_calls_the_daemon` ora accetta `announce` tra le chiamate: parla con l'app, non con il demone.
+
+Non verificato (T2): la voce (nessun audio, si legge il file di debug di Orca); Orca 46 su un desktop vero (Q28, in B6); un
+errore *assertive* detto da Orca: la strada è provata per il *polite* (urgenza 1) con l'app vera, per l'*assertive* solo con
+ATK vero in `the_signal_atk_has_is_emitted_with_the_text_and_the_urgency` (il segnale parte con 2) e con lo spike (riga D,
+`notification(testo, 2)` detta con priorità più alta); `R4b` e `R4c` del piano (esito di salvataggio, eliminazione) nascono con
+i task che producono quegli esiti (T5, T8).

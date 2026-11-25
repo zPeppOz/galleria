@@ -154,3 +154,12 @@ export function record(label: string, speech: string[], tree?: AtNode[]): void {
   const lines = [`## ${label}`, ...speech.map((s) => `SPEECH OUTPUT: ${s}`), ...(tree ? ["tree:", ...tree.map(formatNode)] : []), ""];
   appendFileSync(`${out}/transcript.txt`, `${lines.join("\n")}\n`);
 }
+
+/** The lines of Orca's own debug file that match `pattern` (it also holds the `EVENT MANAGER` lines, one per event). */
+export function orcaDebugLines(pattern: RegExp): string[] {
+  const log = env("GALLERIA_A11Y_ORCA_LOG");
+  if (!existsSync(log)) return [];
+  return readFileSync(log, "utf8")
+    .split("\n")
+    .filter((line) => pattern.test(line));
+}

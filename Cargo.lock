@@ -1335,6 +1335,7 @@ dependencies = [
  "galleria-backend",
  "galleria-ipc",
  "galleriad",
+ "gtk",
  "nix",
  "rstest",
  "serde",

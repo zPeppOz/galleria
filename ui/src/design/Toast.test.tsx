@@ -106,3 +106,57 @@ describe("Toast", () => {
     await expectNoAccessibilityViolations(container);
   });
 });
+
+describe("Toast announcements (Q27)", () => {
+  function Notifier() {
+    const toast = useToast();
+    return (
+      <>
+        <button type="button" onClick={() => toast("Saved the profile")}>Info</button>
+        <button type="button" onClick={() => toast("Duplicated", { tone: "ok" })}>Ok</button>
+        <button type="button" onClick={() => toast("Could not save", { tone: "error" })}>Error</button>
+      </>
+    );
+  }
+  const withAnnouncer = (announce?: (text: string, assertive: boolean) => void) =>
+    render(
+      <ToastProvider closeLabel="Dismiss" announce={announce}>
+        <main>
+          <Notifier />
+        </main>
+      </ToastProvider>,
+    );
+
+  it("every_notice_is_announced_once", async () => {
+    const user = userEvent.setup();
+    const announce = vi.fn();
+    withAnnouncer(announce);
+    await user.click(screen.getByRole("button", { name: "Info" }));
+    await user.click(screen.getByRole("button", { name: "Ok" }));
+    expect(announce.mock.calls).toEqual([
+      ["Saved the profile", false],
+      ["Duplicated", false],
+    ]);
+    // the sentence announced is the one on the screen
+    expect(screen.getByRole("status").textContent).toContain("Saved the profile");
+    expect(screen.getByRole("status").textContent).toContain("Duplicated");
+    // dismissing a notice (a re-render of the provider) does not announce anything again
+    await user.click(screen.getAllByRole("button", { name: "Dismiss" })[0]);
+    expect(announce).toHaveBeenCalledTimes(2);
+  });
+
+  it("error_notices_are_announced_as_assertive", async () => {
+    const user = userEvent.setup();
+    const announce = vi.fn();
+    withAnnouncer(announce);
+    await user.click(screen.getByRole("button", { name: "Error" }));
+    expect(announce.mock.calls).toEqual([["Could not save", true]]);
+  });
+
+  it("works_without_an_announcer", async () => {
+    const user = userEvent.setup();
+    withAnnouncer(undefined);
+    await user.click(screen.getByRole("button", { name: "Info" }));
+    expect(screen.getByRole("status").textContent).toContain("Saved the profile");
+  });
+});

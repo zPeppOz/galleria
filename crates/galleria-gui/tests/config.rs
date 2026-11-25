@@ -14,6 +14,7 @@ const ALLOWED: &[&str] = &[
     "allow-app-info",
     "allow-ui-state-get",
     "allow-ui-state-set",
+    "allow-announce",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

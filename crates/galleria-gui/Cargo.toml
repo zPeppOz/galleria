@@ -25,6 +25,11 @@ tokio.workspace = true
 toml.workspace = true
 uuid.workspace = true
 
+# Only for the screen reader announcement (Q27): the same `gtk` 0.18 that Tauri brings, so it adds no crate and no
+# version to Cargo.lock. `glib` and `atk` are used through it (`gtk::glib`, `gtk::atk`), never as direct dependencies.
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
 

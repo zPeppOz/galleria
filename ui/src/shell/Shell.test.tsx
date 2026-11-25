@@ -183,6 +183,7 @@ describe("Shell", () => {
     await user.click(await screen.findByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(calls).toContain("daemon_retry"));
-    expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", "daemon_retry"]));
+    // `announce` tells the screen reader about the two notices of the round; it talks to the app, not to the daemon (Q27)
+    expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", "daemon_retry", "announce"]));
   });
 });

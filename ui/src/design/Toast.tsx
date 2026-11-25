@@ -4,6 +4,8 @@ import "./Toast.css";
 
 type Tone = "info" | "ok" | "error";
 type ShowToast = (message: string, opts?: { tone?: Tone }) => void;
+/** Tells a screen reader a notice (Q27): the live regions below are silent under Orca, so the app sends it another way. */
+export type Announce = (text: string, assertive: boolean) => void;
 
 interface Entry { id: number; message: string; tone: Tone }
 
@@ -62,16 +64,24 @@ function ToastItem(props: { entry: Entry; closeLabel: string; onDismiss: (id: nu
  * Short notices that go away by themselves. The two live regions are in the page from the start and empty, because a
  * screen reader only announces what is added to a region it already knows: `status` (polite) for information, `alert`
  * (assertive) for errors. `aria-live` is written out as well, because that is what WebKitGTK exports as the politeness
- * of the region. A notice never takes the focus.
+ * of the region. A notice never takes the focus. When `announce` is given it is called once for every notice shown, with
+ * the visible text (`assertive` for the error tone): the live regions are what a screen reader is meant to read, but
+ * Orca does not say them (docs/08, «Spike Orca»), so the app sends the same sentence by the ATK signal as well.
  */
-export function ToastProvider({ closeLabel, children }: { closeLabel: string; children: ReactNode }) {
+export function ToastProvider({ closeLabel, announce, children }: { closeLabel: string; announce?: Announce; children: ReactNode }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const next = useRef(0);
+  // The latest function, without making `show` change: a notice is announced by the one that is current when it shows.
+  const announceRef = useRef(announce);
+  announceRef.current = announce;
   const dismiss = useCallback((id: number) => setEntries((list) => list.filter((entry) => entry.id !== id)), []);
   const show = useCallback<ShowToast>((message, opts) => {
     next.current += 1;
-    const entry = { id: next.current, message, tone: opts?.tone ?? "info" };
+    const tone = opts?.tone ?? "info";
+    const entry = { id: next.current, message, tone };
     setEntries((list) => [...list, entry]);
+    // Once per notice, and outside the state update (which React may run twice). The text is the one on the screen.
+    announceRef.current?.(message, tone === "error");
   }, []);
   const toasts = (polite: boolean) =>
     entries

@@ -5,7 +5,7 @@
 // copied into docs/08-esito-fase2.md, because they are Orca's, not ours.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  atspiTree, closeApp, daemon, descendants, findNode, focusedNode, openApp, record, speechMark, speechSince, waitForBody, waitForSpeech, waitForTree,
+  atspiTree, closeApp, daemon, descendants, findNode, focusedNode, openApp, orcaDebugLines, record, speechMark, speechSince, waitForBody, waitForSpeech, waitForTree,
   type AtNode, type Browser,
 } from "./support";
 
@@ -171,19 +171,37 @@ describe("the shell under a screen reader", () => {
     record("S6 notice after «Duplicate»", speechSince(mark), tree);
   });
 
-  // KNOWN GAP (see docs/08-esito-fase2.md, «Buco 2» and «Spike Orca»): Orca 46 with WebKitGTK 2.52.6 receives the
-  // `children-changed:add` of the region and says nothing, whatever the form of the live region (the control below).
-  // Confirmed on real GNOME with Orca 50.3 and 51.1. Q27: outcomes go through the ATK announcement emitted by the Rust
-  // side; plan B3 T2 turns this test into a positive one («Orca says the outcome»).
-  // Only the wait for the speech is turned upside down: opening the menu and showing the notice are asserted as usual,
-  // so a failure of either is a failure, not the gap. The day Orca says it, the last line fails.
+  // Q27 (spec §12.1): the live regions of WebKitGTK stay mute under Orca (the controls below say so), so the notice is
+  // also sent by the `announce` command, which makes the Rust side emit the ATK `notification` signal on the accessible
+  // of the window; the atk-bridge turns it into `object:announcement` and Orca says it. S6b is the positive test the
+  // spike called for: after «Duplicate» Orca says the text of the notice, once, and the focus stays on «More actions».
+  const NOTICE = "Sample data: nothing was changed";
+  const noticeShown = (t: AtNode[]) => !!findNode(t, "push button", "Dismiss the notice") && focusedIs("More actions")(t);
+
   it("S6b_notice_is_spoken_by_orca", async () => {
     await key("Enter");
     await waitForTree(focusedIs("Duplicate"), "the menu open on «Duplicate»");
     const mark = speechMark();
     await key("Enter");
-    await waitForTree((t) => !!findNode(t, "push button", "Dismiss the notice") && focusedIs("More actions")(t), "the notice shown and the focus on «More actions»");
-    await expect(waitForSpeech(mark, /Sample data: nothing was changed/, 4000), "known gap: Orca does not say a live region").rejects.toThrow(/Orca never said/);
+    const tree = await waitForTree(noticeShown, "the notice shown and the focus on «More actions»");
+    const said = await waitForSpeech(mark, NOTICE, 4000);
+    // once: the notice is in the page too, and if Orca ever starts to say the live region this counts two
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const times = speechSince(mark).filter((line) => line.includes(NOTICE)).length;
+    record("S6b notice after «Duplicate», spoken by Orca", speechSince(mark), tree);
+    expect(times, `Orca said the notice ${times} times: ${JSON.stringify(speechSince(mark))}`).toBe(1);
+    expect(said.some((line) => line.includes(NOTICE))).toBe(true);
+    // the announcement does not take the focus
+    expect(focusedIs("More actions")(atspiTree())).toBe(true);
+  });
+
+  // S20: the signal comes from the galleria-gui process, not from a stand-in. Orca's debug file has one line per
+  // `object:announcement` it dequeues, with the source and the application.
+  it("S6c_the_announcement_comes_from_the_app", async () => {
+    const lines = orcaDebugLines(/Dequeued object:announcement/).filter((line) => line.includes(NOTICE));
+    record("S6c object:announcement lines for the notice", lines);
+    expect(lines.length, "Orca dequeued an object:announcement carrying the notice").toBeGreaterThan(0);
+    for (const line of lines) expect(line).toMatch(/for \[frame: 'Galleria'\] in \[application: 'galleria-gui'\]/);
   });
 
   // Controls for the two gaps, in the style of `control_how_webkitgtk_exposes_a_plain_popup_button`: bare elements put
@@ -261,10 +279,12 @@ describe("the shell under a screen reader", () => {
       await b.execute(() => document.getElementById("control-field")?.remove());
       const names = heard.join(" ").includes(name);
       record(`control: bare text field, ${form} (Orca ${names ? "says" : "does not say"} the name)`, heard, [focusedNode(tree) as AtNode]);
-      // The empty field is recorded and not asserted: Orca says its name on arrival in some runs («Probe alpha entry.»,
-      // «Probe alpha empty entry.» in the review) and nothing at all in others. The eight fields with a value are the
-      // gap: the name is never said (the textarea says nothing at all).
-      if (form !== "aria-label empty") expect(names, `${form}: Orca said ${JSON.stringify(heard)}`).toBe(false);
+      // The empty field and the textarea are recorded and not asserted: Orca says the name of the empty field on arrival
+      // in some runs («Probe alpha entry.», «Probe alpha empty entry.» in the review) and nothing at all in others, and
+      // the same goes for the textarea («Probe foxtrot entry Some value.»: 2 runs of 4 with the announcement of Q27, 1 of 3 with
+      // it switched off in the A/B of B3-T2, so it is the dispatch of Orca, not ours). The seven other
+      // fields with a value are the gap: the name is never said.
+      if (form !== "aria-label empty" && form !== "textarea") expect(names, `${form}: Orca said ${JSON.stringify(heard)}`).toBe(false);
     }
   });
 

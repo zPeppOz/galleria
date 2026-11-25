@@ -10,6 +10,7 @@
     "allow-daemon-retry",
     "allow-app-info",
     "allow-ui-state-get",
-    "allow-ui-state-set"
+    "allow-ui-state-set",
+    "allow-announce"
   ]
 }

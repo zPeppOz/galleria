@@ -2,6 +2,9 @@
 
 //! Rust side of the Galleria GUI: builds the Tauri app that hosts the `ui/` frontend.
 
+pub mod announce;
+#[cfg(target_os = "linux")]
+pub mod announce_atk;
 pub mod commands;
 pub mod error;
 pub mod events;
@@ -10,6 +13,7 @@ pub mod supervisor;
 pub mod ui_state;
 pub mod window;
 
+use announce::Announcer;
 use commands::app::AppInfo;
 use std::{path::PathBuf, sync::Arc};
 use supervisor::RelinkPolicy;
@@ -45,7 +49,8 @@ pub fn configure_with<R: Runtime>(
             commands::daemon::daemon_retry,
             commands::app::app_info,
             commands::ui_state::ui_state_get,
-            commands::ui_state::ui_state_set
+            commands::ui_state::ui_state_set,
+            commands::announce::announce
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.
@@ -59,11 +64,24 @@ pub fn configure_with<R: Runtime>(
             );
             app.manage(handle);
             app.manage(AppInfo::new(&socket));
+            // The tests of level 2 manage their own announcer before the build, and `manage` keeps the first one.
+            app.manage(default_announcer(app.handle()));
             if let Some(main) = app.get_webview_window("main") {
                 window::restore(&main, &state);
             }
             Ok(())
         })
+}
+
+/// The announcer of the running app: the ATK signal on Linux, nothing elsewhere.
+#[cfg(target_os = "linux")]
+fn default_announcer<R: Runtime>(app: &tauri::AppHandle<R>) -> Arc<dyn Announcer> {
+    Arc::new(announce_atk::AtkAnnouncer(app.clone()))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn default_announcer<R: Runtime>(_app: &tauri::AppHandle<R>) -> Arc<dyn Announcer> {
+    Arc::new(announce::NoAnnouncer)
 }
 
 /// Builds the Tauri application from `tauri.conf.json` and runs it until the last window closes. The daemon

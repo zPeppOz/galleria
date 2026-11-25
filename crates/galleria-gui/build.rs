@@ -6,6 +6,7 @@ const COMMANDS: &[&str] = &[
     "app_info",
     "ui_state_get",
     "ui_state_set",
+    "announce",
 ];
 
 fn main() {

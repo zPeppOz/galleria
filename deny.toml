@@ -7,8 +7,10 @@ ignore = [
     { id = "RUSTSEC-2024-0370", reason = "build-time proc-macro of the GTK3 bindings under Tauri; no safe upgrade" },
     # `glib` 0.18 is unsound in `glib::VariantStrIter` (fixed in glib 0.20). It is the GTK3 binding that Tauri, tao and
     # wry use on Linux; no safe upgrade exists while Tauri stays on GTK3. Galleria depends on no glib crate directly
-    # (`cargo tree -i glib`: only through tauri), and no crate in the tree outside glib itself calls
-    # `VariantStrIter` or the glib `Variant` string-array API. Revisit when Tauri moves off GTK3.
+    # (`cargo tree -i glib`: only through tauri and `gtk`, which `galleria-gui` names for the screen reader
+    # announcement only and uses through `gtk::glib`), and no crate in the tree outside glib itself calls
+    # `VariantStrIter` or the glib `Variant` string-array API: the announcement passes a string and an integer.
+    # Revisit when Tauri moves off GTK3.
     { id = "RUSTSEC-2024-0429", reason = "glib 0.18 of the GTK3 bindings under Tauri; VariantStrIter is not used by us or by the tree" },
 ]
 

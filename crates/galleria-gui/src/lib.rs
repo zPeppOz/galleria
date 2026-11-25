@@ -56,7 +56,11 @@ pub fn configure_with<R: Runtime>(
             commands::announce::announce,
             commands::profiles::profiles_list,
             commands::profiles::profile_get,
-            commands::profiles::profile_update
+            commands::profiles::profile_update,
+            commands::groups::group_create,
+            commands::groups::group_rename,
+            commands::groups::group_delete,
+            commands::groups::groups_reorder
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.

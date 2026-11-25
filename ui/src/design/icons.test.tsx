@@ -4,7 +4,7 @@ import { icons } from "./icons";
 
 describe("icons", () => {
   it("has_the_icons_the_plan_names", () => {
-    expect(Object.keys(icons).sort()).toEqual(["check", "chevron", "close", "copy", "error", "info", "more", "star", "warning"]);
+    expect(Object.keys(icons).sort()).toEqual(["arrowDown", "arrowUp", "check", "chevron", "close", "copy", "error", "info", "more", "star", "trash", "warning"]);
   });
 
   it("icons_are_hidden_from_assistive_technology_by_default", () => {

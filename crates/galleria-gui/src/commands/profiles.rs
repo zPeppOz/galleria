@@ -30,6 +30,11 @@ impl From<RubricaError> for CmdError {
             RubricaError::Invalid(fields) => {
                 ("gui_invalid_field", Some(json!({ "fields": fields })))
             }
+            RubricaError::GroupInvalid(reason) => {
+                ("gui_group_invalid", Some(json!({ "reason": reason })))
+            }
+            RubricaError::GroupExists => ("gui_group_exists", None),
+            RubricaError::GroupNotFound => ("gui_group_not_found", None),
             RubricaError::Store { dir, source } => match source {
                 StoreError::NotFound => ("gui_profile_not_found", None),
                 StoreError::InsecurePermissions { path, mode } => (

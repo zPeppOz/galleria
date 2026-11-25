@@ -63,6 +63,27 @@ describe("General", () => {
     expect(setSwitch).toHaveBeenCalledWith("auto_reconnect", false);
   });
 
+  it("group_select_lists_the_saved_groups_and_none", () => {
+    renderTab(General, makeDetail(OFFICE), { groups: ["Lavoro", "Famiglia", "Clienti"] });
+    const group = screen.getByRole("combobox", { name: "Group" }) as HTMLSelectElement;
+    // «No group» first, then the groups in the order of the list, and the profile's own group is the chosen one
+    expect(within(group).getAllByRole("option").map((o) => o.textContent)).toEqual(["No group", "Lavoro", "Famiglia", "Clienti"]);
+    expect(group.value).toBe("Lavoro");
+  });
+
+  it("a_group_the_list_does_not_have_is_still_the_one_the_profile_is_in", () => {
+    // a file written by hand or by the CLI: the profile says «Ospiti», `galleria.toml` does not list it
+    renderTab(General, { ...makeDetail(OFFICE), group: "Ospiti" }, { groups: ["Lavoro"] });
+    const group = screen.getByRole("combobox", { name: "Group" }) as HTMLSelectElement;
+    expect(within(group).getAllByRole("option").map((o) => o.textContent)).toEqual(["No group", "Lavoro", "Ospiti"]);
+    expect(group.value).toBe("Ospiti");
+  });
+
+  it("a_profile_without_a_group_has_no_group_chosen", () => {
+    renderTab(General, { ...makeDetail(OFFICE), group: null });
+    expect((screen.getByRole("combobox", { name: "Group" }) as HTMLSelectElement).value).toBe("");
+  });
+
   it("a_field_with_an_error_is_linked_to_its_text", () => {
     renderTab(General, makeDetail(OFFICE), { errors: { name: "This field is required." } });
     const name = screen.getByRole("textbox", { name: "Name" });

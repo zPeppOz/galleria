@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrange, type SortKey } from "./arrange";
-import type { CmdError, ProfileDetail, ProfilePatch, RubricaView } from "./types";
+import type { CmdError, GroupActions, ProfileDetail, ProfilePatch, RubricaView } from "./types";
 
 export interface Rubrica {
   /** The first answer (a list or an error) has arrived. */
@@ -23,6 +23,8 @@ export interface Rubrica {
    * `reload` when it has put the answer where it belongs. A refusal is thrown as the error of the command.
    */
   update: (id: string, patch: ProfilePatch, expectedModified: string) => Promise<ProfileDetail>;
+  /** The groups of the list: created, renamed, deleted, put in another order. Each one reads the rubrica again when it worked. */
+  groups: GroupActions;
 }
 
 /** The ids in the order the list shows them: what «the next one» means when the selected profile disappears. */
@@ -73,6 +75,26 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
       throw asError(failure);
     }
   }, []);
+
+  // A group command answers with the new list of groups; the profiles it moved are read with the list.
+  const groups = useMemo<GroupActions>(() => {
+    const done = async (call: Promise<string[]>): Promise<string[]> => {
+      let next: string[];
+      try {
+        next = await call;
+      } catch (failure) {
+        throw asError(failure);
+      }
+      await reload();
+      return next;
+    };
+    return {
+      create: (name) => done(invoke<string[]>("group_create", { name })),
+      rename: (from, to) => done(invoke<string[]>("group_rename", { from, to })),
+      remove: (name) => done(invoke<string[]>("group_delete", { name })),
+      reorder: (names) => done(invoke<string[]>("groups_reorder", { names })),
+    };
+  }, [reload]);
 
   useEffect(() => {
     void reload();
@@ -140,5 +162,6 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
     detailError,
     reload,
     update,
+    groups,
   };
 }

@@ -1,4 +1,7 @@
-use crate::{ProfileStore, StoreError, store::read_private};
+use crate::{
+    ProfileStore, StoreError,
+    store::{atomic, read_private},
+};
 use serde::{Deserialize, Serialize};
 /// The version of `galleria.toml` this build writes and understands.
 const SCHEMA_OF_SETTINGS: u32 = 1;
@@ -35,5 +38,29 @@ impl ProfileStore {
             return Err(StoreError::Invalid("Invalid galleria.toml schema".into()));
         }
         Ok(settings)
+    }
+}
+impl ProfileStore {
+    /// Writes `galleria.toml`: a rename of a private temporary file, so a reader sees the old file or the new one and
+    /// never half of it, with the permissions of the store (`0600`). It does not overwrite a file written by a newer
+    /// version (`NewerSchema`, the file is left as it is), and it does not write settings of a schema other than the one
+    /// this build understands.
+    pub fn save_settings(&self, settings: &RubricaSettings) -> Result<(), StoreError> {
+        match settings.schema_version.cmp(&SCHEMA_OF_SETTINGS) {
+            std::cmp::Ordering::Greater => {
+                return Err(StoreError::NewerSchema {
+                    found: settings.schema_version,
+                });
+            }
+            std::cmp::Ordering::Less => {
+                return Err(StoreError::Invalid("Invalid galleria.toml schema".into()));
+            }
+            std::cmp::Ordering::Equal => {}
+        }
+        // What is there now: a newer schema, a key this version does not know or a file that does not read all stop the write.
+        self.settings()?;
+        let text = toml::to_string(settings)
+            .map_err(|_| StoreError::Invalid("Cannot encode galleria.toml".into()))?;
+        atomic(&self.root().join("galleria.toml"), &text)
     }
 }

@@ -811,3 +811,41 @@ Scostamenti dal piano, da sapere:
 Non verificato (T5): la finestra «Salva · Scarta · Annulla» con il lettore di schermo (nessuna prova di Orca; la conferma di «Elimina» di T8 ha la sua `S5`); il fuoco
 che torna sul campo sbagliato dopo la chiusura della finestra di conferma è affidato a un `setTimeout(0)` (provato in jsdom, non nella finestra vera); un profilo
 WireGuard con più peer nella finestra vera (provato in jsdom e con le prove Rust); la lettura dell'errore di un campo con Orca su un desktop vero (S25).
+
+### Gruppi in `galleria.toml` (T6)
+
+- **`galleria-profile`, solo aggiunta** (Q29, Q30): `ProfileStore::save_settings(&RubricaSettings)`: rename atomico di un file temporaneo privato (`0600`), rifiuta uno schema più
+  nuovo sia nelle impostazioni date sia in quelle già sul disco (`NewerSchema`, il file resta com'è), e non scrive impostazioni di uno schema diverso da quello che questa versione capisce.
+  `open`, `list` e `find` non cambiano (`the_cli_store_still_opens_a_folder_with_groups`).
+- **`galleria-gui`**: `rubrica/groups.rs` (figlio di `rubrica.rs`, che ne vede i campi privati): `group_create`, `group_rename`, `group_delete`, `groups_reorder`, ognuna restituisce l'elenco
+  nuovo. Nome: spazi tolti ai lati, 1–48 caratteri, niente caratteri di controllo, unico senza guardare le maiuscole (con le maiuscole di un gruppo rinominato in se stesso non c'è
+  scontro). **Prima i profili, poi l'elenco** (rinominare o eliminare riscrive più file e non è atomico): ogni profilo spostato è scritto con una nuova `modified`, i segreti non si aprono.
+  `RubricaError` guadagna `GroupInvalid(motivo)`, `GroupExists`, `GroupNotFound`; i quattro comandi (`commands/groups.rs`, solo nomi, nessun percorso né id) entrano in `COMMANDS`, nella
+  capability e in `tests/config.rs`; codici `gui_group_invalid` (`data.reason`), `gui_group_exists`, `gui_group_not_found` nei due cataloghi.
+- **Webview**: `GroupsDialog` («Gestisci gruppi», aperta dal fondo della colonna della lista, P9): una riga per gruppo (campo del nome, che si rinomina con Invio o con il pulsante «Rinomina» che compare
+  quando il nome è cambiato; su, giù, elimina; quanti profili ha), i gruppi che solo i profili hanno con «Aggiungi all'elenco», e il campo del nuovo gruppo. «Elimina» su un gruppo con profili chiede
+  conferma e dice quanti restano senza gruppo. Il fuoco segue la riga: un gruppo nuovo prende il fuoco sul suo nome, dopo uno spostamento il fuoco resta sul pulsante (o sull'altro, se per il posto nuovo
+  quello è spento), dopo un'eliminazione va alla riga che ne ha preso il posto. Creato, rinominato, eliminato e «aggiunto all'elenco» sono avvisi (*polite*); lo spostamento non ha avviso. Un errore
+  su un nome (della finestra o di `gui_group_*`) va sul campo e prende il fuoco; un altro errore è un avviso d'errore. `useRubrica().groups` ha le quattro operazioni e rilegge la rubrica dopo ogni scrittura riuscita.
+  Il selettore «Gruppo» di «Generale» elenca i gruppi dell'elenco, il gruppo che il profilo ha anche se l'elenco no, e «Nessun gruppo». Tre icone nuove (`arrowUp`, `arrowDown`, `trash`).
+- **Prove**: `galleria-profile/tests/settings.rs` (4 nuove: 10 nel file), `galleria-gui/tests/groups.rs` (16 con i casi), `GroupsDialog.test.tsx` (16), `General.test.tsx` (3 nuove),
+  `ProfileDetail.test.tsx` (2 nuove sul giro finestra → lista → selettore). Fumo nuovo: `a_group_is_created_renamed_and_survives_a_restart` (crea «Casa», lo rinomina «Famiglia», rinomina «Clienti» in «Clienti VIP»:
+  `galleria.toml` e il profilo sul disco seguono, riavviata la finestra i gruppi ci sono). Tab ha una sosta in più («Manage groups» tra la lista e la stella): `keyboard.test.tsx`, `App.test.tsx`, fumo e Orca aggiornati.
+
+Scostamenti dal piano, da sapere:
+
+- `rename_is_resumable_after_a_failure` **non forza** una scrittura che fallisce a metà: nell'immagine (e in locale) le prove girano come root, per cui togliere i permessi di scrittura non impedisce niente, e non c'è un altro
+  modo pulito di far fallire il secondo profilo e non il primo. La prova mette a mano lo stato che un fallimento lascia (un profilo già col nome nuovo, l'elenco ancora col vecchio) e controlla che la stessa chiamata
+  lo finisca. Che una scrittura che fallisce restituisca un errore è già coperto da `store_errors_map_to_gui_codes` e dalle prove di T5.
+- Un profilo che non si legge (saltato da `list_lenient`) non è spostato da una rinomina o eliminazione: tiene il vecchio nome di gruppo (si vede finché è saltato).
+- Il piano diceva che la finestra «offre “Aggiungi all'elenco”»: lo fa con `group_create` (quello è anche il modo), niente comando in più.
+
+Esito dei comandi (gruppo C): `scripts/gui.sh check` verde (461 prove JS, prove Rust di `galleria-gui` e clippy `-D warnings`), `smoke` 20/20, `a11y` 25 + 1 saltata (`S5`, T8); host `fmt`, `clippy -D warnings`,
+`cargo test`, `cargo deny`, `check-boundaries.sh`. `git diff main -- crates/galleria-ipc crates/galleriad crates/galleria-backend*` vuoto.
+
+Non verificato (T6): la finestra «Gestisci gruppi» sotto Orca (nessuna prova di Orca: solo l'albero e i ruoli in jsdom con axe); un gruppo con centinaia di profili (ogni rinomina riscrive i suoi file, uno alla volta); gruppi con la stessa grafia
+che differiscono solo per forma Unicode (NFC/NFD): per «unico» conta il minuscolo, non la normalizzazione.
+
+**«Fatto quando» di T6, a mano:** una cartella con il seme, in cui le funzioni di `Rubrica` hanno creato «Casa», rinominato «Lavoro» in «Ufficio» ed eliminato «Clienti» (`galleria.toml`:
+`groups = ["Ufficio", "Personale", "Casa"]`), letta da `galleria list` della fase 1 sull'host (`XDG_CONFIG_HOME` puntato alla cartella): i cinque profili escono senza errori. La prova automatica è del T9
+(`cli_lists_what_the_gui_saved`). Fatto con una prova temporanea, poi tolta.

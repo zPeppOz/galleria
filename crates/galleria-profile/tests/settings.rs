@@ -137,3 +137,119 @@ fn list_lenient_still_fails_on_insecure_permissions_of_the_folder() {
         Err(StoreError::InsecurePermissions { mode: 0o755, .. })
     ));
 }
+
+// ---- writing galleria.toml (plan B3, T6) -----------------------------------------------------------------------------
+
+fn settings_with(groups: &[&str]) -> RubricaSettings {
+    RubricaSettings {
+        schema_version: 1,
+        groups: groups.iter().map(|g| (*g).to_owned()).collect(),
+    }
+}
+
+#[test]
+fn save_settings_is_atomic_and_private() {
+    let root = private_dir();
+    let store = ProfileStore::open(root.path()).unwrap();
+    store
+        .save_settings(&settings_with(&["Lavoro", "Personale", "Clienti"]))
+        .unwrap();
+    // read back by the same code the CLI uses, in the same order
+    assert_eq!(
+        store.settings().unwrap().groups,
+        ["Lavoro", "Personale", "Clienti"]
+    );
+    assert_eq!(
+        fs::metadata(settings_path(root.path()))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+    // the temporary file of the rename is gone: nothing but the file, the profiles and the secrets is in the folder
+    let mut names: Vec<_> = fs::read_dir(root.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["galleria.toml", "profiles"]);
+    // a second write replaces the first, and an empty list is an empty list
+    store.save_settings(&settings_with(&[])).unwrap();
+    assert!(store.settings().unwrap().groups.is_empty());
+    assert_eq!(
+        fs::read_to_string(settings_path(root.path())).unwrap(),
+        "schema_version = 1\ngroups = []\n"
+    );
+}
+
+#[test]
+fn names_with_quotes_and_accents_survive_the_round_trip() {
+    let root = private_dir();
+    let store = ProfileStore::open(root.path()).unwrap();
+    let names = ["Città \"Nord\"", "a\\b", "😀 casa", "con # e ["];
+    store.save_settings(&settings_with(&names)).unwrap();
+    assert_eq!(store.settings().unwrap().groups, names);
+}
+
+#[test]
+fn save_refuses_a_newer_schema() {
+    let root = private_dir();
+    let store = ProfileStore::open(root.path()).unwrap();
+    // a file written by a newer version is not overwritten by an older one
+    write_private(
+        &settings_path(root.path()),
+        "schema_version = 2\ngroups = [\"Da una versione nuova\"]\nsomething_new = true\n",
+    );
+    let before = fs::read(settings_path(root.path())).unwrap();
+    let error = store
+        .save_settings(&settings_with(&["Lavoro"]))
+        .unwrap_err();
+    assert!(
+        matches!(error, StoreError::NewerSchema { found: 2 }),
+        "{error:?}"
+    );
+    assert_eq!(fs::read(settings_path(root.path())).unwrap(), before);
+
+    // and settings of another schema than this one's are not written either
+    write_private(&settings_path(root.path()), "schema_version = 1\n");
+    let newer = RubricaSettings {
+        schema_version: 2,
+        groups: vec![],
+    };
+    assert!(matches!(
+        store.save_settings(&newer),
+        Err(StoreError::NewerSchema { found: 2 })
+    ));
+    let older = RubricaSettings {
+        schema_version: 0,
+        groups: vec![],
+    };
+    assert!(matches!(
+        store.save_settings(&older),
+        Err(StoreError::Invalid(_))
+    ));
+    assert_eq!(
+        fs::read(settings_path(root.path())).unwrap(),
+        b"schema_version = 1\n"
+    );
+}
+
+#[test]
+fn the_cli_store_still_opens_a_folder_with_groups() {
+    let root = private_dir();
+    let store = ProfileStore::open(root.path()).unwrap();
+    let profile = wireguard("Prova");
+    store.save(&profile).unwrap();
+    store
+        .save_settings(&settings_with(&["Lavoro", "Vuoto"]))
+        .unwrap();
+    // `open` and `list` are what the CLI calls: they do not care about the groups, and do not rewrite the file
+    let before = fs::read(settings_path(root.path())).unwrap();
+    let again = ProfileStore::open(root.path()).unwrap();
+    let listed = again.list().unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].name, "Prova");
+    assert_eq!(again.find("Prova").unwrap().id, profile.id);
+    assert_eq!(fs::read(settings_path(root.path())).unwrap(), before);
+}

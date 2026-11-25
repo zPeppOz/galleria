@@ -24,4 +24,7 @@ pub const GUI_CODES: &[&str] = &[
     "gui_profile_invalid",
     "gui_profile_changed",
     "gui_invalid_field",
+    "gui_group_invalid",
+    "gui_group_exists",
+    "gui_group_not_found",
 ];

@@ -1,11 +1,13 @@
 import { useMemo, useRef, useState } from "react";
 import type { SortOrder } from "../app/uiState";
 import type { AppInfo, DaemonView } from "../daemon/types";
+import { Button } from "../design/Button";
 import { ConfirmDialog } from "../design/ConfirmDialog";
 import { ToastProvider, type Announce } from "../design/Toast";
 import { useLang, useT } from "../i18n";
 import { arrange } from "../rubrica/arrange";
 import type { Rubrica } from "../rubrica/store";
+import { GroupsDialog } from "./GroupsDialog";
 import { ProfileDetail, type Guard } from "./ProfileDetail";
 import { ProfileList, type ListGroup } from "./ProfileList";
 import { RubricaNotices } from "./RubricaNotices";
@@ -39,6 +41,7 @@ export function Shell(props: {
   // The form of the chosen profile says whether it has edits that are not saved; the list asks before it moves away.
   const guard = useRef<Guard | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);
+  const [managing, setManaging] = useState(false);
   const profiles = rubrica.view?.profiles;
   const selected = profiles?.find((p) => p.id === rubrica.selectedId) ?? null;
   const choose = (id: string) => {
@@ -102,6 +105,11 @@ export function Shell(props: {
             ) : (
               <p className="shell-aside-empty">{rubrica.loaded ? t("list.empty") : t("rubrica.loading")}</p>
             )}
+            {rubrica.view ? (
+              <div className="shell-aside-foot">
+                <Button onClick={() => setManaging(true)}>{t("groups.manage")}</Button>
+              </div>
+            ) : null}
           </aside>
           <main className="shell-main">
             <ServiceArea view={view} info={info} onRetry={onRetry} />
@@ -112,6 +120,7 @@ export function Shell(props: {
           </main>
         </div>
         <StatusBar view={view} info={info} />
+        <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
         <ConfirmDialog
           open={leaving !== null}
           title={t("leave.title")}

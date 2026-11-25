@@ -69,6 +69,8 @@ describe("App", () => {
     expect(document.activeElement).toBe(screen.getByRole("radio", { name: "Per nome" }));
     await user.tab();
     expect(document.activeElement).toBe(screen.getByRole("option", { name: "Ufficio Napoli" }));
+    await user.tab(); // «Gestisci gruppi» closes the column of the list
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Gestisci gruppi" }));
     await user.tab();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Copia" }));
     await user.keyboard("{Enter}");

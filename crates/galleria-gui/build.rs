@@ -10,6 +10,10 @@ const COMMANDS: &[&str] = &[
     "profiles_list",
     "profile_get",
     "profile_update",
+    "group_create",
+    "group_rename",
+    "group_delete",
+    "groups_reorder",
 ];
 
 fn main() {

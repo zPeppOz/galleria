@@ -375,6 +375,37 @@ describe("ProfileDetail, editing", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
+  it("a_group_made_in_the_manage_groups_window_is_in_the_group_selector_and_the_list", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await user.click(screen.getByRole("button", { name: "Manage groups" }));
+    const dialog = await screen.findByRole("dialog", { name: "Manage groups" });
+    await user.type(within(dialog).getByRole("textbox", { name: "New group" }), "Famiglia{Enter}");
+    await waitFor(() => expect(within(dialog).getByRole("textbox", { name: "Group 4" })).toBeTruthy());
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Manage groups" }));
+    expect(within(screen.getByRole("combobox", { name: "Group" })).getAllByRole("option").map((o) => o.textContent)).toEqual(["No group", "Lavoro", "Personale", "Clienti", "Famiglia"]);
+  });
+
+  it("renaming_a_group_in_the_window_renames_it_in_the_list_and_in_the_header", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await user.click(screen.getByRole("button", { name: "Manage groups" }));
+    const dialog = await screen.findByRole("dialog", { name: "Manage groups" });
+    const field = within(dialog).getByRole("textbox", { name: "Group 1" });
+    await user.clear(field);
+    await user.type(field, "Ufficio{Enter}");
+    await waitFor(() => expect(within(dialog).getByRole("textbox", { name: "Group 1" }) as HTMLInputElement).toHaveProperty("value", "Ufficio"));
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getAllByRole("group", { name: "Ufficio" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("group", { name: "Lavoro" })).toBeNull();
+    // the chosen profile was in «Lavoro»: its header and its selector follow
+    await waitFor(() => expect(document.querySelector(".detail-meta")?.textContent).toContain("Ufficio"));
+    expect((screen.getByRole("combobox", { name: "Group" }) as HTMLSelectElement).value).toBe("Ufficio");
+  });
+
   it("the_form_has_no_accessibility_violations_with_the_save_bar_and_an_error", async () => {
     const user = userEvent.setup();
     const { container } = setup(HOMELAB, withGoodKey(makeDetail(HOMELAB)));

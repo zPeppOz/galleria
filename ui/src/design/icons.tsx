@@ -21,4 +21,7 @@ export const icons = {
   info: icon(<path d="M8 2.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM8 7.25v3.5M8 5.25h.01" />),
   star: icon(<path d="M8 2l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.8l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 2z" />),
   copy: icon(<path d="M5.5 5.5h7v8h-7zM3.5 10.5v-8h7" />),
+  arrowUp: icon(<path d="M8 13V3M3.5 7.5L8 3l4.5 4.5" />),
+  arrowDown: icon(<path d="M8 3v10M3.5 8.5L8 13l4.5-4.5" />),
+  trash: icon(<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 8.5h6l.5-8.5M7 7v4M9 7v4" />),
 };

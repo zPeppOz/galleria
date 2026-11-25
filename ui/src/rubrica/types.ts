@@ -56,3 +56,15 @@ export interface ProfilePatch {
   settings?: ProfileSettings;
   wireguard?: WireGuardView;
 }
+
+/**
+ * What the window can do with the groups (`group_create`, `group_rename`, `group_delete`, `groups_reorder`): each one
+ * answers with the new list of groups, in order, and throws the error of the command. The rubrica is read again after a
+ * write that worked, so the list and the detail show it.
+ */
+export interface GroupActions {
+  create: (name: string) => Promise<string[]>;
+  rename: (from: string, to: string) => Promise<string[]>;
+  remove: (name: string) => Promise<string[]>;
+  reorder: (names: string[]) => Promise<string[]>;
+}

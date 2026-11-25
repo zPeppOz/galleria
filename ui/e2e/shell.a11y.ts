@@ -73,7 +73,10 @@ describe("the shell under a screen reader", () => {
   });
 
   it("S3_tabs_are_a_page_tab_list_and_the_chosen_tab_is_spoken", async () => {
-    // the star (a toggle button: «pressed» when the profile is a favourite), then «More actions»
+    // «Manage groups» (the foot of the column of the list), the star (a toggle button: «pressed» when the profile is a
+    // favourite), then «More actions»
+    await key("Tab");
+    await waitForTree(focusedIs("Manage groups"), "«Manage groups» focused");
     await key("Tab");
     const star = await waitForTree(focusedIs("Favourite"), "the star focused");
     expect((focusedNode(star) as AtNode).role, "the star is a toggle button").toBe("toggle button");

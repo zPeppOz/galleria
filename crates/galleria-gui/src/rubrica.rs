@@ -99,6 +99,20 @@ pub enum RubricaError {
     Changed,
     #[error("Some fields are not valid")]
     Invalid(Vec<FieldIssue>),
+    /// A group name that cannot be used (`required`, `too_long`, `invalid_chars`), or an order that is not a permutation.
+    #[error("Not a valid group name or order: {0}")]
+    GroupInvalid(&'static str),
+    #[error("A group with this name already exists")]
+    GroupExists,
+    #[error("There is no such group in the list")]
+    GroupNotFound,
+}
+
+mod groups;
+
+/// Now as the profiles keep their times; `None` only if the clock cannot be formatted, and then the old time stays.
+fn stamp() -> Option<String> {
+    OffsetDateTime::now_utc().format(&Rfc3339).ok()
 }
 
 /// The folder of the profiles and the file of the state. The store is opened at every call, so that a fix made in
@@ -196,7 +210,7 @@ impl Rubrica {
         if !issues.is_empty() {
             return Err(RubricaError::Invalid(issues));
         }
-        if let Ok(now) = OffsetDateTime::now_utc().format(&Rfc3339) {
+        if let Some(now) = stamp() {
             profile.modified = now;
         }
         store.save(&profile).map_err(|e| self.fail(e))?;

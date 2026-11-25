@@ -1,0 +1,14 @@
+/* «Manage groups»: only variables of tokens.css. A row is the name, how many profiles it has and three small buttons. */
+.groups { display: flex; flex-direction: column; gap: var(--sp-7); }
+.groups-empty { margin: 0; color: var(--muted); }
+.groups-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-5); }
+.groups-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: end; gap: var(--sp-4); }
+.groups-name { display: flex; align-items: end; gap: var(--sp-4); min-width: 0; }
+.groups-name > .gx-field { flex: 1; min-width: 0; }
+.groups-count { padding-bottom: var(--sp-3); color: var(--muted); font-size: var(--fs-sm); white-space: nowrap; }
+.groups-buttons { display: flex; gap: var(--sp-2); }
+.groups-subtitle { margin: 0 0 var(--sp-4); font-size: var(--fs-xs); font-weight: var(--fw-strong); letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+.groups-row-unlisted { align-items: center; }
+.groups-unlisted-name { overflow-wrap: anywhere; }
+.groups-new { display: flex; align-items: end; gap: var(--sp-4); padding-top: var(--sp-6); border-top: 1px solid var(--line); }
+.groups-new > .gx-field { flex: 1; min-width: 0; }

@@ -18,6 +18,10 @@ const ALLOWED: &[&str] = &[
     "allow-profiles-list",
     "allow-profile-get",
     "allow-profile-update",
+    "allow-group-create",
+    "allow-group-rename",
+    "allow-group-delete",
+    "allow-groups-reorder",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

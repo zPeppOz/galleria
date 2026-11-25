@@ -80,12 +80,12 @@ describe("keyboard on the whole shell", () => {
     show(firstRun());
     const stops = await tabStops(user);
     const seen = stops.map((el) => `${roleOf(el)}:${nameOf(el)}`);
-    // The menu button, the search field, the sort order (one stop: the chosen radio), the list (one stop: the chosen row), the
-    // first-run panel («Copy», «Try again»), the star, «More actions», the tab strip (one stop: the chosen tab) and then the
-    // panel itself and its first control.
-    expect(seen.slice(0, 8)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Copy", "button:Try again", "button:Favourite", "button:More actions"]);
-    expect(seen[8]).toBe("tab:General");
-    const rest = seen.slice(9);
+    // The menu button, the search field, the sort order (one stop: the chosen radio), the list (one stop: the chosen row),
+    // «Manage groups» (the foot of the column), the first-run panel («Copy», «Try again»), the star, «More actions», the tab
+    // strip (one stop: the chosen tab) and then the panel itself and its first control.
+    expect(seen.slice(0, 9)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Manage groups", "button:Copy", "button:Try again", "button:Favourite", "button:More actions"]);
+    expect(seen[9]).toBe("tab:General");
+    const rest = seen.slice(10);
     // After the strip comes the panel of the chosen tab (Base UI makes it a stop) or straight its first control; the
     // first control is the name field either way.
     expect(rest.some((s) => s === "input:Name")).toBe(true);
@@ -96,7 +96,7 @@ describe("keyboard on the whole shell", () => {
     const user = userEvent.setup();
     show();
     const seen = (await tabStops(user)).map((el) => `${roleOf(el)}:${nameOf(el)}`);
-    expect(seen.slice(0, 7)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Favourite", "button:More actions", "tab:General"]);
+    expect(seen.slice(0, 8)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Manage groups", "button:Favourite", "button:More actions", "tab:General"]);
     expect(seen).not.toContain("button:Copy");
   });
 
@@ -249,6 +249,7 @@ describe("keyboard on the whole shell", () => {
     expect(title()).toBe("Ufficio Napoli");
 
     // a tab: to the strip, the arrows choose; the panel shows
+    await user.tab(); // «Manage groups»
     await user.tab(); // the star
     await user.tab(); // More actions
     await user.tab(); // the tab strip

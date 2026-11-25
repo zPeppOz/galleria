@@ -357,6 +357,43 @@ describe("the shell in the real window", () => {
     expect(await cspViolations(b)).toEqual([]);
   });
 
+  // T6 (R1, Q30): the groups are managed from the window and kept in `galleria.toml`. A group is made and renamed, a group
+  // with profiles in it is renamed (the profiles follow, on the disk too), and all of it is there after a restart.
+  it("a_group_is_created_renamed_and_survives_a_restart", async () => {
+    const config = (file: string) => join(env("XDG_CONFIG_HOME"), "galleria", file);
+    const profileFiles = () => readdirSync(config("profiles")).map((name) => readFileSync(join(config("profiles"), name), "utf8"));
+    const first = await openShell();
+    const listGroups = (b: Browser) => b.execute(() => [...document.querySelectorAll('[role="listbox"] [role="group"]')].map((g) => g.getAttribute("aria-label"))) as Promise<string[]>;
+    await waitFor(first, async () => (await listGroups(first)).length === 3, "the list never showed the three groups");
+    await first.$("button=Manage groups").click();
+    await first.$('input[name="new-group"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    // a new group goes to the end of the list and the file
+    await first.$('input[name="new-group"]').click();
+    await press(first, ...Array.from("Casa"), "Enter");
+    await first.$('input[name="group:Casa"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    await waitFor(first, async () => readFileSync(config("galleria.toml"), "utf8").includes('groups = ["Lavoro", "Personale", "Clienti", "Casa"]'), "the new group is not in galleria.toml");
+    // and it is renamed in its place (select the name, type the new one, Enter)
+    await first.$('input[name="group:Casa"]').click();
+    await press(first, "Control", "a");
+    await press(first, ...Array.from("Famiglia"), "Enter");
+    await first.$('input[name="group:Famiglia"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    // a group with a profile in it: «Clienti» has «Cliente Rossi»
+    await first.$('input[name="group:Clienti"]').click();
+    await press(first, "Control", "a");
+    await press(first, ...Array.from("Clienti VIP"), "Enter");
+    await first.$('input[name="group:Clienti VIP"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    await waitFor(first, async () => readFileSync(config("galleria.toml"), "utf8").includes('groups = ["Lavoro", "Personale", "Clienti VIP", "Famiglia"]'), `galleria.toml holds: ${readFileSync(config("galleria.toml"), "utf8")}`);
+    expect(profileFiles().filter((text) => text.includes('group = "Clienti VIP"')), "the profile of the group moved with it").toHaveLength(1);
+    expect(profileFiles().some((text) => text.includes('group = "Clienti"\n')), "no profile is left in the old name").toBe(false);
+    await first.keys(["Escape"]);
+    await waitFor(first, async () => (await listGroups(first)).join() === "Lavoro,Personale,Clienti VIP,Famiglia", "the list does not show the groups as they are now");
+    await closeApp();
+
+    const second = await openApp(true);
+    await waitForBody(second, CONNECTED, "the new window never showed the link");
+    await waitFor(second, async () => (await listGroups(second)).join() === "Lavoro,Personale,Clienti VIP,Famiglia", "the groups did not come back after the restart");
+  });
+
   it("shell_is_navigable_with_the_seeded_rubrica", async () => {
     const b = await openShell();
     expect(await bodyText(b)).not.toContain("Sample data");
@@ -376,10 +413,8 @@ describe("the shell in the real window", () => {
     await press(b, "Home");
     await waitFor(b, async () => (await title(b)) === "Ufficio Napoli", "Home in the list did not choose the first profile");
 
-    // the star, «More actions», then the tab strip: the arrows open the tabs, down to «Log»
-    await press(b, "Tab");
-    await press(b, "Tab");
-    await press(b, "Tab");
+    // «Manage groups», the star, «More actions», then the tab strip: the arrows open the tabs, down to «Log»
+    for (let step = 0; step < 4; step++) await press(b, "Tab");
     expect(await activeRole(b)).toBe("tab");
     for (let step = 0; step < 4; step++) await press(b, "ArrowRight");
     const log = await byText(b, "[role=tab]", "Log");

@@ -19,6 +19,9 @@ const ALLOWED: &[&str] = &[
     "allow-profile-get",
     "allow-profile-update",
     "allow-profile-validate-raw",
+    "allow-profile-duplicate",
+    "allow-profile-export",
+    "allow-profile-delete",
     "allow-group-create",
     "allow-group-rename",
     "allow-group-delete",
@@ -144,4 +147,25 @@ fn every_registered_command_has_a_permission() {
     declared.sort();
     permitted.sort();
     assert_eq!(declared, permitted);
+}
+
+/// «Export» opens the window «Save» from Rust (`export_gtk.rs`): the webview is granted nothing of a dialog or file
+/// plugin, and no such plugin is in the app (plan B3, T8, S22).
+#[test]
+fn the_webview_has_no_dialog_or_file_permission() {
+    let cap = read_json("capabilities/main.json");
+    for permission in cap["permissions"].as_array().unwrap() {
+        let name = permission.as_str().unwrap();
+        for forbidden in ["dialog", "fs:", "opener", "shell"] {
+            assert!(
+                !name.contains(forbidden),
+                "{name} gives the webview a {forbidden} permission"
+            );
+        }
+    }
+    let manifest = std::fs::read_to_string(crate_file("Cargo.toml")).unwrap();
+    assert!(
+        !manifest.contains("tauri-plugin"),
+        "a Tauri plugin is a dependency"
+    );
 }

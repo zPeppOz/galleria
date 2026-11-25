@@ -3,12 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../design/Toast";
 import { I18n } from "../i18n";
-import type { CmdError, ProfileDetail as Detail, ProfilePatch, ProfileSummary, RawCheck } from "../rubrica/types";
+import type { CmdError, ProfileActions, ProfileDetail as Detail, ProfilePatch, ProfileSummary, RawCheck } from "../rubrica/types";
 import { expectNoAccessibilityViolations } from "../test/axe";
 import { applyPatch, makeDetail, makeSummary, SAMPLE_PROFILES } from "../test/fixtures";
 import { renderShell } from "../test/shell";
 import { withGoodKey } from "../test/tabs";
-import { ProfileDetail } from "./ProfileDetail";
+import { copyName, ProfileDetail } from "./ProfileDetail";
 
 const [OFFICE, DATACENTER, HOMELAB] = SAMPLE_PROFILES;
 
@@ -16,22 +16,30 @@ type Update = (id: string, patch: ProfilePatch, expectedModified: string) => Pro
 type Validate = (id: string, text: string) => Promise<RawCheck>;
 
 /** The form with a backend that answers what a test says (by default: the patch applied, the text clean) and the calls it received. */
-const setup = (profile: ProfileSummary = OFFICE, detail: Detail | null = makeDetail(profile), detailError: CmdError | null = null, update?: Update, validate?: Validate) => {
+const setup = (profile: ProfileSummary = OFFICE, detail: Detail | null = makeDetail(profile), detailError: CmdError | null = null, update?: Update, validate?: Validate, extra: { inUse?: boolean; names?: string[]; actions?: Partial<ProfileActions> } = {}) => {
   const send = vi.fn<Update>(update ?? (async (_id, patch) => applyPatch(detail ?? makeDetail(profile), patch)));
   const check = vi.fn<Validate>(validate ?? (async () => ({ issues: [], can_save: true })));
   const reload = vi.fn(async () => undefined);
   const announce = vi.fn();
+  const copy = makeSummary({ id: "copy-id", name: "Ufficio Napoli (copy)" });
+  const actions = {
+    duplicate: vi.fn<ProfileActions["duplicate"]>(extra.actions?.duplicate ?? (async () => copy)),
+    export: vi.fn<ProfileActions["export"]>(extra.actions?.export ?? (async () => true)),
+    remove: vi.fn<ProfileActions["remove"]>(extra.actions?.remove ?? (async () => undefined)),
+  };
+  const onSelect = vi.fn();
+  const onDeleted = vi.fn();
   const tree = (current: Detail | null) => (
     <I18n lang="en">
       <ToastProvider closeLabel="Dismiss the notice" announce={announce}>
         <main>
-          <ProfileDetail profile={profile} detail={current} detailError={detailError} groups={["Lavoro", "Personale", "Clienti"]} update={send} validateRaw={check} reload={reload} />
+          <ProfileDetail profile={profile} detail={current} detailError={detailError} groups={["Lavoro", "Personale", "Clienti"]} update={send} validateRaw={check} actions={actions} names={extra.names ?? [profile.name]} inUse={extra.inUse ?? false} onSelect={onSelect} onDeleted={onDeleted} reload={reload} />
         </main>
       </ToastProvider>
     </I18n>
   );
   const view = render(tree(detail));
-  return { ...view, send, check, reload, announce, show: (next: Detail | null) => view.rerender(tree(next)) };
+  return { ...view, send, check, reload, announce, actions, onSelect, onDeleted, show: (next: Detail | null) => view.rerender(tree(next)) };
 };
 
 const toasts = () => document.querySelector<HTMLElement>(".gx-toasts [role=status]")!;
@@ -131,13 +139,128 @@ describe("ProfileDetail", () => {
     expect(within(menu).getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Duplicate", "Export", "Delete"]);
   });
 
-  it.each(["Duplicate", "Export", "Delete"])("%s_only_says_it_arrives_later", async (action) => {
+  it("duplicate_asks_for_a_copy_with_the_first_free_name_and_chooses_it", async () => {
     const user = userEvent.setup();
-    setup();
+    const { actions, onSelect } = setup(OFFICE, makeDetail(OFFICE), null, undefined, undefined, { names: ["Ufficio Napoli", "Ufficio Napoli (copy)"] });
     await openMore(user);
-    await user.click(screen.getByRole("menuitem", { name: action }));
-    await waitFor(() => expect(toasts().textContent).toContain("This action arrives in a later release."));
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+    await waitFor(() => expect(actions.duplicate).toHaveBeenCalledWith(OFFICE.id, "Ufficio Napoli (copy 2)"));
+    await waitFor(() => expect(onSelect).toHaveBeenCalledWith("copy-id"));
+    expect(toasts().textContent).toContain("Duplicated as “Ufficio Napoli (copy)”.");
     expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("a_copy_name_never_goes_over_the_longest_name", () => {
+    const long = "x".repeat(64);
+    const t = (key: string, vars?: Record<string, string | number>) => (key === "detail.copy_name" ? `${vars?.name} (copy)` : `${vars?.name} (copy ${vars?.n})`);
+    const name = copyName(t as never, long, []);
+    expect([...name].length).toBeLessThanOrEqual(64);
+    expect(name.endsWith("(copy)")).toBe(true);
+  });
+
+  it("a_failed_duplicate_says_why_and_keeps_the_profile", async () => {
+    const user = userEvent.setup();
+    const { onSelect } = setup(OFFICE, makeDetail(OFFICE), null, undefined, undefined, {
+      actions: { duplicate: async () => Promise.reject({ code: "gui_store_failed", message: "no" }) },
+    });
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+    await waitFor(() => expect(alerts()).toBeTruthy());
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("export_asks_first_because_the_file_has_the_keys_and_cancel_exports_nothing", async () => {
+    const user = userEvent.setup();
+    const { actions } = setup();
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Export" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Export Ufficio Napoli?" });
+    expect(dialog.textContent).toContain("private keys");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(actions.export).not.toHaveBeenCalled();
+  });
+
+  it("export_runs_after_the_confirmation_and_says_nothing_when_the_save_window_is_cancelled", async () => {
+    const user = userEvent.setup();
+    const { actions } = setup(OFFICE, makeDetail(OFFICE), null, undefined, undefined, { actions: { export: async () => false } });
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Export" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(actions.export).toHaveBeenCalledWith(OFFICE.id));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(toasts()?.textContent ?? "").not.toContain("Exported");
+  });
+
+  it("export_that_wrote_the_file_says_so_and_one_that_failed_says_it_could_not", async () => {
+    const user = userEvent.setup();
+    const ok = setup();
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Export" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(toasts().textContent).toContain("Exported."));
+    ok.unmount();
+
+    setup(OFFICE, makeDetail(OFFICE), null, undefined, undefined, { actions: { export: async () => Promise.reject({ code: "gui_export_failed", message: "x", data: { path: "/secret/place" } }) } });
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Export" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(alerts().textContent).toContain("The file could not be saved."));
+    expect(alerts().textContent).not.toContain("/secret/place");
+  });
+
+  it("delete_asks_first_and_cancel_keeps_the_profile", async () => {
+    const user = userEvent.setup();
+    const { actions } = setup();
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Delete Ufficio Napoli?" });
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(actions.remove).not.toHaveBeenCalled();
+  });
+
+  it("delete_runs_after_the_confirmation_and_tells_the_shell", async () => {
+    const user = userEvent.setup();
+    const { actions, onDeleted } = setup();
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(actions.remove).toHaveBeenCalledWith(OFFICE.id));
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledWith(OFFICE.id));
+    expect(toasts().textContent).toContain("Deleted “Ufficio Napoli”.");
+  });
+
+  it("the_profile_of_the_open_session_cannot_be_deleted_and_the_menu_says_why", async () => {
+    const user = userEvent.setup();
+    const { actions } = setup(OFFICE, makeDetail(OFFICE), null, undefined, undefined, { inUse: true });
+    await openMore(user);
+    const item = screen.getByRole("menuitem", { name: "Delete" });
+    expect(item.getAttribute("aria-disabled")).toBe("true");
+    expect(item.getAttribute("aria-describedby")).toBeTruthy();
+    expect(item.textContent).toContain("In use by the connection");
+    await user.click(item);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByRole("menu")).not.toBeNull();
+    expect(actions.remove).not.toHaveBeenCalled();
+  });
+
+  it("a_delete_the_backend_refuses_says_so", async () => {
+    const user = userEvent.setup();
+    const { onDeleted } = setup(OFFICE, makeDetail(OFFICE), null, undefined, undefined, { actions: { remove: async () => Promise.reject({ code: "gui_profile_in_use", message: "x" }) } });
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(alerts().textContent).toContain("in use by a connection"));
+    expect(onDeleted).not.toHaveBeenCalled();
+  });
+
+  it("the_actions_work_before_the_detail_is_read", async () => {
+    const user = userEvent.setup();
+    const { actions } = setup(OFFICE, null);
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+    await waitFor(() => expect(actions.duplicate).toHaveBeenCalled());
   });
 
   it("has_no_accessibility_violations", async () => {

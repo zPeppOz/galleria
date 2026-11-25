@@ -35,6 +35,8 @@
 }
 .gx-menu-item[data-highlighted] { background: var(--panel-2); outline: var(--focus-ring); outline-offset: -2px; }
 .gx-menu-item.gx-danger { color: var(--err); }
+.gx-menu-item[aria-disabled="true"] { color: var(--faint); cursor: not-allowed; }
+.gx-menu-hint { display: block; font-size: var(--fs-sm); color: var(--faint); }
 .gx-menu-indicator { display: inline-grid; place-items: center; width: 16px; height: 16px; }
 .gx-menu-separator { height: 1px; margin: var(--sp-2) 0; background: var(--line); }
 .gx-menu-group-label { padding: var(--sp-2) var(--sp-5); font-size: var(--fs-sm); color: var(--muted); }

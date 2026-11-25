@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+mod export;
 mod import_ovpn;
 mod import_wg;
 mod model;
@@ -6,6 +7,7 @@ mod raw;
 mod secrets;
 mod settings;
 mod store;
+pub use export::*;
 use galleria_ipc::{
     BackendParams, ConnectOptions, ConnectParams, OpenVpnParams, ProfileRef, Protocol,
     ReconnectOptions, Secret, WireGuardParams,

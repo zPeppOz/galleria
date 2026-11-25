@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../design/Toast";
 import { I18n } from "../../i18n";
-import type { CmdError, ProfileDetail as Detail, ProfilePatch, RawCheck } from "../../rubrica/types";
+import type { CmdError, ProfileActions, ProfileDetail as Detail, ProfilePatch, RawCheck } from "../../rubrica/types";
 import { expectNoAccessibilityViolations } from "../../test/axe";
 import { applyPatch, makeDetail, SAMPLE_PROFILES } from "../../test/fixtures";
 import { ProfileDetail } from "../ProfileDetail";
@@ -12,6 +12,9 @@ const [OFFICE, , HOMELAB] = SAMPLE_PROFILES;
 
 type Update = (id: string, patch: ProfilePatch, expectedModified: string) => Promise<Detail>;
 type Validate = (id: string, text: string) => Promise<RawCheck>;
+
+/** The tab under test does not use the three actions of «More actions». */
+const noActions: ProfileActions = { duplicate: async () => OFFICE, export: async () => false, remove: async () => undefined };
 
 const UP: RawCheck = { can_save: false, issues: [{ line: 2, directive: "up", kind: "dangerous" }, { line: 3, directive: "frob", kind: "unsupported" }] };
 const TEXT = "client\nup /tmp/x.sh\nfrob yes\nremote a.example 1194\n";
@@ -25,7 +28,7 @@ const setup = (detail: Detail, validate: Validate = async () => ({ issues: [], c
     <I18n lang="en">
       <ToastProvider closeLabel="Dismiss the notice" announce={announce}>
         <main>
-          <ProfileDetail profile={detail} detail={detail} detailError={null} groups={["Lavoro"]} update={send} validateRaw={check} reload={async () => undefined} />
+          <ProfileDetail profile={detail} detail={detail} detailError={null} groups={["Lavoro"]} update={send} validateRaw={check} actions={noActions} names={[detail.name]} inUse={false} onSelect={() => undefined} onDeleted={() => undefined} reload={async () => undefined} />
         </main>
       </ToastProvider>
     </I18n>,

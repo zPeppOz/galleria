@@ -180,21 +180,56 @@ describe("Shell", () => {
     await user.click(screen.getByRole("button", { name: own["detail.more"] }));
     checkAll();
     await user.click(await screen.findByRole("menuitem", { name: own["detail.delete"] }));
-    await waitFor(() => expect(screen.getAllByRole("status").map((s) => s.textContent).join(" ")).toContain(own["action.arrives_later"]));
+    const dialog = await screen.findByRole("alertdialog");
+    checkAll();
+    await user.click(within(dialog).getByRole("button", { name: own["delete.cancel"] }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await user.click(screen.getByRole("button", { name: own["detail.more"] }));
+    await user.click(await screen.findByRole("menuitem", { name: own["detail.export"] }));
+    await screen.findByRole("alertdialog");
     checkAll();
   });
 
-  it("the_three_actions_only_say_they_arrive_later", async () => {
+  it("duplicate_adds_a_copy_to_the_list_and_chooses_it", async () => {
     const user = userEvent.setup();
     show();
-    for (const action of ["Duplicate", "Export", "Delete"]) {
-      await user.click(screen.getByRole("button", { name: "More actions" }));
-      await user.click(await screen.findByRole("menuitem", { name: action }));
-      await waitFor(() => expect(screen.getAllByRole("status").map((s) => s.textContent).join(" ")).toContain("This action arrives in a later release."));
-    }
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Ufficio Napoli (copy)" })).toBeTruthy());
+    expect(options()).toHaveLength(6);
+    // the focus is on «More actions» of the copy
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "More actions" })));
+  });
+
+  it("delete_removes_the_profile_and_the_focus_goes_to_the_list", async () => {
+    const user = userEvent.setup();
+    show();
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(options()).toHaveLength(4));
+    expect(screen.queryByRole("option", { name: "Ufficio Napoli" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).not.toBe("Ufficio Napoli");
+    await waitFor(() => expect(screen.getByRole("listbox").contains(document.activeElement)).toBe(true));
+  });
+
+  it("delete_of_the_last_profile_leaves_the_empty_text_with_the_focus", async () => {
+    const user = userEvent.setup();
+    renderShell(makeView(), { rubrica: makeRubricaView({ profiles: [makeRubricaView().profiles[0]], groups: [] }) });
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(document.activeElement?.textContent).toBe("No profiles"));
+  });
+
+  it("the_profile_of_the_open_session_is_not_offered_for_deletion", async () => {
+    const user = userEvent.setup();
+    show(makeView({ status: makeStatus({ state: "connected", profile: { id: makeRubricaView().profiles[0].id, name: "Ufficio Napoli" }, protocol: "openvpn" }) }));
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    const item = await screen.findByRole("menuitem", { name: "Delete" });
+    expect(item.getAttribute("aria-disabled")).toBe("true");
+    await user.click(item);
     expect(screen.queryByRole("alertdialog")).toBeNull();
-    expect(options()).toHaveLength(5);
-    expect(screen.getByRole("heading", { level: 1, name: "Ufficio Napoli" })).toBeTruthy();
   });
 
   it("changing_language_and_theme_keeps_the_selection", async () => {
@@ -256,12 +291,9 @@ describe("Shell", () => {
     await user.click(await screen.findByRole("option", { name: "Homelab" }));
     await screen.findByRole("textbox", { name: "Name" });
     for (const tab of screen.getAllByRole("tab")) await user.click(tab);
-    await user.click(screen.getByRole("button", { name: "More actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
     await user.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(calls).toContain("daemon_retry"));
-    // `announce` tells the screen reader about the notice; it talks to the app, not to the daemon (Q27)
-    expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", "daemon_retry", "announce", "profiles_list", "profile_get"]));
+    expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", "daemon_retry", "profiles_list", "profile_get"]));
     expect(calls.filter((c) => c === "profile_get").length).toBeGreaterThanOrEqual(2);
   });
 });

@@ -81,3 +81,17 @@ export interface GroupActions {
   remove: (name: string) => Promise<string[]>;
   reorder: (names: string[]) => Promise<string[]>;
 }
+
+/**
+ * What the window can do with one profile besides editing it (`profile_duplicate`, `profile_export`, `profile_delete`). The
+ * secrets are handled in Rust and none of them comes back; there is no place or file in any of them. A failure is thrown as
+ * the error of the command. The rubrica is read again after a duplicate and a delete that worked.
+ */
+export interface ProfileActions {
+  /** A copy with this name, secrets included; answers with the row of the copy. */
+  duplicate: (id: string, name: string) => Promise<ProfileSummary>;
+  /** Rust opens the window «Save» and writes the file, keys included: `true` when it did, `false` when the window was cancelled. */
+  export: (id: string) => Promise<boolean>;
+  /** Deletes the profile and its secrets (`gui_profile_in_use` for the profile of the session the service has open). */
+  remove: (id: string) => Promise<void>;
+}

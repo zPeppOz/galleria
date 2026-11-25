@@ -5,12 +5,13 @@
 
 use crate::edit::apply;
 pub use crate::edit::{FieldIssue, ProfilePatch, check_wireguard};
+use crate::export::ExportError;
 use crate::ui_state::UiStateFile;
 use galleria_ipc::Protocol;
 use galleria_profile::openvpn_text::Item;
 use galleria_profile::{
-    ConfigIssue, ConfigIssueKind, Profile, ProfileStore, Settings, Skipped, StoreError,
-    WireGuardProfile, check_openvpn_config, render_wireguard,
+    ConfigIssue, ConfigIssueKind, FileSecretStore, Profile, ProfileStore, SecretStore, Settings,
+    Skipped, StoreError, WireGuardProfile, check_openvpn_config, render_wireguard,
 };
 use serde::Serialize;
 use std::{
@@ -163,9 +164,25 @@ pub enum RubricaError {
     GroupExists,
     #[error("There is no such group in the list")]
     GroupNotFound,
+    /// The profile is the one of the session that the service has open: it is not deleted under it.
+    #[error("The profile is in use by the session of the service")]
+    InUse,
+    /// The file of «Export» could not be written (the place is in the error, never the text).
+    #[error("{0}")]
+    Export(#[from] ExportError),
 }
 
+mod actions;
 mod groups;
+
+/// Opens the archive of the secrets of the folder of the rubrica: the one place that says which archive it is (B5 puts
+/// the layered one here), and what the tests replace to see a write fail.
+pub type SecretFactory =
+    Arc<dyn Fn(&Path) -> Result<Box<dyn SecretStore>, StoreError> + Send + Sync>;
+
+fn file_secrets(dir: &Path) -> Result<Box<dyn SecretStore>, StoreError> {
+    Ok(Box::new(FileSecretStore::open(dir)?))
+}
 
 /// Now as the profiles keep their times; `None` only if the clock cannot be formatted, and then the old time stays.
 fn stamp() -> Option<String> {
@@ -177,11 +194,27 @@ fn stamp() -> Option<String> {
 pub struct Rubrica {
     dir: PathBuf,
     state: Arc<UiStateFile>,
+    secrets: SecretFactory,
 }
 
 impl Rubrica {
     pub fn new(dir: PathBuf, state: Arc<UiStateFile>) -> Self {
-        Self { dir, state }
+        Self::with_secrets(dir, state, Arc::new(file_secrets))
+    }
+
+    /// A rubrica whose archive of the secrets is the one the factory opens (the tests make one that fails).
+    pub fn with_secrets(dir: PathBuf, state: Arc<UiStateFile>, secrets: SecretFactory) -> Self {
+        Self {
+            dir,
+            state,
+            secrets,
+        }
+    }
+
+    /// The archive of the secrets: duplicate and export read it, and nothing else in the rubrica does. A secret never
+    /// goes into a view; what leaves this crate through a command has none.
+    fn secrets(&self) -> Result<Box<dyn SecretStore>, RubricaError> {
+        (self.secrets)(&self.dir).map_err(|e| self.fail(e))
     }
 
     /// The folder of the phase 1: `$XDG_CONFIG_HOME/galleria` or `$HOME/.config/galleria`.

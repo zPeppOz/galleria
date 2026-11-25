@@ -3,8 +3,12 @@
 use crate::{
     edit::ProfilePatch,
     error::CmdError,
-    rubrica::{ProfileDetail, RawCheck, Rubrica, RubricaError, RubricaView},
+    export::SavePicker,
+    link::DaemonView,
+    rubrica::{ProfileDetail, ProfileSummary, RawCheck, Rubrica, RubricaError, RubricaView},
+    supervisor::SupervisorHandle,
 };
+use galleria_ipc::{ProfileRef, State as VpnState};
 use galleria_profile::StoreError;
 use serde_json::json;
 use std::{path::Path, sync::Arc};
@@ -43,6 +47,11 @@ impl From<RubricaError> for CmdError {
             }
             RubricaError::GroupExists => ("gui_group_exists", None),
             RubricaError::GroupNotFound => ("gui_group_not_found", None),
+            RubricaError::InUse => ("gui_profile_in_use", None),
+            // The place, so that the window can say where it failed; never the text.
+            RubricaError::Export(error) => {
+                ("gui_export_failed", Some(json!({ "path": error.path() })))
+            }
             RubricaError::Store { dir, source } => match source {
                 StoreError::NotFound => ("gui_profile_not_found", None),
                 StoreError::InsecurePermissions { path, mode } => (
@@ -106,4 +115,55 @@ pub fn profile_validate_raw(
     text: String,
 ) -> Result<RawCheck, CmdError> {
     Ok(rubrica.validate_raw(id, &text)?)
+}
+
+/// What `profile_export` answers: whether a file was written, and nothing else. The text of the file, the keys in it
+/// and the place it went to stay in Rust (Q31).
+#[derive(Debug, serde::Serialize)]
+pub struct ExportOutcome {
+    pub saved: bool,
+}
+
+/// The profile of the session the service has open, when there is one that is not `disconnected`: the one that may not
+/// be deleted under it.
+fn active_profile(view: &DaemonView) -> Option<ProfileRef> {
+    view.status
+        .as_ref()
+        .filter(|status| status.state != VpnState::Disconnected)
+        .and_then(|status| status.profile.clone())
+}
+
+/// A copy of a profile with the name the window gives, secrets included, made in Rust. Answers with the row of the copy.
+/// Works without the daemon.
+#[tauri::command(async)]
+pub fn profile_duplicate(
+    rubrica: State<'_, Arc<Rubrica>>,
+    id: Uuid,
+    name: String,
+) -> Result<ProfileSummary, CmdError> {
+    Ok(rubrica.duplicate(id, &name)?)
+}
+
+/// Asks the system for a place (a window «Save» that Rust opens) and writes the profile there, keys included. The answer
+/// is `{ "saved": bool }`: `false` is a cancel, and neither the text nor the place comes back.
+#[tauri::command(async)]
+pub fn profile_export(
+    rubrica: State<'_, Arc<Rubrica>>,
+    picker: State<'_, Arc<dyn SavePicker>>,
+    id: Uuid,
+) -> Result<ExportOutcome, CmdError> {
+    Ok(ExportOutcome {
+        saved: rubrica.export(id, &**picker)?,
+    })
+}
+
+/// Deletes a profile and its secrets, unless it is the one of the session the service has open (`gui_profile_in_use`).
+#[tauri::command(async)]
+pub fn profile_delete(
+    rubrica: State<'_, Arc<Rubrica>>,
+    supervisor: State<'_, SupervisorHandle>,
+    id: Uuid,
+) -> Result<(), CmdError> {
+    let active = active_profile(&supervisor.view());
+    Ok(rubrica.delete(id, active.as_ref())?)
 }

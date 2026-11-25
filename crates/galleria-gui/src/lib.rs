@@ -9,6 +9,9 @@ pub mod commands;
 pub mod edit;
 pub mod error;
 pub mod events;
+pub mod export;
+#[cfg(target_os = "linux")]
+pub mod export_gtk;
 pub mod link;
 pub mod rubrica;
 pub mod supervisor;
@@ -17,6 +20,7 @@ pub mod window;
 
 use announce::Announcer;
 use commands::app::AppInfo;
+use export::SavePicker;
 use rubrica::Rubrica;
 use std::{path::PathBuf, sync::Arc};
 use supervisor::RelinkPolicy;
@@ -58,6 +62,9 @@ pub fn configure_with<R: Runtime>(
             commands::profiles::profile_get,
             commands::profiles::profile_update,
             commands::profiles::profile_validate_raw,
+            commands::profiles::profile_duplicate,
+            commands::profiles::profile_export,
+            commands::profiles::profile_delete,
             commands::groups::group_create,
             commands::groups::group_rename,
             commands::groups::group_delete,
@@ -82,6 +89,8 @@ pub fn configure_with<R: Runtime>(
             )));
             // The tests of level 2 manage their own announcer before the build, and `manage` keeps the first one.
             app.manage(default_announcer(app.handle()));
+            // The same for the window «Save» of «Export»: the tests of level 2 cannot drive a native window and manage theirs.
+            app.manage(default_picker(app.handle()));
             if let Some(main) = app.get_webview_window("main") {
                 window::restore(&main, &state);
             }
@@ -98,6 +107,17 @@ fn default_announcer<R: Runtime>(app: &tauri::AppHandle<R>) -> Arc<dyn Announcer
 #[cfg(not(target_os = "linux"))]
 fn default_announcer<R: Runtime>(_app: &tauri::AppHandle<R>) -> Arc<dyn Announcer> {
     Arc::new(announce::NoAnnouncer)
+}
+
+/// The window «Save» of the running app: the one of GTK on Linux, none elsewhere (an export is then a cancel).
+#[cfg(target_os = "linux")]
+fn default_picker<R: Runtime>(app: &tauri::AppHandle<R>) -> Arc<dyn SavePicker> {
+    Arc::new(export_gtk::GtkSavePicker(app.clone()))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn default_picker<R: Runtime>(_app: &tauri::AppHandle<R>) -> Arc<dyn SavePicker> {
+    Arc::new(export::NoPicker)
 }
 
 /// Builds the Tauri application from `tauri.conf.json` and runs it until the last window closes. The daemon

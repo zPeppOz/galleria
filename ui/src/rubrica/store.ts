@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrange, type SortKey } from "./arrange";
-import type { CmdError, GroupActions, ProfileDetail, ProfilePatch, RawCheck, RubricaView } from "./types";
+import type { CmdError, GroupActions, ProfileActions, ProfileDetail, ProfilePatch, ProfileSummary, RawCheck, RubricaView } from "./types";
 
 export interface Rubrica {
   /** The first answer (a list or an error) has arrived. */
@@ -29,6 +29,8 @@ export interface Rubrica {
    * of the command.
    */
   validateRaw: (id: string, text: string) => Promise<RawCheck>;
+  /** Duplicate, export and delete of a profile (T8). */
+  actions: ProfileActions;
   /** The groups of the list: created, renamed, deleted, put in another order. Each one reads the rubrica again when it worked. */
   groups: GroupActions;
 }
@@ -110,6 +112,39 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
     };
   }, [reload]);
 
+  // The profile actions: a duplicate and a delete that worked read the rubrica again before they answer, so that whoever
+  // asked finds the copy in the list and the deleted profile gone (and the selection already moved).
+  const actions = useMemo<ProfileActions>(
+    () => ({
+      duplicate: async (id, name) => {
+        let copy: ProfileSummary;
+        try {
+          copy = await invoke<ProfileSummary>("profile_duplicate", { id, name });
+        } catch (failure) {
+          throw asError(failure);
+        }
+        await reload();
+        return copy;
+      },
+      export: async (id) => {
+        try {
+          return (await invoke<{ saved: boolean }>("profile_export", { id })).saved;
+        } catch (failure) {
+          throw asError(failure);
+        }
+      },
+      remove: async (id) => {
+        try {
+          await invoke("profile_delete", { id });
+        } catch (failure) {
+          throw asError(failure);
+        }
+        await reload();
+      },
+    }),
+    [reload],
+  );
+
   useEffect(() => {
     void reload();
     const again = () => void reload();
@@ -177,6 +212,7 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
     reload,
     update,
     validateRaw,
+    actions,
     groups,
   };
 }

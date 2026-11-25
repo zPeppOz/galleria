@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { Button } from "../design/Button";
+import { ConfirmDialog } from "../design/ConfirmDialog";
 import { icons } from "../design/icons";
 import { InlineAlert } from "../design/InlineAlert";
 import { Menu, type MenuEntry } from "../design/Menu";
 import { Tabs } from "../design/Tabs";
 import { useToast } from "../design/Toast";
-import { errorText, useT } from "../i18n";
+import { errorText, useT, type Translate } from "../i18n";
 import { build, fieldOrder, fieldTab, isDirty, toDraft, type Draft } from "../rubrica/draft";
-import type { CmdError, FieldIssue, ProfileDetail as Detail, ProfilePatch, ProfileSettings, ProfileSummary, RawCheck } from "../rubrica/types";
+import type { CmdError, FieldIssue, ProfileActions, ProfileDetail as Detail, ProfilePatch, ProfileSettings, ProfileSummary, RawCheck } from "../rubrica/types";
+import { NAME_MAX } from "../rubrica/validate";
 import "./ProfileDetail.css";
 import { ProtocolTag } from "./ProtocolTag";
 import { SaveBar } from "./SaveBar";
@@ -35,9 +37,19 @@ export interface DetailProps {
   detailError: CmdError | null;
   /** The groups of the list, for the group selector. */
   groups: string[];
+  /** The names of every profile of the rubrica: a copy takes the first «X (copy N)» that none of them has. */
+  names: string[];
+  /** The profile is the one of the session the service has open: it cannot be deleted, and the menu says why. */
+  inUse: boolean;
   update: (id: string, patch: ProfilePatch, expectedModified: string) => Promise<Detail>;
   /** Checks the text of the editor of an OpenVPN profile (T7): the form asks while the text is typed and before it saves. */
   validateRaw: (id: string, text: string) => Promise<RawCheck>;
+  /** Duplicate, export and delete (T8). */
+  actions: ProfileActions;
+  /** The window chooses this profile (the copy, once it is in the list): the shell asks before it lets go of unsaved edits. */
+  onSelect: (id: string) => void;
+  /** A profile was deleted and the rubrica has been read again: the shell puts the focus where the next one is. */
+  onDeleted: (id: string) => void;
   reload: () => Promise<void>;
   guard?: MutableRefObject<Guard | null>;
 }
@@ -53,20 +65,13 @@ function Empty() {
 }
 
 /**
- * Header, «More actions», status strip and the five tabs. The strip is empty (the live state is B5) and the three
- * actions say that they arrive later (P10). The panels and the star come from the caller: the form, or «reading».
+ * Header, «More actions», status strip and the five tabs. The strip is empty (the live state is B5). The panels, the star and
+ * the entries of the menu come from the caller: the form, or «reading».
  */
-function Frame(props: { profile: ProfileSummary; panels: Record<TabId, ReactNode>; tab: TabId; onTab: (tab: TabId) => void; star?: { pressed: boolean; onToggle: () => void }; above?: ReactNode; below?: ReactNode }) {
-  const { profile, panels, tab, onTab, star, above, below } = props;
+function Frame(props: { profile: ProfileSummary; panels: Record<TabId, ReactNode>; tab: TabId; onTab: (tab: TabId) => void; menu: MenuEntry[]; star?: { pressed: boolean; onToggle: () => void }; above?: ReactNode; below?: ReactNode }) {
+  const { profile, panels, tab, onTab, menu, star, above, below } = props;
   const t = useT();
-  const toast = useToast();
-  const later = () => toast(t("action.arrives_later"));
-  const entries: MenuEntry[] = [
-    { kind: "item", id: "duplicate", label: t("detail.duplicate"), onSelect: later },
-    { kind: "item", id: "export", label: t("detail.export"), onSelect: later },
-    { kind: "separator" },
-    { kind: "item", id: "delete", label: t("detail.delete"), danger: true, onSelect: later },
-  ];
+  const entries = menu;
   const cells: [string, string][] = [
     ["strip.state", t("strip.state")],
     ["strip.ip", t("strip.ip")],
@@ -116,7 +121,7 @@ function Frame(props: { profile: ProfileSummary; panels: Record<TabId, ReactNode
 }
 
 /** The form: the saved profile, a draft of its text fields, the writes (P7: the switches and the star at once, the text with «Save»). */
-function Form({ detail, groups, update, validateRaw, reload, guard }: Omit<DetailProps, "profile" | "detail" | "detailError"> & { detail: Detail }) {
+function Form({ detail, groups, update, validateRaw, reload, guard, menu }: Pick<DetailProps, "groups" | "update" | "validateRaw" | "reload" | "guard"> & { detail: Detail; menu: MenuEntry[] }) {
   const t = useT();
   const toast = useToast();
   const root = useRef<HTMLDivElement>(null);
@@ -343,6 +348,7 @@ function Form({ detail, groups, update, validateRaw, reload, guard }: Omit<Detai
         profile={base}
         tab={tab}
         onTab={setTab}
+        menu={menu}
         star={{ pressed: favourite, onToggle: () => writeNow({ favorite: !favourite }, { favorite: !favourite }) }}
         above={
           changed ? (
@@ -366,11 +372,95 @@ function Form({ detail, groups, update, validateRaw, reload, guard }: Omit<Detai
 
 /**
  * The profile that is chosen. The header is drawn from the row of the list, which is already there; the form waits for
- * the detail and is remade for every profile (a draft belongs to one profile).
+ * the detail and is remade for every profile (a draft belongs to one profile). The three actions of «More actions» are
+ * here, because they work on the profile as it is on the disk and do not wait for the form: the copy takes the name the
+ * catalogue proposes, «Export» and «Delete» ask first.
  */
-export function ProfileDetail({ profile, detail, detailError, groups, update, validateRaw, reload, guard }: DetailProps) {
+export function ProfileDetail({ profile, detail, detailError, groups, names, inUse, update, validateRaw, actions, onSelect, onDeleted, reload, guard }: DetailProps) {
   const t = useT();
-  if (detail) return <Form key={detail.id} detail={detail} groups={groups} update={update} validateRaw={validateRaw} reload={reload} guard={guard} />;
+  const toast = useToast();
+  const [asking, setAsking] = useState<"export" | "delete" | null>(null);
+  // The copy whose «More actions» button takes the focus when the copy is shown: the menu of the old profile goes with it.
+  const refocus = useRef<string | null>(null);
+  const shownId = detail?.id ?? null;
+  useEffect(() => {
+    if (refocus.current !== null && shownId === refocus.current) {
+      refocus.current = null;
+      document.querySelector<HTMLElement>(".detail-actions .gx-menu-trigger")?.focus();
+    }
+  }, [shownId]);
+
+  const failed = (failure: unknown) => {
+    const error = failure as CmdError;
+    toast(errorText(t, error.code, error.message), { tone: "error" });
+  };
+  const duplicate = async () => {
+    try {
+      const copy = await actions.duplicate(profile.id, copyName(t, profile.name, names));
+      toast(t("detail.duplicated", { name: copy.name }), { tone: "ok" });
+      refocus.current = copy.id;
+      onSelect(copy.id);
+    } catch (failure) {
+      failed(failure);
+    }
+  };
+  const exportFile = async () => {
+    setAsking(null);
+    try {
+      // a cancel of the window «Save» is not an outcome: nothing is said
+      if (await actions.export(profile.id)) toast(t("detail.exported"), { tone: "ok" });
+    } catch (failure) {
+      failed(failure);
+    }
+  };
+  const remove = async () => {
+    setAsking(null);
+    try {
+      await actions.remove(profile.id);
+      toast(t("detail.deleted", { name: profile.name }), { tone: "ok" });
+      onDeleted(profile.id);
+    } catch (failure) {
+      failed(failure);
+    }
+  };
+  const menu: MenuEntry[] = [
+    { kind: "item", id: "duplicate", label: t("detail.duplicate"), onSelect: () => void duplicate() },
+    { kind: "item", id: "export", label: t("detail.export"), onSelect: () => setAsking("export") },
+    { kind: "separator" },
+    { kind: "item", id: "delete", label: t("detail.delete"), danger: true, disabled: inUse, hint: inUse ? t("detail.delete.in_use") : undefined, onSelect: () => setAsking("delete") },
+  ];
+  const dialogs = (
+    <>
+      <ConfirmDialog
+        open={asking === "export"}
+        title={t("export.title", { name: profile.name })}
+        body={t("export.body")}
+        confirmLabel={t("export.confirm")}
+        cancelLabel={t("export.cancel")}
+        onConfirm={() => void exportFile()}
+        onCancel={() => setAsking(null)}
+      />
+      <ConfirmDialog
+        open={asking === "delete"}
+        danger
+        title={t("delete.title", { name: profile.name })}
+        body={t("delete.body")}
+        confirmLabel={t("delete.confirm")}
+        cancelLabel={t("delete.cancel")}
+        onConfirm={() => void remove()}
+        onCancel={() => setAsking(null)}
+      />
+    </>
+  );
+
+  if (detail) {
+    return (
+      <>
+        <Form key={detail.id} detail={detail} groups={groups} update={update} validateRaw={validateRaw} reload={reload} guard={guard} menu={menu} />
+        {dialogs}
+      </>
+    );
+  }
   const waiting = detailError ? (
     <InlineAlert tone="error" toneLabel={t("alert.error")}>{errorText(t, detailError.code, detailError.message)}</InlineAlert>
   ) : (
@@ -378,12 +468,13 @@ export function ProfileDetail({ profile, detail, detailError, groups, update, va
   );
   return (
     <div className="detail">
-      <WaitingFrame profile={profile} waiting={waiting} />
+      <WaitingFrame profile={profile} waiting={waiting} menu={menu} />
+      {dialogs}
     </div>
   );
 }
 
-function WaitingFrame({ profile, waiting }: { profile: ProfileSummary; waiting: ReactNode }) {
+function WaitingFrame({ profile, waiting, menu }: { profile: ProfileSummary; waiting: ReactNode; menu: MenuEntry[] }) {
   const t = useT();
   const [tab, setTab] = useState<TabId>("general");
   return (
@@ -391,8 +482,25 @@ function WaitingFrame({ profile, waiting }: { profile: ProfileSummary; waiting: 
       profile={profile}
       tab={tab}
       onTab={setTab}
+      menu={menu}
       panels={{ general: waiting, auth: waiting, network: waiting, config: waiting, log: <p className="detail-later">{t("pane.arrives_later")}</p> }}
     />
   );
+}
+
+/**
+ * The name of a copy: «X (copy)», then «X (copy 2)» and so on, the first that no profile has. It is cut short when it
+ * would not fit in a name (the longest is `NAME_MAX`), from the name of the original, so that Rust never refuses it.
+ */
+export function copyName(t: Translate, name: string, taken: string[]): string {
+  const make = (n: number) => {
+    const key = n === 1 ? "detail.copy_name" : "detail.copy_name_n";
+    const room = Math.max(1, NAME_MAX - [...t(key, { name: "", n })].length);
+    return t(key, { name: [...name].slice(0, room).join("").trimEnd(), n });
+  };
+  const used = new Set(taken);
+  let n = 1;
+  while (used.has(make(n))) n += 1;
+  return make(n);
 }
 

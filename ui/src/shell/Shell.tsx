@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { SortOrder } from "../app/uiState";
 import type { AppInfo, DaemonView } from "../daemon/types";
 import { Button } from "../design/Button";
@@ -42,8 +42,23 @@ export function Shell(props: {
   const guard = useRef<Guard | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
+  // A profile was deleted: the focus goes to the row that takes its place (or to the text of the empty rubrica) as soon as
+  // the rubrica has been read again and the selection has moved.
+  const [deleted, setDeleted] = useState<string | null>(null);
+  const emptyText = useRef<HTMLParagraphElement>(null);
   const profiles = rubrica.view?.profiles;
   const selected = profiles?.find((p) => p.id === rubrica.selectedId) ?? null;
+  useEffect(() => {
+    if (deleted === null || !profiles || profiles.some((p) => p.id === deleted)) return;
+    if (profiles.length === 0) {
+      emptyText.current?.focus();
+    } else if (selected) {
+      list.current?.focus();
+    } else {
+      return;
+    }
+    setDeleted(null);
+  }, [deleted, profiles, selected]);
   const choose = (id: string) => {
     if (id !== rubrica.selectedId && guard.current?.dirty) setLeaving(id);
     else rubrica.select(id);
@@ -103,7 +118,7 @@ export function Shell(props: {
                 <ProfileList label={t("list.label")} groups={groups} selectedId={selected?.id ?? ""} onSelect={choose} empty={t("search.no_match")} focusRef={list} />
               </>
             ) : (
-              <p className="shell-aside-empty">{rubrica.loaded ? t("list.empty") : t("rubrica.loading")}</p>
+              <p className="shell-aside-empty" ref={emptyText} tabIndex={-1}>{rubrica.loaded ? t("list.empty") : t("rubrica.loading")}</p>
             )}
             {rubrica.view ? (
               <div className="shell-aside-foot">
@@ -115,7 +130,21 @@ export function Shell(props: {
             <ServiceArea view={view} info={info} onRetry={onRetry} />
             <RubricaNotices rubrica={rubrica} />
             {selected ? (
-              <ProfileDetail profile={selected} detail={rubrica.detail} detailError={rubrica.detailError} groups={rubrica.view?.groups ?? []} update={rubrica.update} validateRaw={rubrica.validateRaw} reload={rubrica.reload} guard={guard} />
+              <ProfileDetail
+                profile={selected}
+                detail={rubrica.detail}
+                detailError={rubrica.detailError}
+                groups={rubrica.view?.groups ?? []}
+                names={profiles?.map((p) => p.name) ?? []}
+                inUse={session?.id === selected.id}
+                update={rubrica.update}
+                validateRaw={rubrica.validateRaw}
+                actions={rubrica.actions}
+                onSelect={choose}
+                onDeleted={setDeleted}
+                reload={rubrica.reload}
+                guard={guard}
+              />
             ) : null}
           </main>
         </div>

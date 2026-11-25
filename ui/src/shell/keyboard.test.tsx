@@ -193,20 +193,21 @@ describe("keyboard on the whole shell", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     here("button:Menu");
 
-    // «More actions» → Delete: nothing to confirm yet (it arrives with D), so a notice and the focus stays on the button
+    // «More actions» → Delete asks first; Escape gives up and the focus goes back to the button
     screen.getByRole("button", { name: "More actions" }).focus();
     await user.keyboard("{Enter}");
     await menuOpen("More actions");
     await user.keyboard("{End}{Enter}");
-    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await screen.findByRole("alertdialog", { name: "Delete Ufficio Napoli?" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
     here("button:More actions");
-    // «Duplicate» closes the menu and shows a notice, without taking the focus
+    // «Duplicate» closes the menu, makes the copy and puts the focus on «More actions» of the copy
     await user.keyboard("{Enter}");
     await menuOpen("More actions");
     await user.keyboard("{Home}{Enter}");
-    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-    here("button:More actions");
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Ufficio Napoli (copy)"));
+    await waitFor(() => here("button:More actions"));
   });
 
   it("a_notice_closed_from_the_keyboard_does_not_drop_the_focus_on_the_body", async () => {
@@ -218,15 +219,17 @@ describe("keyboard on the whole shell", () => {
     await menuOpen("More actions");
     await user.keyboard("{Home}{Enter}");
     const status = toastStatus();
-    await waitFor(() => expect(status.textContent).toContain("This action arrives in a later release."));
-    expect(document.activeElement).toBe(more); // the notice did not take the focus
+    await waitFor(() => expect(status.textContent).toContain("Duplicated as"));
+    // the copy is chosen, so the form is another one: the focus is on its «More actions»
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "More actions" })));
+    const here = screen.getByRole("button", { name: "More actions" });
     // a person who wants to read it or close it gets there with Tab (it comes after the main area)
     const close = within(status).getByRole("button", { name: "Dismiss the notice" });
     close.focus();
     await user.keyboard("{Enter}");
     await waitFor(() => expect(within(status).queryByRole("button")).toBeNull());
     expect(document.activeElement, "the focus after the notice left").not.toBe(document.body);
-    expect(document.activeElement).toBe(more);
+    expect(document.activeElement).toBe(here);
   });
 
   it("a_full_tour_needs_no_pointer", async () => {
@@ -276,13 +279,14 @@ describe("keyboard on the whole shell", () => {
     expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("Ufficio Napoli");
     expect(active(), "the focus after Cancel").toBe(screen.getByRole("tab", { name: "General" }));
 
-    // «Delete» says that it arrives later, and nothing changes
+    // «Delete» asks first; Escape gives up and nothing changes
     screen.getByRole("button", { name: "More actions" }).focus();
     await user.keyboard("{Enter}");
     await menuOpen("More actions");
     await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
-    await waitFor(() => expect(toastStatus().textContent).toContain("This action arrives in a later release."));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await screen.findByRole("alertdialog", { name: "Delete Ufficio Napoli?" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
     expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(5);
 
     // the language and the theme from the menu

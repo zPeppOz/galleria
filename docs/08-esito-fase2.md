@@ -889,3 +889,12 @@ Scostamenti dal piano, da sapere:
 
 Non verificato (T7): l'editor con un testo di molte migliaia di righe (la validazione è sincrona in Rust e il testo passa tutto dall'IPC a ogni controllo, 400 ms dopo l'ultimo tasto); l'editor sotto Orca (`entry` multilinea, elenco dei problemi: T9);
 il caret portato sulla riga e lo scorrimento in WebKitGTK (provato in jsdom: `setSelectionRange`; lo scorrimento usa `getComputedStyle(...).lineHeight`, che in jsdom non c'è, e nella finestra vera non è provato).
+
+### Duplica, esporta, elimina (T8, Q31)
+
+- **Duplica**: la copia nasce in Rust, segreti compresi, col primo nome libero «X (copy)», «X (copy 2)»… (accorciato dal nome dell'originale se sfora `NAME_MAX`). Tutto o niente: si scrivono prima i segreti e, se il profilo non si scrive, si cancellano. La copia non è preferita e viene scelta; il fuoco va su «Altre azioni» della copia.
+- **Esporta**: dopo una conferma («il file conterrà le chiavi private») Rust apre la finestra «Salva» (`gtk::FileChooserNative`, `export_gtk.rs`) e scrive il file dall'archivio dei segreti senza passare dalla webview: la risposta è solo `{ saved }`, mai testo, percorso o chiavi. Annullare la finestra non dice nulla. Un errore dice «il file non si è potuto salvare» senza il percorso. Scelta (S22): niente `tauri-plugin-dialog`, che avrebbe portato 4 crate in più, un secondo major di `toml` e i comandi di due plugin; `gtk` è già una dipendenza (Q27). Un test della configurazione verifica che la capability non dia alla webview alcun permesso di dialoghi o file.
+- **Elimina**: dopo una conferma; rifiutata (`gui_profile_in_use`) se il profilo è quello della sessione aperta dal servizio, e la voce del menu lo dice (`aria-disabled` + descrizione, resta una sosta delle frecce). Dopo l'eliminazione il fuoco va alla lista o, se è vuota, al testo «Nessun profilo».
+- `Rubrica::with_secrets(SecretFactory)` è il punto unico che B5 sostituirà con l'archivio a strati.
+
+Non verificato (T8): la finestra «Salva» GTK vera non è pilotata da nessuna prova (il selettore è finto nei test); smoke ed a11y della conferma di Elimina (S5) non rieseguiti dopo T8.

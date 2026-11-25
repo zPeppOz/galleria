@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrange, type SortKey } from "./arrange";
-import type { CmdError, GroupActions, ProfileDetail, ProfilePatch, RubricaView } from "./types";
+import type { CmdError, GroupActions, ProfileDetail, ProfilePatch, RawCheck, RubricaView } from "./types";
 
 export interface Rubrica {
   /** The first answer (a list or an error) has arrived. */
@@ -23,6 +23,12 @@ export interface Rubrica {
    * `reload` when it has put the answer where it belongs. A refusal is thrown as the error of the command.
    */
   update: (id: string, patch: ProfilePatch, expectedModified: string) => Promise<ProfileDetail>;
+  /**
+   * Checks the text the editor holds for an OpenVPN profile: what stops a save, line by line. It writes nothing; the save
+   * checks again by itself. The findings carry the names of directives, never the text. A failure is thrown as the error
+   * of the command.
+   */
+  validateRaw: (id: string, text: string) => Promise<RawCheck>;
   /** The groups of the list: created, renamed, deleted, put in another order. Each one reads the rubrica again when it worked. */
   groups: GroupActions;
 }
@@ -71,6 +77,14 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
   const update = useCallback(async (id: string, patch: ProfilePatch, expectedModified: string): Promise<ProfileDetail> => {
     try {
       return await invoke<ProfileDetail>("profile_update", { id, expectedModified, patch });
+    } catch (failure) {
+      throw asError(failure);
+    }
+  }, []);
+
+  const validateRaw = useCallback(async (id: string, text: string): Promise<RawCheck> => {
+    try {
+      return await invoke<RawCheck>("profile_validate_raw", { id, text });
     } catch (failure) {
       throw asError(failure);
     }
@@ -162,6 +176,7 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
     detailError,
     reload,
     update,
+    validateRaw,
     groups,
   };
 }

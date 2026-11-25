@@ -31,6 +31,8 @@ export interface ProfileDetail extends ProfileSummary {
   secret_refs: string[];
   openvpn: OpenVpnView | null;
   wireguard: WireGuardView | null;
+  /** The `.conf` of a WireGuard profile without its key lines, for the tab «Configuration» (read only). */
+  wireguard_config: string | null;
 }
 
 /** A file of the profiles folder that could not be read, shown by its name. */
@@ -38,15 +40,25 @@ export interface SkippedProfile { file_name: string; code: "gui_profile_newer" |
 
 export interface RubricaView { profiles: ProfileSummary[]; groups: string[]; skipped: SkippedProfile[] }
 
+/** What the editor of the raw text can find wrong in a line (`ConfigIssueKind` of `galleria-profile`, in snake_case). */
+export type RawIssueKind = "syntax" | "dangerous" | "unsupported" | "daemon_owned" | "file_reference" | "secret_block" | "no_tls_client";
+
+/** One finding: the line (0 is the text as a whole), the name of the directive or block (empty for a syntax error), the kind. Never the text itself. */
+export interface RawIssue { line: number; directive: string; kind: RawIssueKind }
+
+/** The answer of `profile_validate_raw`: what was found, and whether the text can be saved (the missing `client` is a warning). */
+export interface RawCheck { issues: RawIssue[]; can_save: boolean }
+
 /** The error every command returns (spec §4): a stable code, the English message, and sometimes data for the text. */
-export interface CmdError { code: string; message: string; data?: { path?: string; mode?: string; fix?: string; fields?: FieldIssue[] } }
+export interface CmdError { code: string; message: string; data?: { path?: string; mode?: string; fix?: string; fields?: FieldIssue[]; issues?: RawIssue[] } }
 
 /** A field that may not be saved, by its path (`name`, `mtu`, `peers.0.endpoint`), with the reason: `gui_invalid_field` carries a list of them. */
 export interface FieldIssue { field: string; code: string }
 
 /**
  * What the window asks to change in a profile (`ProfilePatch` in `crates/galleria-gui/src/edit.rs`): only the keys that
- * change. `group: null` is «no group». There is no key for a secret, a path or the text of an OpenVPN profile.
+ * change. `group: null` is «no group». There is no key for a secret or a path; the text of an OpenVPN profile is
+ * `openvpn_config`, saved as written if nothing in it stops a save.
  */
 export interface ProfilePatch {
   name?: string;
@@ -55,6 +67,7 @@ export interface ProfilePatch {
   notes?: string;
   settings?: ProfileSettings;
   wireguard?: WireGuardView;
+  openvpn_config?: string;
 }
 
 /**

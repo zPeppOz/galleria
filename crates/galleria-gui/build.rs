@@ -10,6 +10,7 @@ const COMMANDS: &[&str] = &[
     "profiles_list",
     "profile_get",
     "profile_update",
+    "profile_validate_raw",
     "group_create",
     "group_rename",
     "group_delete",

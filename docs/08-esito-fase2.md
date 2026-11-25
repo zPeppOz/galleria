@@ -849,3 +849,43 @@ che differiscono solo per forma Unicode (NFC/NFD): per «unico» conta il minusc
 **«Fatto quando» di T6, a mano:** una cartella con il seme, in cui le funzioni di `Rubrica` hanno creato «Casa», rinominato «Lavoro» in «Ufficio» ed eliminato «Clienti» (`galleria.toml`:
 `groups = ["Ufficio", "Personale", "Casa"]`), letta da `galleria list` della fase 1 sull'host (`XDG_CONFIG_HOME` puntato alla cartella): i cinque profili escono senza errori. La prova automatica è del T9
 (`cli_lists_what_the_gui_saved`). Fatto con una prova temporanea, poi tolta.
+
+### Editor raw con validazione (T7, Q32)
+
+- **`galleria-profile`, solo aggiunte** (Q29): `raw.rs` con `ConfigIssueKind` (`Syntax`, `Dangerous`, `Unsupported`, `DaemonOwned`, `FileReference`, `SecretBlock`, `NoTlsClient`), `ConfigIssue { line, directive, kind }`
+  e `check_openvpn_config(text)`: la classificazione della fase 1 (`galleria_ovpn::classify`, come la applica `check_strict`), riga per riga, senza leggere file. Un errore di sintassi è l'unico
+  problema (dopo non si può dire altro); l'avviso `NoTlsClient` (né `client` né `tls-client`) viene per ultimo, a riga 0, e non impedisce il salvataggio (`blocks_saving`). `directive` è il
+  **nome** della direttiva o del blocco, mai un argomento né il contenuto di un blocco (`an_issue_never_carries_the_content_of_a_block_or_an_argument`). `render_wireguard(profilo, chiavi)`
+  rifà il `.conf`: senza chiavi non ci sono le righe `PrivateKey` e `PresharedKey`, con le chiavi è il file che T8 esporterà e `import_wireguard` lo rilegge nello stesso profilo e negli stessi segreti.
+  `galleria_profile::openvpn_text` riesporta `parse`, `Item` e `ParseError`: `galleria-gui` non nomina più `galleria-ovpn` nel suo `Cargo.toml` (lo nominava dal T3, per leggere i `remote`).
+- **`galleria-gui`**: `rubrica::check_raw` è l'unico punto che dice cosa impedisce un salvataggio. `profile_validate_raw(id, text)` risponde `{ issues: [{ line, directive, kind }], can_save }`, non scrive
+  niente e per un profilo WireGuard dà `gui_invalid_field` (`wrong_protocol`). `profile_update` accetta `openvpn_config` e **ricontrolla il testo da solo**, qualunque cosa abbia detto prima la
+  finestra: se qualcosa impedisce il salvataggio risponde `gui_invalid_field` con `data.fields = [{ field: "openvpn_config", code: "config_issues" }]` e `data.issues` con la stessa lista
+  (`RubricaError::InvalidConfig`); altrimenti salva il testo **com'è scritto**, commenti e righe vuote compresi, con la solita rename atomica a `0600`. Se insieme al testo c'è un altro campo
+  sbagliato, la risposta è la lista dei campi (con `config_issues` dentro) e senza `issues`: la finestra, che controlla da sé prima di inviare, non ci arriva. `ProfileDetail` guadagna
+  `wireguard_config` (il `.conf` senza chiavi). Il comando entra in `COMMANDS`, nella capability e in `tests/config.rs`. `galleria-backend-openvpn` è dipendenza **di sola prova** (come il
+  backend WireGuard per P8): `cargo tree -p galleria-gui -e normal` non lo contiene.
+- **Webview**: `shell/tabs/Configuration.tsx` (`Field as="textarea" mono`, 16 righe, senza correzione ortografica; sotto, l'elenco dei problemi, una voce per riga, ognuna un pulsante che porta il cursore
+  sulla riga e la seleziona; la voce di riga 0 è testo, non pulsante). `Draft.config` tiene il testo; `build` lo manda **senza toccarlo**. `ProfileDetail` controlla il testo 400 ms dopo l'ultimo tasto e **sempre
+  prima di salvare**: se qualcosa impedisce il salvataggio non invia niente, apre la scheda, mette l'errore sul campo e il fuoco sul primo problema dell'elenco (nessun avviso: Q27, regola 2); lo stesso
+  se è Rust a rifiutare. Un avviso (manca `client`) si vede e non ferma il salvataggio. Il testo di D19 («Galleria non esegue gli script dei profili») è per `up`, `down`, `route-up`, `plugin` e le altre
+  direttive che lanciano uno script; le altre «pericolose» (`log`, `user`, `auth-user-pass file`) hanno una frase che non dice «script». Un blocco segreto e un riferimento a un file dicono di importare di nuovo il profilo.
+  Sotto il testo, «Nell'archivio dei segreti: …» con i nomi tradotti (`secretLabel`: «chiave privata», «chiave condivisa del peer 2»; un nome sconosciuto resta com'è). Un profilo WireGuard mostra il suo
+  `.conf` in sola lettura, senza chiavi. `Field` ha le proprietà `rows` e `spellCheck`. Tolto il testo `issue.not_editable`, che non nasce più.
+- **Prove**: `galleria-profile/tests/raw.rs` (21 con i casi), `galleria-gui/tests/raw.rs` (10), `Configuration.test.tsx` (20), `draft.test.ts` (2 nuove); fumo nuovo
+  `a_script_directive_cannot_be_saved_from_the_editor` (si scrive `up /tmp/x.sh`, «Salva»: la lista lo mostra, il fuoco va sul problema e i file sul disco sono quelli di prima) e
+  `a_comment_typed_in_the_editor_is_saved_as_written`.
+
+| # | Supposizione | Esito | Dove | Ripiego applicato |
+|---|---|---|---|---|
+| S24 | Un testo di configurazione salvato com'è scritto, con i commenti, passa il validatore del demone | **Vero.** `saved_raw_config_is_accepted_by_the_daemon_validator`: un testo con commenti `#` e `;`, righe vuote e un commento in coda a una riga si salva identico, `to_connect_params` e `galleria_backend_openvpn::config::validate` lo accettano (il parser toglie i commenti prima di classificare) | `tests/raw.rs` | nessuno: non serve `render(parse(testo))` |
+
+Scostamenti dal piano, da sapere:
+
+- `ConfigIssueKind` ha `blocks_saving()` (non c'era nel piano): è il punto unico che dice che `NoTlsClient` è un avviso.
+- Il piano elencava `ui/src/shell/ProfileDetail.tsx` e `Configuration.tsx` ma non il tipo `RawCheck`/`RawIssue` in `rubrica/types.ts`, né `validateRaw` in `useRubrica` (la finestra deve chiedere il controllo mentre si scrive).
+- Il rifiuto di Rust è `gui_invalid_field` con `data.issues`, come chiede il piano; la forma di `fields` resta quella di T5, così la finestra la tratta come ogni altro campo sbagliato.
+- La stella, gli interruttori e le altre schede non sono toccate. La scheda «Log» dice ancora `pane.arrives_later`.
+
+Non verificato (T7): l'editor con un testo di molte migliaia di righe (la validazione è sincrona in Rust e il testo passa tutto dall'IPC a ogni controllo, 400 ms dopo l'ultimo tasto); l'editor sotto Orca (`entry` multilinea, elenco dei problemi: T9);
+il caret portato sulla riga e lo scorrimento in WebKitGTK (provato in jsdom: `setSelectionRange`; lo scorrimento usa `getComputedStyle(...).lineHeight`, che in jsdom non c'è, e nella finestra vera non è provato).

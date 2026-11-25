@@ -57,6 +57,7 @@ pub fn configure_with<R: Runtime>(
             commands::profiles::profiles_list,
             commands::profiles::profile_get,
             commands::profiles::profile_update,
+            commands::profiles::profile_validate_raw,
             commands::groups::group_create,
             commands::groups::group_rename,
             commands::groups::group_delete,

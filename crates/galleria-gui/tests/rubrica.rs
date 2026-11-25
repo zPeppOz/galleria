@@ -564,19 +564,7 @@ fn openvpn_profile_refuses_a_wireguard_patch_and_the_other_way_round() {
         fields(error),
         [("openvpn_config".to_owned(), "wrong_protocol")]
     );
-
-    // the text of an OpenVPN profile is edited in the editor of T7, not by this command
-    let error = rubrica
-        .update(
-            office.summary.id,
-            &office.summary.modified,
-            patch(json!({ "openvpn_config": "client\n" })),
-        )
-        .unwrap_err();
-    assert_eq!(
-        fields(error),
-        [("openvpn_config".to_owned(), "not_editable")]
-    );
+    // the text of an OpenVPN profile is edited in the editor of T7: `tests/raw.rs`
 }
 
 #[test]

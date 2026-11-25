@@ -7,8 +7,11 @@ use crate::edit::apply;
 pub use crate::edit::{FieldIssue, ProfilePatch, check_wireguard};
 use crate::ui_state::UiStateFile;
 use galleria_ipc::Protocol;
-use galleria_ovpn::Item;
-use galleria_profile::{Profile, ProfileStore, Settings, Skipped, StoreError, WireGuardProfile};
+use galleria_profile::openvpn_text::Item;
+use galleria_profile::{
+    ConfigIssue, ConfigIssueKind, Profile, ProfileStore, Settings, Skipped, StoreError,
+    WireGuardProfile, check_openvpn_config, render_wireguard,
+};
 use serde::Serialize;
 use std::{
     path::{Path, PathBuf},
@@ -67,6 +70,57 @@ pub struct ProfileDetail {
     pub openvpn: Option<OpenVpnView>,
     /// No keys in here: the private and the shared keys are in the archive of the secrets.
     pub wireguard: Option<WireGuardProfile>,
+    /// The `.conf` of a WireGuard profile as the tab «Configuration» shows it, read only and without the key lines.
+    pub wireguard_config: Option<String>,
+}
+
+/// One finding of the editor of the raw text, as the webview gets it: the line (0 for the text as a whole), the name
+/// of the directive or block (never an argument, never the content of a block) and the kind, in `snake_case`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct IssueView {
+    pub line: usize,
+    pub directive: String,
+    pub kind: &'static str,
+}
+
+/// The answer to a check of the text: what was found, and whether the text may be saved (a warning does not stop it).
+#[derive(Debug, Clone, Serialize)]
+pub struct RawCheck {
+    pub issues: Vec<IssueView>,
+    pub can_save: bool,
+}
+
+fn kind_name(kind: ConfigIssueKind) -> &'static str {
+    match kind {
+        ConfigIssueKind::Syntax => "syntax",
+        ConfigIssueKind::Dangerous => "dangerous",
+        ConfigIssueKind::Unsupported => "unsupported",
+        ConfigIssueKind::DaemonOwned => "daemon_owned",
+        ConfigIssueKind::FileReference => "file_reference",
+        ConfigIssueKind::SecretBlock => "secret_block",
+        ConfigIssueKind::NoTlsClient => "no_tls_client",
+    }
+}
+
+fn issue_views(issues: &[ConfigIssue]) -> Vec<IssueView> {
+    issues
+        .iter()
+        .map(|i| IssueView {
+            line: i.line,
+            directive: i.directive.clone(),
+            kind: kind_name(i.kind),
+        })
+        .collect()
+}
+
+/// Checks the text of an OpenVPN configuration: the one place that says what stops a save (Q32), for the check and for
+/// the save itself.
+pub fn check_raw(text: &str) -> RawCheck {
+    let found = check_openvpn_config(text);
+    RawCheck {
+        can_save: !found.iter().any(|i| i.kind.blocks_saving()),
+        issues: issue_views(&found),
+    }
 }
 
 /// A file of the profiles folder that could not be read, shown by its name with a code of its own.
@@ -99,6 +153,9 @@ pub enum RubricaError {
     Changed,
     #[error("Some fields are not valid")]
     Invalid(Vec<FieldIssue>),
+    /// The text of an OpenVPN configuration has something that stops the save (Q32): what, line by line. Never the text.
+    #[error("The configuration has problems that stop it from being saved")]
+    InvalidConfig(Vec<IssueView>),
     /// A group name that cannot be used (`required`, `too_long`, `invalid_chars`), or an order that is not a permutation.
     #[error("Not a valid group name or order: {0}")]
     GroupInvalid(&'static str),
@@ -187,6 +244,24 @@ impl Rubrica {
         &self.dir
     }
 
+    /// What is wrong with a text that the editor holds for an OpenVPN profile. Reads the profile (to know it is an OpenVPN
+    /// one) and writes nothing.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::NotFound`] when there is no such profile, [`RubricaError::Invalid`] for a WireGuard one.
+    pub fn validate_raw(&self, id: Uuid, text: &str) -> Result<RawCheck, RubricaError> {
+        let store = ProfileStore::open(&self.dir).map_err(|e| self.fail(e))?;
+        let profile = store.find(&id.to_string()).map_err(|e| self.fail(e))?;
+        if profile.openvpn.is_none() {
+            return Err(RubricaError::Invalid(vec![FieldIssue {
+                field: "openvpn_config".into(),
+                code: "wrong_protocol",
+            }]));
+        }
+        Ok(check_raw(text))
+    }
+
     /// Changes the fields named by the patch and saves the profile, atomically and with the permissions of the phase 1.
     /// `expected_modified` is the time of modification the window knows: if the file says another one, the CLI or
     /// another window wrote it in the meantime, and nothing is written. The secrets are not opened.
@@ -206,9 +281,17 @@ impl Rubrica {
         if profile.modified != expected_modified {
             return Err(RubricaError::Changed);
         }
+        // The text is looked at again here whatever the window said before: only what arrives at the save counts.
+        let config = patch.openvpn_config.clone();
         let issues = apply(&mut profile, patch);
         if !issues.is_empty() {
-            return Err(RubricaError::Invalid(issues));
+            let only_the_config = issues.iter().all(|i| i.code == "config_issues");
+            return match config {
+                Some(text) if only_the_config => {
+                    Err(RubricaError::InvalidConfig(check_raw(&text).issues))
+                }
+                _ => Err(RubricaError::Invalid(issues)),
+            };
         }
         if let Some(now) = stamp() {
             profile.modified = now;
@@ -276,6 +359,10 @@ fn detail(profile: &Profile, last_used: Option<&str>) -> ProfileDetail {
             .as_ref()
             .map(|o| openvpn_view(&o.config, &profile.secret_refs)),
         wireguard: profile.wireguard.clone(),
+        wireguard_config: profile
+            .wireguard
+            .as_ref()
+            .map(|wg| render_wireguard(wg, None)),
     }
 }
 
@@ -298,7 +385,7 @@ type RawRemote = (String, Option<u16>, Option<&'static str>, Option<usize>);
 /// The remotes and the ways of authenticating of an OpenVPN configuration. A configuration that does not parse gives
 /// no remotes: the text itself is still shown, and the validation is the business of the editor (T7).
 pub fn openvpn_view(config: &str, secret_refs: &[String]) -> OpenVpnView {
-    let items = galleria_ovpn::parse(config).unwrap_or_default();
+    let items = galleria_profile::openvpn_text::parse(config).unwrap_or_default();
     let mut auth = AuthFlags {
         certificate: secret_refs.iter().any(|r| r == "openvpn.block.pkcs12"),
         ..AuthFlags::default()

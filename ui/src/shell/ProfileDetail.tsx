@@ -7,11 +7,12 @@ import { Tabs } from "../design/Tabs";
 import { useToast } from "../design/Toast";
 import { errorText, useT } from "../i18n";
 import { build, fieldOrder, fieldTab, isDirty, toDraft, type Draft } from "../rubrica/draft";
-import type { CmdError, FieldIssue, ProfileDetail as Detail, ProfilePatch, ProfileSettings, ProfileSummary } from "../rubrica/types";
+import type { CmdError, FieldIssue, ProfileDetail as Detail, ProfilePatch, ProfileSettings, ProfileSummary, RawCheck } from "../rubrica/types";
 import "./ProfileDetail.css";
 import { ProtocolTag } from "./ProtocolTag";
 import { SaveBar } from "./SaveBar";
 import { Authentication } from "./tabs/Authentication";
+import { Configuration } from "./tabs/Configuration";
 import { General } from "./tabs/General";
 import { Network } from "./tabs/Network";
 import { issueText } from "./tabs/tab";
@@ -35,6 +36,8 @@ export interface DetailProps {
   /** The groups of the list, for the group selector. */
   groups: string[];
   update: (id: string, patch: ProfilePatch, expectedModified: string) => Promise<Detail>;
+  /** Checks the text of the editor of an OpenVPN profile (T7): the form asks while the text is typed and before it saves. */
+  validateRaw: (id: string, text: string) => Promise<RawCheck>;
   reload: () => Promise<void>;
   guard?: MutableRefObject<Guard | null>;
 }
@@ -113,7 +116,7 @@ function Frame(props: { profile: ProfileSummary; panels: Record<TabId, ReactNode
 }
 
 /** The form: the saved profile, a draft of its text fields, the writes (P7: the switches and the star at once, the text with «Save»). */
-function Form({ detail, groups, update, reload, guard }: Omit<DetailProps, "profile" | "detail" | "detailError"> & { detail: Detail }) {
+function Form({ detail, groups, update, validateRaw, reload, guard }: Omit<DetailProps, "profile" | "detail" | "detailError"> & { detail: Detail }) {
   const t = useT();
   const toast = useToast();
   const root = useRef<HTMLDivElement>(null);
@@ -127,6 +130,8 @@ function Form({ detail, groups, update, reload, guard }: Omit<DetailProps, "prof
   const [tab, setTab] = useState<TabId>("general");
   const [focus, setFocus] = useState<{ field: string; turn: number } | null>(null);
   const [barGone, setBarGone] = useState(0);
+  // What the check says about the text in the editor (T7): null until the text is changed and the check has answered.
+  const [raw, setRaw] = useState<RawCheck | null>(null);
   // One write at a time: a second one would carry a time of modification that the first has just made stale.
   const writing = useRef(false);
   const dirty = isDirty(draft, base);
@@ -140,7 +145,32 @@ function Form({ detail, groups, update, reload, guard }: Omit<DetailProps, "prof
     setPending({});
     setChanged(false);
     setAdopt(false);
+    setRaw(null);
   }, []);
+
+  // The text of an OpenVPN profile is checked 400 ms after the last key, with nothing written. A text that is as saved has
+  // nothing to say; an answer for a text that is no longer the one in the editor is dropped.
+  const text = draft.config;
+  const savedText = base.openvpn?.config ?? null;
+  useEffect(() => {
+    if (text === null || text === savedText) {
+      setRaw(null);
+      return undefined;
+    }
+    let current = true;
+    const timer = setTimeout(() => {
+      validateRaw(base.id, text).then(
+        (check) => {
+          if (current) setRaw(check);
+        },
+        () => undefined,
+      );
+    }, 400);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [text, savedText, base.id, validateRaw]);
 
   // The profile changed on disk (the CLI, another window): without edits of ours it is taken in silently; with edits
   // they are kept and the form says so. Only a change of the live detail counts, not our own write coming back.
@@ -178,9 +208,21 @@ function Form({ detail, groups, update, reload, guard }: Omit<DetailProps, "prof
     root.current?.querySelector<HTMLElement>(`[name="${focus.field}"]`)?.focus();
   }, [focus]);
 
+  const showConfigRefused = useCallback(() => {
+    setErrors((now) => ({ ...now, openvpn_config: issueText(t, "openvpn_config", "config_issues") }));
+    setTab("config");
+    setFocus((was) => ({ field: "config_issue", turn: (was?.turn ?? 0) + 1 }));
+  }, [t]);
+
   const fail = useCallback(
     (failure: unknown) => {
       const error = failure as CmdError;
+      // The save was refused for the text: the list Rust found is the list to show, and the first one takes the focus.
+      if (error.code === "gui_invalid_field" && error.data?.issues?.length) {
+        setRaw({ issues: error.data.issues, can_save: false });
+        showConfigRefused();
+        return;
+      }
       if (error.code === "gui_invalid_field" && error.data?.fields?.length) {
         showIssues(error.data.fields);
         return;
@@ -191,7 +233,7 @@ function Form({ detail, groups, update, reload, guard }: Omit<DetailProps, "prof
       }
       toast(errorText(t, error.code, error.message), { tone: "error" });
     },
-    [reload, showIssues, t, toast],
+    [reload, showConfigRefused, showIssues, t, toast],
   );
 
   const save = useCallback(async (): Promise<boolean> => {
@@ -208,6 +250,16 @@ function Form({ detail, groups, update, reload, guard }: Omit<DetailProps, "prof
     writing.current = true;
     setBusy(true);
     try {
+      // The text is checked again right before it is sent, whatever the last check said (Rust checks it once more): a
+      // refusal puts the list on the screen and the focus on its first line, and nothing is written.
+      if (patch.openvpn_config !== undefined) {
+        const check = await validateRaw(base.id, patch.openvpn_config);
+        setRaw(check);
+        if (!check.can_save) {
+          showConfigRefused();
+          return false;
+        }
+      }
       const next = await update(base.id, patch, base.modified);
       rebase(next);
       toast(t("profile.saved"), { tone: "ok" });
@@ -220,7 +272,7 @@ function Form({ detail, groups, update, reload, guard }: Omit<DetailProps, "prof
       writing.current = false;
       setBusy(false);
     }
-  }, [base, draft, fail, rebase, reload, showIssues, t, toast, update]);
+  }, [base, draft, fail, rebase, reload, showConfigRefused, showIssues, t, toast, update, validateRaw]);
 
   // A switch and the star write at once. The control shows the new value while the write goes; if it fails it goes back.
   const writeNow = useCallback(
@@ -251,6 +303,7 @@ function Form({ detail, groups, update, reload, guard }: Omit<DetailProps, "prof
   const discard = useCallback(() => {
     setDraft(toDraft(latest.current.base));
     setErrors({});
+    setRaw(null);
   }, []);
   const focusError = useCallback(() => setFocus((was) => was && { ...was, turn: was.turn + 1 }), []);
   useEffect(() => {
@@ -302,7 +355,7 @@ function Form({ detail, groups, update, reload, guard }: Omit<DetailProps, "prof
           general: <General {...props} />,
           auth: <Authentication {...props} />,
           network: <Network {...props} />,
-          config: <p className="detail-later">{t("pane.arrives_later")}</p>,
+          config: <Configuration {...props} issues={raw?.issues ?? []} />,
           log: <p className="detail-later">{t("pane.arrives_later")}</p>,
         }}
         below={<SaveBar dirty={dirty} busy={busy} onSave={afterBar(save)} onCancel={afterBar(discard)} />}
@@ -315,9 +368,9 @@ function Form({ detail, groups, update, reload, guard }: Omit<DetailProps, "prof
  * The profile that is chosen. The header is drawn from the row of the list, which is already there; the form waits for
  * the detail and is remade for every profile (a draft belongs to one profile).
  */
-export function ProfileDetail({ profile, detail, detailError, groups, update, reload, guard }: DetailProps) {
+export function ProfileDetail({ profile, detail, detailError, groups, update, validateRaw, reload, guard }: DetailProps) {
   const t = useT();
-  if (detail) return <Form key={detail.id} detail={detail} groups={groups} update={update} reload={reload} guard={guard} />;
+  if (detail) return <Form key={detail.id} detail={detail} groups={groups} update={update} validateRaw={validateRaw} reload={reload} guard={guard} />;
   const waiting = detailError ? (
     <InlineAlert tone="error" toneLabel={t("alert.error")}>{errorText(t, detailError.code, detailError.message)}</InlineAlert>
   ) : (
@@ -338,7 +391,7 @@ function WaitingFrame({ profile, waiting }: { profile: ProfileSummary; waiting: 
       profile={profile}
       tab={tab}
       onTab={setTab}
-      panels={{ general: waiting, auth: waiting, network: waiting, config: <p className="detail-later">{t("pane.arrives_later")}</p>, log: <p className="detail-later">{t("pane.arrives_later")}</p> }}
+      panels={{ general: waiting, auth: waiting, network: waiting, config: waiting, log: <p className="detail-later">{t("pane.arrives_later")}</p> }}
     />
   );
 }

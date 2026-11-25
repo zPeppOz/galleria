@@ -31,3 +31,15 @@ export function issueText(t: Translate, field: string, code: string): string {
 export function peerLabel(t: Translate, peers: number, single: "field.endpoint" | "field.public_key" | "field.allowed_ips" | "field.keepalive", many: "field.peer_endpoint" | "field.peer_public_key" | "field.peer_allowed_ips" | "field.peer_keepalive", index: number): string {
   return peers > 1 ? t(many, { n: index + 1 }) : t(single);
 }
+
+/**
+ * The name of a secret of the archive in words («private key», «shared key of peer 2»); a name it does not know is shown
+ * as it is. With one peer the shared key is not numbered.
+ */
+export function secretLabel(t: Translate, ref: string, peers: number): string {
+  const key = `secret.${ref}`;
+  if (hasKey(key)) return t(key);
+  const peer = /^wireguard\.peer\.(\d+)\.preshared_key$/.exec(ref);
+  if (!peer) return ref;
+  return peers > 1 ? t("secret.wireguard.preshared_peer", { n: Number(peer[1]) + 1 }) : t("secret.wireguard.preshared");
+}

@@ -1,0 +1,11 @@
+/* The tab «Configuration»: the text is wider than the other forms, and the list of problems sits right under it. */
+.config-form { display: flex; flex-direction: column; gap: var(--sp-5); max-width: 760px; }
+.config-issues { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--sp-2); }
+.config-issue {
+  width: 100%; padding: var(--sp-3) var(--sp-5); border: 1px solid var(--err); border-radius: var(--r-sm);
+  background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-md); text-align: left; cursor: pointer;
+}
+.config-issue:hover { background: var(--panel-2); }
+.config-issue-warning { border-color: var(--line-strong); }
+.config-issue-text { margin: 0; padding: var(--sp-3) var(--sp-5); border: 1px solid var(--line-strong); border-radius: var(--r-sm); font-size: var(--fs-md); }
+.config-secrets { margin: 0; font-size: var(--fs-sm); color: var(--muted); }

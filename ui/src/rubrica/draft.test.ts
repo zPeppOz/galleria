@@ -82,11 +82,29 @@ describe("draft", () => {
       "name", "group", "notes", "peers.0.endpoint", "peers.1.endpoint",
       "peers.0.public_key", "peers.1.public_key",
       "addresses", "dns", "search_domains", "mtu", "peers.0.allowed_ips", "peers.0.persistent_keepalive", "peers.1.allowed_ips", "peers.1.persistent_keepalive",
+      "openvpn_config",
     ]);
     expect(fieldTab("name")).toBe("general");
     expect(fieldTab("peers.3.endpoint")).toBe("general");
     expect(fieldTab("peers.0.public_key")).toBe("auth");
     expect(fieldTab("mtu")).toBe("network");
     expect(fieldTab("peers.1.allowed_ips")).toBe("network");
+    expect(fieldTab("openvpn_config")).toBe("config");
+  });
+
+  it("the_text_of_an_openvpn_profile_goes_as_typed_and_is_not_tidied", () => {
+    const detail = makeDetail(OFFICE);
+    const draft = toDraft(detail);
+    expect(draft.config).toBe(detail.openvpn!.config);
+    expect(build(draft, detail)).toEqual({ patch: {}, issues: [] });
+    draft.config = `# mine\n${detail.openvpn!.config}\n\n   \n`;
+    expect(isDirty(draft, detail)).toBe(true);
+    expect(build(draft, detail)).toEqual({ patch: { openvpn_config: `# mine\n${detail.openvpn!.config}\n\n   \n` }, issues: [] });
+  });
+
+  it("a_wireguard_profile_has_no_text_to_edit", () => {
+    const detail = wireguard();
+    expect(toDraft(detail).config).toBeNull();
+    expect(build(toDraft(detail), detail).patch.openvpn_config).toBeUndefined();
   });
 });

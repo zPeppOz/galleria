@@ -3,7 +3,7 @@
 use crate::{
     edit::ProfilePatch,
     error::CmdError,
-    rubrica::{ProfileDetail, Rubrica, RubricaError, RubricaView},
+    rubrica::{ProfileDetail, RawCheck, Rubrica, RubricaError, RubricaView},
 };
 use galleria_profile::StoreError;
 use serde_json::json;
@@ -30,6 +30,14 @@ impl From<RubricaError> for CmdError {
             RubricaError::Invalid(fields) => {
                 ("gui_invalid_field", Some(json!({ "fields": fields })))
             }
+            // The same code and the same `fields` as any refused field, plus the list the editor shows. Never the text.
+            RubricaError::InvalidConfig(issues) => (
+                "gui_invalid_field",
+                Some(json!({
+                    "fields": [{ "field": "openvpn_config", "code": "config_issues" }],
+                    "issues": issues,
+                })),
+            ),
             RubricaError::GroupInvalid(reason) => {
                 ("gui_group_invalid", Some(json!({ "reason": reason })))
             }
@@ -87,4 +95,15 @@ pub fn profile_update(
     patch: ProfilePatch,
 ) -> Result<ProfileDetail, CmdError> {
     Ok(rubrica.update(id, &expected_modified, patch)?)
+}
+
+/// What is wrong with the text the editor holds for an OpenVPN profile, line by line, and whether it can be saved. Writes
+/// nothing, and the findings carry names of directives, never the text (the save checks again by itself).
+#[tauri::command(async)]
+pub fn profile_validate_raw(
+    rubrica: State<'_, Arc<Rubrica>>,
+    id: Uuid,
+    text: String,
+) -> Result<RawCheck, CmdError> {
+    Ok(rubrica.validate_raw(id, &text)?)
 }

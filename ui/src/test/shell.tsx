@@ -6,7 +6,7 @@ import type { Announce } from "../design/Toast";
 import { Preferences } from "../prefs";
 import { arrange } from "../rubrica/arrange";
 import type { Rubrica } from "../rubrica/store";
-import type { CmdError, GroupActions, ProfileDetail, ProfilePatch, RubricaView } from "../rubrica/types";
+import type { CmdError, GroupActions, ProfileDetail, ProfilePatch, RawCheck, RubricaView } from "../rubrica/types";
 import { Shell } from "../shell/Shell";
 import { applyPatch, makeDetail, makeInfo, makeRubricaView, makeView } from "./fixtures";
 
@@ -21,6 +21,8 @@ interface Options {
   sort?: SortOrder;
   /** The answer to a write of the window; by default the detail with the patch on it. A test makes it reject to see a refusal. */
   update?: (id: string, patch: ProfilePatch, expectedModified: string) => Promise<ProfileDetail>;
+  /** The answer of the check of the raw text; by default the text is clean. */
+  validateRaw?: (id: string, text: string) => Promise<RawCheck>;
   /** The group commands; by default they work on the list and the profiles the harness keeps, as the backend would. */
   groups?: GroupActions;
 }
@@ -55,6 +57,7 @@ function Harness({ view, options }: { view: DaemonView | null; options: Options 
     detailError: null,
     reload: async () => undefined,
     update: options.update ?? (async (id, patch) => applyPatch(makeDetail(list?.profiles.find((p) => p.id === id) ?? selected!), patch)),
+    validateRaw: options.validateRaw ?? (async () => ({ issues: [], can_save: true })),
     groups: options.groups ?? groupActions,
   };
   return (

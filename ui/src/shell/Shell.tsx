@@ -115,7 +115,7 @@ export function Shell(props: {
             <ServiceArea view={view} info={info} onRetry={onRetry} />
             <RubricaNotices rubrica={rubrica} />
             {selected ? (
-              <ProfileDetail profile={selected} detail={rubrica.detail} detailError={rubrica.detailError} groups={rubrica.view?.groups ?? []} update={rubrica.update} reload={rubrica.reload} guard={guard} />
+              <ProfileDetail profile={selected} detail={rubrica.detail} detailError={rubrica.detailError} groups={rubrica.view?.groups ?? []} update={rubrica.update} validateRaw={rubrica.validateRaw} reload={rubrica.reload} guard={guard} />
             ) : null}
           </main>
         </div>

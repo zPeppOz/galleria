@@ -8,7 +8,7 @@ import { checkLabel, checkWireguard, NAME_MAX } from "./validate";
  */
 export interface PeerDraft { public_key: string; endpoint: string; allowed_ips: string; persistent_keepalive: string }
 export interface WireGuardDraft { addresses: string; dns: string; search_domains: string; mtu: string; peers: PeerDraft[] }
-export interface Draft { name: string; group: string; notes: string; wireguard: WireGuardDraft | null }
+export interface Draft { name: string; group: string; notes: string; wireguard: WireGuardDraft | null; /** The text of an OpenVPN profile as the editor has it; null for a WireGuard one. */ config: string | null }
 
 const join = (items: string[]) => items.join(", ");
 const split = (text: string) => text.split(/[\s,]+/).filter((item) => item !== "");
@@ -22,6 +22,7 @@ export function toDraft(detail: ProfileDetail): Draft {
     name: detail.name,
     group: detail.group ?? "",
     notes: detail.notes,
+    config: detail.openvpn?.config ?? null,
     wireguard: wg && {
       addresses: join(wg.addresses),
       dns: join(wg.dns),
@@ -60,6 +61,8 @@ export function build(draft: Draft, base: ProfileDetail): { patch: ProfilePatch;
   }
   if (draft.group !== before.group) patch.group = draft.group === "" ? null : draft.group;
   if (draft.notes !== before.notes) patch.notes = draft.notes;
+  // The text goes as it is typed: no trimming, no tidying. What is checked is checked by the editor and again by Rust.
+  if (draft.config !== null && draft.config !== before.config) patch.openvpn_config = draft.config;
   if (draft.wireguard && JSON.stringify(draft.wireguard) !== JSON.stringify(before.wireguard)) {
     const view = toView(draft.wireguard);
     const found = checkWireguard(view);
@@ -73,14 +76,15 @@ export function build(draft: Draft, base: ProfileDetail): { patch: ProfilePatch;
 export function fieldOrder(peers: number): string[] {
   const each = (name: string) => Array.from({ length: peers }, (_, i) => `peers.${i}.${name}`);
   const network = Array.from({ length: peers }, (_, i) => [`peers.${i}.allowed_ips`, `peers.${i}.persistent_keepalive`]).flat();
-  return ["name", "group", "notes", ...each("endpoint"), ...each("public_key"), "addresses", "dns", "search_domains", "mtu", ...network];
+  return ["name", "group", "notes", ...each("endpoint"), ...each("public_key"), "addresses", "dns", "search_domains", "mtu", ...network, "openvpn_config"];
 }
 
-export type DetailTab = "general" | "auth" | "network";
+export type DetailTab = "general" | "auth" | "network" | "config";
 
-/** The tab a field is in (D26): the endpoint of a peer is in General, its key in Authentication, the rest in Network. */
+/** The tab a field is in (D26): the endpoint of a peer is in General, its key in Authentication, the text in Configuration, the rest in Network. */
 export function fieldTab(field: string): DetailTab {
   if (field === "name" || field === "group" || field === "notes" || field.endsWith(".endpoint")) return "general";
   if (field.endsWith(".public_key")) return "auth";
+  if (field === "openvpn_config") return "config";
   return "network";
 }

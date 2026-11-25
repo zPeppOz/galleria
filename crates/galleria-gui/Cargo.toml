@@ -15,9 +15,8 @@ custom-protocol = ["tauri/custom-protocol"]
 anyhow.workspace = true
 base64.workspace = true
 galleria-ipc = { workspace = true, features = ["client"] }
-# The rubrica reads the same store as the CLI (plan B3). The parser of the OpenVPN text is the one the profile crate
-# already uses; neither is a backend and neither reaches the daemon.
-galleria-ovpn = { path = "../galleria-ovpn" }
+# The rubrica reads the same store as the CLI (plan B3); it is not a backend and it does not reach the daemon. The parser
+# of the OpenVPN text comes through it (`galleria_profile::openvpn_text`): this crate does not name `galleria-ovpn`.
 galleria-profile = { path = "../galleria-profile" }
 ipnet.workspace = true
 nix.workspace = true
@@ -44,6 +43,8 @@ tauri-build = { version = "2.7", features = [] }
 galleria-backend = { workspace = true, features = ["fake"] }
 # Only to prove that what the window accepts for a WireGuard profile is what the daemon accepts (plan B3, P8).
 galleria-backend-wireguard = { path = "../galleria-backend-wireguard" }
+# The same for the text of an OpenVPN profile (T7): what the editor saves is what the daemon validator accepts (S24).
+galleria-backend-openvpn = { path = "../galleria-backend-openvpn" }
 galleriad = { path = "../galleriad" }
 rstest.workspace = true
 tauri = { version = "2.12", features = ["test"] }

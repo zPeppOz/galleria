@@ -18,6 +18,7 @@ const ALLOWED: &[&str] = &[
     "allow-profiles-list",
     "allow-profile-get",
     "allow-profile-update",
+    "allow-profile-validate-raw",
     "allow-group-create",
     "allow-group-rename",
     "allow-group-delete",

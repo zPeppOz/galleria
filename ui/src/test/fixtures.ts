@@ -89,6 +89,7 @@ export function makeDetail(summary: ProfileSummary): ProfileDetail {
         auth: { certificate: true, user_pass: false, otp: false },
       },
       wireguard: null,
+      wireguard_config: null,
     };
   }
   return {
@@ -101,17 +102,20 @@ export function makeDetail(summary: ProfileSummary): ProfileDetail {
       mtu: null,
       peers: [{ public_key: "PUBLIC", endpoint: summary.server, allowed_ips: ["0.0.0.0/0"], persistent_keepalive: 25 }],
     },
+    // what `render_wireguard` gives without the keys
+    wireguard_config: `[Interface]\nAddress = 10.8.0.2/32\n\n[Peer]\nPublicKey = PUBLIC\nEndpoint = ${summary.server}\nAllowedIPs = 0.0.0.0/0\nPersistentKeepalive = 25\n`,
   };
 }
 
 /** What the backend answers to an update: the detail with the patch on it and a new time of modification. */
 export function applyPatch(detail: ProfileDetail, patch: ProfilePatch): ProfileDetail {
-  const { group, wireguard, ...rest } = patch;
+  const { group, wireguard, openvpn_config, ...rest } = patch;
   return {
     ...detail,
     ...rest,
     group: group === undefined ? detail.group : group,
     wireguard: wireguard ?? detail.wireguard,
+    openvpn: openvpn_config !== undefined && detail.openvpn ? { ...detail.openvpn, config: openvpn_config } : detail.openvpn,
     modified: `${detail.modified}+`,
   };
 }

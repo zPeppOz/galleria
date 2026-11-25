@@ -7,7 +7,7 @@
 //! daemon stays the authority when the connection is made.
 
 use base64::{Engine, engine::general_purpose::STANDARD};
-use galleria_profile::{Profile, Settings, WireGuardProfile};
+use galleria_profile::{OpenVpnProfile, Profile, Settings, WireGuardProfile, check_openvpn_config};
 use ipnet::IpNet;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::net::{IpAddr, SocketAddr};
@@ -51,7 +51,7 @@ pub struct ProfilePatch {
     /// Only for a WireGuard profile, and with the same number of peers: the keys in the archive of the secrets are
     /// indexed by the position of the peer.
     pub wireguard: Option<WireGuardProfile>,
-    /// The text of the editor (T7): refused here.
+    /// The text of the editor, for an OpenVPN profile only: saved as written if nothing in it stops a save (T7, Q32).
     pub openvpn_config: Option<String>,
 }
 
@@ -202,13 +202,22 @@ pub fn apply(profile: &mut Profile, patch: ProfilePatch) -> Vec<FieldIssue> {
             }
         }
     }
-    if patch.openvpn_config.is_some() {
-        let code = if profile.openvpn.is_some() {
-            "not_editable"
-        } else {
-            "wrong_protocol"
-        };
-        issues.push(issue("openvpn_config", code));
+    if let Some(text) = patch.openvpn_config {
+        match &profile.openvpn {
+            None => issues.push(issue("openvpn_config", "wrong_protocol")),
+            // What is in the editor is what is saved, comments and all (Q32): the text is checked, never changed. The
+            // check is the same one the window runs while the text is typed.
+            Some(_) => {
+                if check_openvpn_config(&text)
+                    .iter()
+                    .any(|i| i.kind.blocks_saving())
+                {
+                    issues.push(issue("openvpn_config", "config_issues"));
+                } else {
+                    next.openvpn = Some(OpenVpnProfile { config: text });
+                }
+            }
+        }
     }
     if issues.is_empty() {
         *profile = next;

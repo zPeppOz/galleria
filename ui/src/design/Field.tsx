@@ -15,11 +15,15 @@ export interface FieldProps {
   inputMode?: "numeric";
   /** The `name` of the control: how a form finds the field to put the focus on. */
   name?: string;
+  /** The height of a text area, in lines. */
+  rows?: number;
+  /** Off for text that is not prose (a configuration): the browser underlines nothing. */
+  spellCheck?: boolean;
 }
 
 /** Label, hint and error are linked to the control (`for`, `aria-describedby`, `aria-invalid`). */
 export function Field(props: FieldProps) {
-  const { label, hint, error, mono, readOnly, value, onChange, as = "input", options = [], type = "text", inputMode, name } = props;
+  const { label, hint, error, mono, readOnly, value, onChange, as = "input", options = [], type = "text", inputMode, name, rows = 4, spellCheck } = props;
   const id = useId();
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
@@ -43,7 +47,7 @@ export function Field(props: FieldProps) {
           ))}
         </select>
       ) : as === "textarea" ? (
-        <textarea {...common} value={value} onChange={change} readOnly={readOnly} rows={4} />
+        <textarea {...common} value={value} onChange={change} readOnly={readOnly} rows={rows} spellCheck={spellCheck} />
       ) : (
         <input
           {...common}

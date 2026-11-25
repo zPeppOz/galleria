@@ -2,6 +2,7 @@
 mod import_ovpn;
 mod import_wg;
 mod model;
+mod raw;
 mod secrets;
 mod settings;
 mod store;
@@ -12,9 +13,15 @@ use galleria_ipc::{
 pub use import_ovpn::*;
 pub use import_wg::*;
 pub use model::*;
+pub use raw::*;
 pub use secrets::*;
 pub use settings::*;
 pub use store::*;
+/// The parser of the OpenVPN text, for the window to read the remotes of a configuration with the same rules as the
+/// import, without a dependency of its own on `galleria-ovpn`.
+pub mod openvpn_text {
+    pub use galleria_ovpn::{Item, ParseError, parse};
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WarningKind {
     Dangerous,

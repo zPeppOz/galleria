@@ -394,6 +394,48 @@ describe("the shell in the real window", () => {
     await waitFor(second, async () => (await listGroups(second)).join() === "Lavoro,Personale,Clienti VIP,Famiglia", "the groups did not come back after the restart");
   });
 
+  // T7 (Q32, R1): the editor of the raw text refuses what the phase 1 refuses, in the real window, and writes nothing. A
+  // script directive typed under the last line is listed with its line, the focus goes to the list, the file does not change.
+  it("a_script_directive_cannot_be_saved_from_the_editor", async () => {
+    const dir = join(env("XDG_CONFIG_HOME"), "galleria", "profiles");
+    const onDisk = () => readdirSync(dir).sort().map((name) => readFileSync(join(dir, name), "utf8")).join("\n---\n");
+    const b = await openShell();
+    await waitFor(b, async () => (await b.$$('[role="listbox"] [role="option"]')).length === 5, "the list never showed the five profiles");
+    const before = onDisk();
+    await (await byText(b, "[role=tab]", "Configuration")).click();
+    const area = await b.$('textarea[name="openvpn_config"]');
+    await area.waitForDisplayed({ timeout: TEN_SECONDS });
+    await area.click();
+    await press(b, "Control", "End");
+    await press(b, "Enter", ...Array.from("up /tmp/x.sh"));
+    await waitForBody(b, "You have changes that are not saved.", "the save bar never appeared");
+    // the list shows the finding by itself, 400 ms after the last key
+    await waitForBody(b, "Galleria does not run the scripts of profiles.", "the editor never listed the script directive");
+    await b.$("button=Save").click();
+    await waitFor(b, async () => ((await b.execute(() => document.activeElement?.textContent ?? "")) as string).includes("· up ·"), "the focus did not go to the first problem of the list");
+    expect(await bodyText(b)).not.toContain("Profile saved.");
+    expect(onDisk(), "a refused save leaves the files as they were").toBe(before);
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
+  // T7 (S24): what is typed is what is saved, comments and all, and the phase 1 still reads the file.
+  it("a_comment_typed_in_the_editor_is_saved_as_written", async () => {
+    const dir = join(env("XDG_CONFIG_HOME"), "galleria", "profiles");
+    const b = await openShell();
+    await waitFor(b, async () => (await b.$$('[role="listbox"] [role="option"]')).length === 5, "the list never showed the five profiles");
+    await (await byText(b, "[role=tab]", "Configuration")).click();
+    const area = await b.$('textarea[name="openvpn_config"]');
+    await area.waitForDisplayed({ timeout: TEN_SECONDS });
+    await area.click();
+    await press(b, "Control", "Home");
+    // short, with no doubled letter: the driver's key sequence drops a repeated key and some of the spaces
+    await press(b, ...Array.from("# gateway"), "Enter");
+    await b.$("button=Save").click();
+    await waitForBody(b, "Profile saved.", "the notice of the save never showed");
+    await waitFor(b, async () => readdirSync(dir).some((name) => readFileSync(join(dir, name), "utf8").includes("# gateway")), `the comment is not in the file; the office profile holds: ${readdirSync(dir).map((name) => readFileSync(join(dir, name), "utf8")).find((text) => text.includes("Ufficio")) ?? "(no file)"}`);
+    expect(await bodyText(b)).not.toContain("You have changes that are not saved.");
+  });
+
   it("shell_is_navigable_with_the_seeded_rubrica", async () => {
     const b = await openShell();
     expect(await bodyText(b)).not.toContain("Sample data");

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../design/Toast";
 import { I18n } from "../i18n";
-import type { CmdError, ProfileDetail as Detail, ProfilePatch, ProfileSummary } from "../rubrica/types";
+import type { CmdError, ProfileDetail as Detail, ProfilePatch, ProfileSummary, RawCheck } from "../rubrica/types";
 import { expectNoAccessibilityViolations } from "../test/axe";
 import { applyPatch, makeDetail, makeSummary, SAMPLE_PROFILES } from "../test/fixtures";
 import { renderShell } from "../test/shell";
@@ -13,23 +13,25 @@ import { ProfileDetail } from "./ProfileDetail";
 const [OFFICE, DATACENTER, HOMELAB] = SAMPLE_PROFILES;
 
 type Update = (id: string, patch: ProfilePatch, expectedModified: string) => Promise<Detail>;
+type Validate = (id: string, text: string) => Promise<RawCheck>;
 
-/** The form with a backend that answers what a test says (by default: the patch applied) and the calls it received. */
-const setup = (profile: ProfileSummary = OFFICE, detail: Detail | null = makeDetail(profile), detailError: CmdError | null = null, update?: Update) => {
+/** The form with a backend that answers what a test says (by default: the patch applied, the text clean) and the calls it received. */
+const setup = (profile: ProfileSummary = OFFICE, detail: Detail | null = makeDetail(profile), detailError: CmdError | null = null, update?: Update, validate?: Validate) => {
   const send = vi.fn<Update>(update ?? (async (_id, patch) => applyPatch(detail ?? makeDetail(profile), patch)));
+  const check = vi.fn<Validate>(validate ?? (async () => ({ issues: [], can_save: true })));
   const reload = vi.fn(async () => undefined);
   const announce = vi.fn();
   const tree = (current: Detail | null) => (
     <I18n lang="en">
       <ToastProvider closeLabel="Dismiss the notice" announce={announce}>
         <main>
-          <ProfileDetail profile={profile} detail={current} detailError={detailError} groups={["Lavoro", "Personale", "Clienti"]} update={send} reload={reload} />
+          <ProfileDetail profile={profile} detail={current} detailError={detailError} groups={["Lavoro", "Personale", "Clienti"]} update={send} validateRaw={check} reload={reload} />
         </main>
       </ToastProvider>
     </I18n>
   );
   const view = render(tree(detail));
-  return { ...view, send, reload, announce, show: (next: Detail | null) => view.rerender(tree(next)) };
+  return { ...view, send, check, reload, announce, show: (next: Detail | null) => view.rerender(tree(next)) };
 };
 
 const toasts = () => document.querySelector<HTMLElement>(".gx-toasts [role=status]")!;

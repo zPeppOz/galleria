@@ -76,8 +76,8 @@ verdi dopo il fix. Nessuna modifica di sysctl sull'host.
 | S11 | Locale, T14: tabella delle fonti sotto; tunnel IPv6 funzionante, nessuna perdita fisica. |
 | S12 | Locale, T13: auth-nocache, reneg-sec 10, soft reset osservato in 25 s, credenziali risposte senza needs_input. |
 | S13 | Locale, T13: stesso pid/session con SIGUSR1, cleanup e riapplicazione; ping-restart fallito passa a nuovo processo e richiede un nuovo OTP. Corretto il rilascio del nuovo management-hold. |
-| S14 | **Aperto**: DCO non provato, job mai eseguito; checklist VM sotto. |
-| S15 | **Aperto**: NetworkManager/resolved su desktop reale; checklist sotto. |
+| S14 | **Chiuso** (25/11) su VM Ubuntu 26.04 (kernel 7.0.0-43, OpenVPN 2.7.0) e Fedora 45 (kernel 7.2.11, OpenVPN 2.7.9): `DCO device glr-ovpn0 opened`, `connected`, il tun è di tipo `ovpn` e il contatore di byte sale con 200 ping da 1000 byte e 20 richieste HTTP; `ovpn_dco_state_and_bytecount` verde, non saltato. Dettaglio in §6.1. |
+| S15 | **Chiuso** (25/11) su VM Ubuntu e Fedora con GNOME, NetworkManager e systemd-resolved veri: `glr-wg0` e `glr-ovpn0` non gestite, DNS applicati prima di `connected` e ripristinati, T9/T14 e kill -9 con riavvio verdi. Trovato e corretto un difetto di `install.sh` (nessun reload di NetworkManager). Dettaglio in §6.1. |
 | S16 | **Aperto**: concat 2.7 solo unitario, static challenge SCRV1 provato dal vivo. |
 
 ### Fonti S11 al momento di up
@@ -119,6 +119,100 @@ Su una VM Ubuntu desktop e su una VM Fedora desktop, dopo autorizzazione separat
 - Provare kill -9 del demone e riavvio: nessun residuo di DNS, regole, rotte o cartelle prima di hello.
 - S14: installare il modulo DCO appropriato solo nella VM autorizzata, verificare DCO effettivamente aperto,
   connected e bytecount durante traffico; ripetere disconnessione e cleanup. Non contare un test saltato come verde DCO.
+
+### 6.1 Esito delle prove su VM desktop (25/11)
+
+**Le VM.** Qemu diretto con KVM e UEFI in `qemu:///session`-equivalente (rete utente, SSH su 127.0.0.1:2201 e :2202),
+4 GB di RAM, 4 vCPU, disco qcow2 da 30 GB. Tutto in `/mnt/b/vm` (`disks/ubuntu.qcow2`, `disks/fedora.qcow2`; `images/`; script
+`vmctl.sh`). Immagini ufficiali: `ubuntu-26.04-server-cloudimg-amd64.img` (`SHA256SUMS` verificato e firma GPG «UEC Image
+Automatic Signing Key» buona) e `Fedora-Cloud-Base-Generic-45-1.4.x86_64.qcow2` (`CHECKSUM` verificato, firma della chiave
+Fedora 45 buona). Installazione non presidiata con cloud-init (`lab/vm/*-user-data.tmpl`): utente `lab` solo con chiave SSH,
+nessuna password. Il desktop è installato sopra l'immagine cloud, non da ISO live: `ubuntu-desktop-minimal` +
+`gnome-shell-extension-appindicator` con renderer netplan NetworkManager, oppure il gruppo `workstation-product-environment`
++ `gnome-shell-extension-appindicator` su Fedora (che per `os-release` resta «Cloud Edition»). Verificato nella sessione di `lab`
+(autologin GDM): GNOME Shell 50.1 su Ubuntu e 51.1 su Fedora, sessione Wayland, estensione AppIndicator attiva
+(`ubuntu-appindicators@ubuntu.com`, `appindicatorsupport@rgcjonas.gmail.com`), NetworkManager 1.54.3 / 1.58.1, systemd-resolved
+in modalità stub (systemd 259 / 262). Fedora ha SELinux enforcing e firewalld attivi.
+
+**Il laboratorio nella VM** (`lab/vm/README.md`). Binari e test compilati sull'host nel container `glab-build` (glibc 2.39) e
+copiati in `/lab`; il prodotto è installato con `packaging/linux/install.sh`. I server `glab-*` girano in Docker dentro la VM; `eth0`
+è un veth sul bridge dei server, gestito da NetworkManager (`glab-eth0`, gateway la `glab-target`, metrica 50), come l'`eth0` del client
+Docker. Differenze dichiarate: `/.dockerenv` creato (la guardia `assert_lab`); `binfmt_units_are_masked` saltato (controlla le immagini
+del laboratorio, non il prodotto); `pgrep`/`pkill` di `lab/vm/shims` nascondono gli `openvpn` dei container server, che qui
+condividono `/proc`; `residue()` ignora `expires Nsec` delle rotte RA (commit `abc6a39`).
+
+**Suite e2e completa** (`vm-lab.sh run ""`, 7 binari, 79 test, nessun test del prodotto cambiato):
+
+| VM | t07 | t08 | t09 | t12 | t13 | t14 | t16 | Esito |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Fedora 45 (modulo `ovpn` non caricato) | 8 | 8 | 11 | 16 | 13 | 9 | 14 | 79/79, uscita 0 |
+| Ubuntu 26.04 (corsa finale pulita: modulo `ovpn` caricato e `GALLERIA_E2E_DCO=1`, quindi t12 esegue anche il DCO) | 8 | 8 | 11 | 16 | 13 | 9 | 14 | 79/79, uscita 0 |
+
+Prime corse rosse, tutte per il modo in cui avevo montato il laboratorio, non per il prodotto: rotte /32 al posto del default
+via target (t09), `pgrep -xo openvpn` che trovava i server (t12/t13), `util-linux-script` assente su Fedora (t16), un archivio
+del client lasciato da me in `/var/tmp` (t12 `ovpn_cmdline_and_disk_have_no_secrets`, Ubuntu). Il binario `ipc-probe` e il resto non hanno
+richiesto altro.
+
+**S15, a mano** (`lab/vm/s15-check.sh`, evidenze integrali in `/mnt/b/vm/evidence/s15-*.txt`):
+
+```
+$ nmcli device            # con glr-wg0 connesso, poi con glr-ovpn0 connesso (Ubuntu e Fedora)
+glr-wg0     wireguard  unmanaged  --
+glr-ovpn0   ovpn       unmanaged  --
+$ nmcli -t -f NAME connection show | grep -c glr-      ->  0
+$ nmcli device show eth0 | grep GENERAL.STATE          ->  100 (connected)   # la connessione fisica non cambia
+```
+
+DNS prima di `connected` (campionamento ogni ~50 ms durante `galleria connect`, identico su Ubuntu e Fedora):
+
+```
+state=disconnected dns=[]
+state=connecting   dns=[]
+state=connecting   dns=[10.8.0.1]      <- applicato prima di connected
+state=connected    dns=[10.8.0.1]
+$ resolvectl domain glr-ovpn0  ->  galleria.test ~.
+$ resolvectl query intranet.galleria.test  ->  10.8.0.1 -- link: glr-ovpn0
+```
+
+Dopo `disconnect` (WireGuard e OpenVPN) `ip -br link`, `ip route`, `ip -6 route`, `ip rule`, `ip -6 rule`, `resolvectl dns/domain`
+sono identici a prima (`diff` vuoto) e `nmcli device` non mostra più righe `glr-`. Le catture IPv6 e il ripiego IPv4 di T9 e T14 sono i test
+verdi qui sopra: `control_*_leaks_ipv6` vede pacchetti IPv6 globali su `eth0`, i casi con blocco ne contano 0, il ripiego dà
+`sequential_client_falls_back_to_ipv4_under_2s`. kill -9 e riavvio (`/mnt/b/vm/evidence/kill9-*.txt`, entrambe le VM): kill -9 di
+`galleriad` con OpenVPN connesso, poi con WireGuard connesso; systemd lo riavvia, stato `disconnected`, 0 interfacce `glr-`, 0
+`openvpn` del client, 0 righe resolvectl `glr-`, regole di routing solo le tre/due di sistema; stessa cosa dopo `reboot` della VM.
+
+**Difetto trovato e corretto (S15).** Su Fedora, dopo `install.sh` su un NetworkManager già in esecuzione, `glr-wg0` risultava
+`connected (externally)`, gestito (`GENERAL.NM-MANAGED: yes`) e con un profilo NetworkManager `glr-wg0`: `90-galleria.conf` viene letto
+solo all'avvio di NetworkManager. Su Ubuntu non si vedeva solo perché la VM era già stata riavviata. Prova: `nmcli general reload conf`
+risolve; `install.sh` ora esegue `systemctl reload NetworkManager` se il servizio è attivo (commit di questo ramo). Verificato su Fedora
+partendo da un NetworkManager senza regola: prima `glr-wg0 connected (externally)`, dopo `install.sh` senza riavvio `glr-wg0 unmanaged`
+e 0 profili. `glr-ovpn0` (tipo `ovpn`, DCO) non è mai stato gestito da NetworkManager.
+
+**S14, a mano** (`lab/vm/s14-check.sh`, `/mnt/b/vm/evidence/s14-*.txt`), modulo `ovpn` del kernel (`modprobe ovpn`):
+
+```
+Ubuntu: kernel 7.0.0-43-generic, OpenVPN 2.7.0 [DCO], .../kernel/drivers/net/ovpn/ovpn.ko.zst
+Fedora: kernel 7.2.11-300.fc45, OpenVPN 2.7.9 [DCO], .../kernel/drivers/net/ovpn/ovpn.ko.xz  (serve kernel-modules-extra)
+$ galleria connect base ...                 -> connected
+$ ip -d link show glr-ovpn0                 -> "ovpn addrgenmode random ..."    (tipo ovpn, non tun)
+$ ip -s link show glr-ovpn0                 -> RX 0 byte / TX 0 byte prima del traffico
+  200 ping da 1000 byte verso 10.8.0.1 (200/200 ricevuti) + 20 richieste HTTP a 198.51.100.1 (via glr-ovpn0)
+$ ip -s link show glr-ovpn0                 -> RX 213200 byte, 300 pacchetti / TX 258320 byte, 300 pacchetti
+$ galleria status --json                    -> stats {rx_bytes: 212794, tx_bytes: 213879} su Ubuntu, {180184, 181265} su Fedora
+log del demone: net_iface_new: add glr-ovpn0 type ovpn / DCO device glr-ovpn0 opened / ovpn-dco device [glr-ovpn0] opened
+dopo disconnect: 0 interfacce glr-, nessuna regola o riga resolvectl residua
+```
+
+`GALLERIA_E2E_DCO=1 vm-lab.sh run dco` → `ovpn_dco_state_and_bytecount ... ok` su entrambe (non saltato: il test controlla la riga
+«DCO device … opened» nei log del demone).
+
+**Dove sono le VM.** Spente, su disco: `/mnt/b/vm/disks/ubuntu.qcow2` e `/mnt/b/vm/disks/fedora.qcow2` (30 GB virtuali ciascuno), con
+`/mnt/b/vm/ovmf/*.VARS.fd`, `/mnt/b/vm/seeds/`, chiave SSH `/mnt/b/vm/ssh/id_vm` (utente `lab`, nessuna password), `/mnt/b/vm/vmctl.sh
+start|stop|ssh <ubuntu|fedora>`. Dopo l'accensione serve `sudo bash /lab/lab/vm/vm-lab.sh up 27` (Ubuntu) o `up 79` (Fedora) per i server di
+laboratorio; sono pronte per la fase 2 (G10 e la prova manuale della tray, con la sessione GNOME in autologin).
+
+Limiti: le VM sono desktop costruiti su immagini cloud, non l'ISO Workstation/desktop con installatore; il laboratorio gira nella VM (client e
+server sullo stesso kernel), non su due macchine; la tray non è stata provata (fase 2).
 
 ## 7. Questioni per Peppe
 

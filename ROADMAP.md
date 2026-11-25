@@ -69,11 +69,12 @@ Decidere cosa costruire e provare su Linux e Windows i punti tecnici più rischi
   - [x] con l'ok di Peppe: `spike/windows` e la catena `aitano/galleria-fase1-*` sono entrati in `main` con un fast-forward a `e4a2d71`
   - [x] `docs/06-esito-fase1.md` §7 corretto: la parte Linux di D15 è già allineata da `556b89e`
   - [x] branch locali superati eliminati; il doppione `aitano/galleria-fase1-t6-fix` non è entrato in `main` e resta da solo
-- [ ] Prove su desktop reale: NetworkManager e DCO (S14, S15)
-  - [ ] VM Ubuntu desktop e Fedora desktop autorizzate a parte; binari installati con `packaging/linux/install.sh`
-  - [ ] `nmcli device` mostra `glr-wg0` e `glr-ovpn0` non gestite; DNS interni applicati prima di connected e ripristinati dopo
-  - [ ] catture IPv6 e ripiego IPv4 di T9 e T14 ripetute; nessun residuo dopo `kill -9` e riavvio
-  - [ ] DCO aperto davvero, connected e bytecount con traffico (un test saltato non conta)
+- [x] Prove su desktop reale: NetworkManager e DCO (S14, S15) <!-- branch: galleria/t_4a5ce3ed-galleria-vm-desktop-ubuntu-e-fedora-su-m · by: genny -->
+  - [x] VM Ubuntu 26.04 e Fedora 45 desktop (GNOME, NetworkManager, AppIndicator) in `/mnt/b/vm`, spente su disco; binari installati con `packaging/linux/install.sh`
+  - [x] `nmcli device` mostra `glr-wg0` e `glr-ovpn0` non gestite; DNS interni applicati prima di connected e ripristinati dopo
+  - [x] catture IPv6 e ripiego IPv4 di T9 e T14 ripetute (suite e2e 79/79 su Fedora e Ubuntu); nessun residuo dopo `kill -9` e riavvio
+  - [x] DCO aperto davvero, connected e bytecount con traffico (`ovpn_dco_state_and_bytecount` non saltato, `ip -d link` tipo `ovpn`)
+  - [x] difetto trovato: `install.sh` non ricaricava NetworkManager, `glr-wg0` restava gestito fino al riavvio; corretto
 - [x] Risposte alle questioni aperte della spec di fase 1 <!-- branch: galleria/t_e8440dfb-galleria-applica-d19-d32-spec-della-fase · task: t_e8440dfb · by: nello -->
   - [x] D19–D32 proposte in `docs/07-proposte-fase2.md`, approvate da Aitano su delega di Peppe il 2026-11-25
   - [x] Q5: script del profilo mai eseguiti, nemmeno con conferma (D19), con il mockup allineato

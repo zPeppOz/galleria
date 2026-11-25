@@ -5,6 +5,7 @@ import { I18n, type Lang } from "../i18n";
 import en from "../i18n/en.json";
 import it_ from "../i18n/it.json";
 import { makeStatus, makeView } from "../test/fixtures";
+import { expectNoAccessibilityViolations } from "../test/axe";
 import { StatusView } from "./StatusView";
 
 const catalogues = { en, it: it_ } as Record<Lang, Record<string, string>>;
@@ -52,5 +53,24 @@ describe("StatusView", () => {
   it("there_is_no_connect_control", () => {
     show();
     expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("error_and_warnings_are_inline_alerts_with_a_named_icon", () => {
+    show(makeView({ backends: [openvpn("openvpn_not_found"), wireguard], status: makeStatus({ state: "error", error: { code: "auth_failed", message: "x" } }) }));
+    expect(screen.getByRole("alert").textContent).toContain("auth_failed");
+    expect(screen.getByRole("img", { name: "Errore" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Attenzione" })).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toContain("OpenVPN non è installato");
+  });
+
+  it("has_no_accessibility_violations", async () => {
+    const { container } = render(
+      <I18n lang="it">
+        <main>
+          <StatusView view={makeView({ backends: [openvpn("openvpn_not_found"), wireguard], status: makeStatus({ state: "error", error: { code: "auth_failed", message: "x" }, profile: { id: "p", name: "Homelab" }, protocol: "wireguard" }) })} />
+        </main>
+      </I18n>,
+    );
+    await expectNoAccessibilityViolations(container);
   });
 });

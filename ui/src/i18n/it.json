@@ -72,5 +72,10 @@
   "about.daemon": "Versione del servizio",
   "about.daemon.unknown": "non collegato",
   "about.socket": "Socket del servizio",
-  "about.licence": "Licenza"
+  "about.licence": "Licenza",
+  "alert.info": "Informazione",
+  "alert.ok": "Fatto",
+  "alert.warn": "Attenzione",
+  "alert.error": "Errore",
+  "toast.close": "Chiudi l'avviso"
 }

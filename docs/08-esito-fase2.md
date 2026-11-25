@@ -220,3 +220,28 @@ assistiva. Nessun componente contiene un testo visibile: arrivano tutti come pro
 - Verifiche: 155 prove Vitest (T3: 121), tutte verdi; `scripts/gui.sh check` verde. Axe passa su ogni componente in jsdom, il
   contrasto non lo vede (jsdom): resta alla prova sui token (T2). `smoke` e `a11y` non rilanciati dopo T4: i componenti non
   sono ancora nel bundle dell'app.
+
+### Avvisi, conferma e schermate di B1 (T5)
+
+`design/{Toast,InlineAlert,ConfirmDialog}.tsx` con i loro `.css` e prove. Le schermate `FirstRun` e `StatusView` passano ai
+componenti e hanno un `.css` loro accanto (`screens/*.css`): nessun file di `screens/` usa più una classe di `styles.css`, che
+tiene ora solo la cornice di B1 (titolo, contenuto, barra) fino al T6.
+
+- `ToastProvider` tiene **due regioni vive sempre presenti e vuote** (`status` per l'informazione, `alert` per l'errore): un
+  lettore di schermo annuncia solo ciò che si aggiunge a una regione che già conosce. L'avviso non prende mai il fuoco; resta
+  sotto il puntatore o con il fuoco dentro (5 s, 8 s per l'errore, a tempo finto nella prova). Scritto da noi, senza il
+  `Toast` di Base UI: il comportamento che serve è piccolo e si prova per intero in jsdom.
+- `InlineAlert` ha una proprietà in più rispetto al piano, `toneLabel` (la parola del tono: «Errore», «Attenzione»…): è il
+  nome accessibile dell'icona, cioè ciò che impedisce al tono di stare nel solo colore. Testi nuovi nei cataloghi:
+  `alert.info|ok|warn|error`, `toast.close`. Solo l'errore è `alert`.
+- `ConfirmDialog` sta su `AlertDialog` di Base UI (ruolo `alertdialog`, nome dal titolo, descrizione dal testo): con
+  `danger` il fuoco parte da «Annulla» (`initialFocus`), altrimenti dall'azione; `Esc` annulla. I due pulsanti sono `<button>`
+  con le classi di `Button`, perché il fuoco si assegna per riferimento.
+- Stile di finestra e menu: erano già scritti con i soli token (`--r-lg`, `--shadow-lg`, `--line-strong`, `--scrim`; menu
+  `--r-lg` e `--shadow-md`); in T5 resta confermato dall'`a11y` verde e da `css-rules.test.ts`. `ConfirmDialog` usa lo stesso.
+- `FirstRun`: il comando in un blocco a carattere fisso, «Copia» con l'icona, «Riprova» primario; il testo di «protocollo
+  incompatibile» e il promemoria di «permesso negato» stanno in `InlineAlert`. `StatusView`: errore in `InlineAlert` (`alert`),
+  backend non disponibili in un `InlineAlert` di avviso con la stessa lista (la prova di B1 conta ancora un `listitem`).
+  Testi, ruoli e prove di B1 invariati.
+- Verifiche: 185 prove Vitest verdi; mutazione provata (tempo di permanenza e pausa tolti → `toast_leaves_by_itself…` rossa);
+  `scripts/gui.sh smoke` 8/8 (S8: 1,30 per canale), `a11y` 11/11, gate dell'host verdi.

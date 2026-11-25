@@ -53,5 +53,14 @@
   nell'elenco della macro `every_variant!`.
 - `Tabs.Panel` di Base UI ha `tabindex="0"`: dalla lista il Tab va al pannello. Il `Tabs.Indicator` non è ancora provato nella
   finestra vera (T7).
-- Restano T5 (avvisi, conferma, schermate B1 sui componenti), T6 (guscio) e T7 (tastiera, fumo, Orca, esito, roadmap): card
-  successive già create. `styles.css` sparisce al T6.
+- Restano T6 (guscio) e T7 (tastiera, fumo, Orca, esito, roadmap): card successive. `styles.css` sparisce al T6.
+
+## Scelte da sapere (T5)
+
+- `Toast`: due regioni vive (`status`, `alert`) sempre presenti e vuote, scritte da noi (non il `Toast` di Base UI); l'avviso non
+  prende mai il fuoco, resta con il puntatore o il fuoco dentro. `useToast()` dà `(message, {tone})`.
+- `InlineAlert` ha `toneLabel` (obbligatoria): è il nome dell'icona (`role="img"`), così il tono non è solo colore. Chiavi nuove
+  `alert.*` e `toast.close` nei due cataloghi.
+- `ConfirmDialog` è `AlertDialog` di Base UI; i due pulsanti sono `<button class="gx-button …">` perché `initialFocus` vuole un
+  riferimento (`Button` non lo inoltra).
+- `FirstRun` e `StatusView` hanno `screens/*.css` loro; `App.tsx` avvolge tutto in `ToastProvider` (`toast.close`).

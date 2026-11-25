@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import type { DaemonView } from "../daemon/types";
+import { InlineAlert } from "../design/InlineAlert";
 import { errorText, hasKey, useT } from "../i18n";
+import "./StatusView.css";
 
 const PROTOCOL_NAME = { wireguard: "WireGuard", openvpn: "OpenVPN" } as const;
 
@@ -21,10 +23,10 @@ export function StatusView({ view }: { view: DaemonView }) {
   const warnings = view.backends.filter((b) => !b.available);
   const net = status.net;
   return (
-    <section className="panel" aria-labelledby="status-title">
-      <h2 id="status-title">{t("status.heading")}</h2>
-      <p className={`state state-${status.state}`}>{t(`state.${status.state}`)}</p>
-      <dl className="facts">
+    <section className="status-view" aria-labelledby="status-title">
+      <h2 id="status-title" className="status-view-title">{t("status.heading")}</h2>
+      <p className={`status-view-state status-view-state-${status.state}`}>{t(`state.${status.state}`)}</p>
+      <dl className="status-view-facts">
         {status.profile && <Row label={t("status.profile")}>{status.profile.name}</Row>}
         {status.protocol && <Row label={t("status.protocol")}>{PROTOCOL_NAME[status.protocol]}</Row>}
         {status.local_addresses.length > 0 && <Row label={t("status.addresses")}>{status.local_addresses.join(", ")}</Row>}
@@ -34,14 +36,13 @@ export function StatusView({ view }: { view: DaemonView }) {
         {net && net.routes.length > 0 && <Row label={t("status.routes")}>{net.routes.join(", ")}</Row>}
       </dl>
       {status.error && (
-        <p role="alert" className="error">
+        <InlineAlert tone="error" toneLabel={t("alert.error")}>
           {t("status.error", { code: status.error.code, message: errorText(t, status.error.code, status.error.message) })}
-        </p>
+        </InlineAlert>
       )}
       {warnings.length > 0 && (
-        <div>
-          <h3>{t("status.warnings")}</h3>
-          <ul className="warnings">
+        <InlineAlert tone="warn" toneLabel={t("alert.warn")} title={t("status.warnings")}>
+          <ul>
             {warnings.map((b) => {
               const key = `backend.${b.unavailable_reason ?? ""}`;
               return (
@@ -51,7 +52,7 @@ export function StatusView({ view }: { view: DaemonView }) {
               );
             })}
           </ul>
-        </div>
+        </InlineAlert>
       )}
     </section>
   );

@@ -1,0 +1,15 @@
+/* The text is --ink on a tint of the state; the colour of the state goes to the icon and the border only (C7). */
+.gx-alert {
+  display: flex; gap: var(--sp-5); padding: var(--sp-5) var(--sp-6); border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  background: color-mix(in oklch, var(--alert-colour) var(--tint), transparent); color: var(--ink); --alert-colour: var(--muted);
+}
+.gx-alert-info { --alert-colour: var(--wg); border-color: var(--wg); }
+.gx-alert-ok { --alert-colour: var(--ok); border-color: var(--ok); }
+.gx-alert-warn { --alert-colour: var(--warn); border-color: var(--warn); }
+.gx-alert-error { --alert-colour: var(--err); border-color: var(--err); }
+.gx-alert-icon { display: inline-grid; place-items: start; flex: none; margin-top: var(--sp-1); color: var(--alert-colour); }
+.gx-alert-body { min-width: 0; flex: 1; }
+.gx-alert-title { margin: 0 0 var(--sp-1); font-weight: var(--fw-strong); }
+.gx-alert-text { overflow-wrap: anywhere; }
+.gx-alert-text > ul { margin: var(--sp-2) 0 0; padding-left: var(--sp-7); }
+.gx-alert-actions { display: flex; flex-wrap: wrap; gap: var(--sp-4); margin-top: var(--sp-4); }

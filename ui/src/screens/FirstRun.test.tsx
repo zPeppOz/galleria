@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { I18n } from "../i18n";
 import { makeInfo, makeView } from "../test/fixtures";
+import { expectNoAccessibilityViolations } from "../test/axe";
 import { FirstRun } from "./FirstRun";
 
 const show = (view = makeView({ link: "daemon_not_running", status: null }), info = makeInfo(), onRetry = vi.fn()) =>
@@ -48,5 +49,30 @@ describe("FirstRun", () => {
     show(undefined, undefined, onRetry);
     await user.click(screen.getByRole("button", { name: "Riprova" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["connecting", "daemon_not_running", "permission_denied", "incompatible_protocol"] as const)("has_no_accessibility_violations: %s", async (link) => {
+    const view = makeView({ link, status: null, incompatible: link === "incompatible_protocol" ? { daemon_min: 2, daemon_max: 3, daemon_version: "0.2.0" } : null });
+    const { container } = render(
+      <I18n lang="it">
+        <main>
+          <FirstRun view={view} info={makeInfo()} onRetry={vi.fn()} />
+        </main>
+      </I18n>,
+    );
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("relogin_notice_is_a_named_status_and_the_incompatible_one_a_warning", () => {
+    const { unmount } = render(
+      <I18n lang="it">
+        <FirstRun view={makeView({ link: "permission_denied", status: null })} info={makeInfo()} onRetry={vi.fn()} />
+      </I18n>,
+    );
+    expect(screen.getByRole("status").textContent).toContain("esci e rientra nella sessione");
+    expect(screen.getByRole("img", { name: "Informazione" })).toBeTruthy();
+    unmount();
+    show(makeView({ link: "incompatible_protocol", status: null, incompatible: { daemon_min: 2, daemon_max: 3, daemon_version: "0.2.0" } }));
+    expect(screen.getByRole("img", { name: "Attenzione" })).toBeTruthy();
   });
 });

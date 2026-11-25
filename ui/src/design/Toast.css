@@ -1,0 +1,17 @@
+/* Toasts: two live regions, stacked at the bottom centre, above the status bar. Only variables of tokens.css. */
+.gx-toasts {
+  position: fixed; left: 50%; bottom: calc(var(--h-control) + var(--sp-8)); transform: translateX(-50%); z-index: 20;
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); max-width: calc(100vw - var(--sp-8)); pointer-events: none;
+}
+.gx-toasts > div { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); }
+.gx-toast {
+  display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5); pointer-events: auto;
+  background: var(--panel-2); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  box-shadow: var(--shadow-md); font-size: var(--fs-md);
+  animation: gx-toast-in 160ms ease-out;
+}
+.gx-toast-ok .gx-icon { color: var(--ok); }
+.gx-toast-error .gx-icon { color: var(--err); }
+.gx-toast-info .gx-icon { color: var(--muted); }
+.gx-toast-message { overflow-wrap: anywhere; }
+@keyframes gx-toast-in { from { opacity: 0; transform: translateY(var(--sp-4)); } }

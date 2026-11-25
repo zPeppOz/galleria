@@ -1,7 +1,11 @@
 import { useRef } from "react";
 import { joinGroup, START_SERVICE } from "../daemon/commands";
 import type { AppInfo, DaemonView, LinkState } from "../daemon/types";
+import { Button } from "../design/Button";
+import { icons } from "../design/icons";
+import { InlineAlert } from "../design/InlineAlert";
 import { useT } from "../i18n";
+import "./FirstRun.css";
 
 interface Props { view: DaemonView; info: AppInfo; onRetry: () => void }
 
@@ -14,26 +18,30 @@ export function FirstRun({ view, info, onRetry }: Props) {
   copyOf.current = command ?? "";
   const range = view.incompatible;
   return (
-    <section className="panel" aria-labelledby="first-title">
-      <h2 id="first-title">{t(`first.${link}.title`)}</h2>
+    <section className="first-run" aria-labelledby="first-title">
+      <h2 id="first-title" className="first-run-title">{t(`first.${link}.title`)}</h2>
       {link === "incompatible_protocol" ? (
-        <p>{t("first.incompatible_protocol.body", { gui: info.version, daemon: range?.daemon_version ?? "?", min: range?.daemon_min ?? "?", max: range?.daemon_max ?? "?" })}</p>
+        <InlineAlert tone="warn" toneLabel={t("alert.warn")}>
+          {t("first.incompatible_protocol.body", { gui: info.version, daemon: range?.daemon_version ?? "?", min: range?.daemon_min ?? "?", max: range?.daemon_max ?? "?" })}
+        </InlineAlert>
       ) : (
-        <p>{t(`first.${link}.body`)}</p>
+        <p className="first-run-body">{t(`first.${link}.body`)}</p>
       )}
       {command && (
-        <div className="cmd-row">
-          <code className="cmd">{command}</code>
-          <button type="button" className="btn" onClick={() => void navigator.clipboard.writeText(copyOf.current)}>
+        <div className="first-run-command-row">
+          <code className="first-run-command">{command}</code>
+          <Button icon={icons.copy} onClick={() => void navigator.clipboard.writeText(copyOf.current)}>
             {t("first.copy")}
-          </button>
+          </Button>
         </div>
       )}
-      {link === "permission_denied" && <p>{t("first.permission_denied.relogin")}</p>}
+      {link === "permission_denied" && <InlineAlert tone="info" toneLabel={t("alert.info")}>{t("first.permission_denied.relogin")}</InlineAlert>}
       {link !== "connecting" && (
-        <button type="button" className="btn primary" onClick={onRetry}>
-          {t("first.retry")}
-        </button>
+        <div className="first-run-actions">
+          <Button variant="primary" onClick={onRetry}>
+            {t("first.retry")}
+          </Button>
+        </div>
       )}
     </section>
   );

@@ -1,4 +1,5 @@
-/* Dialog and menu. Only variables of tokens.css; the final look is finished in T5. */
+/* Dialog, alert dialog and menu (the look of T5). Only variables of tokens.css.
+   Dialog: --r-lg, --shadow-lg, border --line-strong, veil --scrim. Menu: --r-lg, --shadow-md. */
 .gx-backdrop { position: fixed; inset: 0; background: var(--scrim); transition: opacity 120ms; }
 .gx-backdrop[data-starting-style], .gx-backdrop[data-ending-style] { opacity: 0; }
 

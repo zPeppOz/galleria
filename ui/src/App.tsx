@@ -1,5 +1,6 @@
 import { AppMenu } from "./app/AppMenu";
 import { useDaemon } from "./daemon/store";
+import { ToastProvider } from "./design/Toast";
 import { useT } from "./i18n";
 import { Preferences, type LangChoice } from "./prefs";
 import { FirstRun } from "./screens/FirstRun";
@@ -11,7 +12,7 @@ function Screen() {
   const link = view?.link ?? "connecting";
   const barKey = `bar.${link}` as const;
   return (
-    <>
+    <ToastProvider closeLabel={t("toast.close")}>
       <header>
         <h1>{t("app.title")}</h1>
         <AppMenu info={info} daemonVersion={view?.daemon_version ?? null} />
@@ -28,7 +29,7 @@ function Screen() {
       <footer className={`bar bar-${link}`} aria-live="polite">
         {link === "connected" ? t("bar.connected", { version: view?.daemon_version ?? "?" }) : t(barKey)}
       </footer>
-    </>
+    </ToastProvider>
   );
 }
 

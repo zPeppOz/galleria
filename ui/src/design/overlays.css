@@ -31,10 +31,10 @@
   border-radius: var(--r-lg); box-shadow: var(--shadow-md); outline: none;
 }
 .gx-menu-item {
-  display: flex; align-items: center; gap: var(--sp-4); min-height: 30px; padding: var(--sp-2) 10px; border-radius: var(--r-sm); cursor: pointer; outline: none;
+  display: flex; align-items: center; gap: var(--sp-4); min-height: 30px; padding: var(--sp-2) var(--sp-5); border-radius: var(--r-sm); cursor: pointer; outline: none;
 }
 .gx-menu-item[data-highlighted] { background: var(--panel-2); outline: var(--focus-ring); outline-offset: -2px; }
 .gx-menu-item.gx-danger { color: var(--err); }
 .gx-menu-indicator { display: inline-grid; place-items: center; width: 16px; height: 16px; }
 .gx-menu-separator { height: 1px; margin: var(--sp-2) 0; background: var(--line); }
-.gx-menu-group-label { padding: var(--sp-2) 10px; font-size: var(--fs-sm); color: var(--muted); }
+.gx-menu-group-label { padding: var(--sp-2) var(--sp-5); font-size: var(--fs-sm); color: var(--muted); }

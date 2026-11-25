@@ -414,3 +414,46 @@ async fn shutdown_closes_the_connection() {
         .expect("the scripted server never saw the connection close")
         .unwrap();
 }
+
+/// Answers `hello` and `subscribe` like a daemon and closes the connection right away.
+async fn hello_and_subscribe_then_close(stream: UnixStream) {
+    let mut reader = BufReader::new(stream);
+    for _ in 0..2 {
+        let line = read_frame(&mut reader, MAX_MESSAGE_BYTES)
+            .await
+            .unwrap()
+            .unwrap();
+        let request: serde_json::Value = serde_json::from_slice(&line).unwrap();
+        let result = match request["method"].as_str().unwrap() {
+            "hello" => serde_json::to_value(HelloResult {
+                protocol: 1,
+                daemon_version: "0.1.0".into(),
+                backends: vec![],
+                status: Status::default(),
+            })
+            .unwrap(),
+            _ => json!({}),
+        };
+        let reply = json!({"jsonrpc":"2.0","id":request["id"],"result":result});
+        reader
+            .get_mut()
+            .write_all(&encode_line(&reply))
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn daemon_closing_right_after_subscribe_is_not_hammered() {
+    let dir = tempfile::tempdir().unwrap();
+    let scripted = Scripted::listen(dir.path(), hello_and_subscribe_then_close);
+    let (sink, _seen) = recorder(Duration::ZERO);
+    let handle = start(&scripted.socket, sink, RelinkPolicy::default());
+    // The first relink after a drop is immediate (the daemon may just have restarted)...
+    eventually("the immediate relink", || handle.attempts() >= 2).await;
+    // ...then the policy applies: waits of 0.5 s, 1 s, 2 s. A second holds three attempts, not thousands.
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let attempts = handle.attempts();
+    assert!(attempts <= 5, "{attempts} attempts in about a second");
+    handle.shutdown().await;
+}

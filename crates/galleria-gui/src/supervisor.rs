@@ -9,7 +9,7 @@ use std::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::{
     sync::{Notify, mpsc, oneshot, watch},
@@ -183,20 +183,27 @@ impl Supervisor {
                 outcome = link::attempt(&self.socket, &self.client_version) => outcome,
             };
             let failure = match outcome {
-                Ok((mut client, hello)) => {
-                    failures = 0;
-                    match subscribe(&mut client).await {
-                        Ok(()) => {
-                            self.publish(DaemonView::connected(&hello));
-                            if !self.forward_events(&mut client).await {
-                                return;
-                            }
-                            // The connection ended: look for the daemon again right away.
+                Ok((mut client, hello)) => match subscribe(&mut client).await {
+                    Ok(()) => {
+                        self.publish(DaemonView::connected(&hello));
+                        let up_since = Instant::now();
+                        if !self.forward_events(&mut client).await {
+                            return;
+                        }
+                        // The connection ended. A daemon that restarted is looked for right away (G1), once. One
+                        // that closes again soon after it answered is not hammered: the policy applies.
+                        if up_since.elapsed() >= self.policy.delay(0) {
+                            failures = 0;
                             continue;
                         }
-                        Err(failure) => failure,
+                        if failures > 0 && !self.wait(self.policy.delay(failures - 1)).await {
+                            return;
+                        }
+                        failures += 1;
+                        continue;
                     }
-                }
+                    Err(failure) => failure,
+                },
                 Err(failure) => failure,
             };
             self.publish_failure(&failure);

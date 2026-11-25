@@ -64,9 +64,16 @@ jobs:
       - run: LAB_BUILD=host lab/run.sh ${{ matrix.client }}
 
 
+  # DCO con il modulo `ovpn` del kernel (CONFIG_OVPN=m dalla 6.16, presente nel kernel -azure 7.0 del runner).
+  # Solo OpenVPN 2.7 lo parla (2.7 ha tolto l'API di ovpn-dco-v2): per questo i client sono 27 e 79, non 26.
+  # Il vecchio modulo fuori albero openvpn-dco-dkms non compila su kernel 7.0 (vedi docs/06-esito-fase1.md §4, S2).
   lab-dco:
     runs-on: ubuntu-latest
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        client: [27, 79]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -74,10 +81,11 @@ jobs:
       - name: Install toolchain
         run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy,llvm-tools-preview
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-      - name: Install and load DCO
+      - name: Load the in-kernel DCO module
         run: |
-          sudo apt-get update
-          sudo apt-get install -y openvpn-dco-dkms
+          uname -r
           sudo modprobe wireguard
-          sudo modprobe ovpn-dco-v2
-      - run: GALLERIA_E2E_DCO=1 LAB_BUILD=host lab/run.sh 26 dco
+          sudo modprobe ovpn
+          lsmod | grep -E '^(ovpn|wireguard) '
+          modinfo ovpn | head -n 5
+      - run: GALLERIA_E2E_DCO=1 LAB_BUILD=host lab/run.sh ${{ matrix.client }} dco

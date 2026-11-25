@@ -33,7 +33,8 @@ nessuna registrazione binfmt reale viene cambiata dal test. Eseguito anche dal j
 
 OpenVPN: `LAB_BUILD=host lab/run.sh 26 t12` (poi 27 e 79). Il test DCO si salta
 se non è impostato `GALLERIA_E2E_DCO=1`; il runner inoltra la variabile al client.
-Il job `lab-dco` installa il modulo sul runner ed esegue solo il filtro `dco`.
+Il job `lab-dco` carica il modulo `ovpn` del kernel (OpenVPN 2.7, client 27 e 79) ed esegue solo il filtro `dco`;
+OpenVPN 2.6 (client 26) non parla l'API del modulo in-tree e non è nella matrice DCO.
 Il server `dns-option` usa DNS `10.9.0.1`; quello base usa `10.8.0.1`.
 Il build in container usa uid/gid dell'utente e HOME nel worktree, così target e
 cache Cargo restano rimovibili dall'utente. Con Docker rootless il build gira come

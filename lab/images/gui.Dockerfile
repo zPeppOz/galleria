@@ -6,6 +6,8 @@ FROM ubuntu:24.04
 ARG NODE_VERSION
 ARG PNPM_VERSION
 ENV DEBIAN_FRONTEND=noninteractive
+# The package names are those of Ubuntu 24.04 (the base is pinned by tag, not by digest): `webkit2gtk-driver` is called
+# `webkitgtk-webdriver` in 26.04, so a newer base needs this line changed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential pkg-config ca-certificates curl wget file git xz-utils xvfb xauth xclip dbus fonts-dejavu-core webkit2gtk-driver \
         libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \

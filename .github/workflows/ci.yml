@@ -120,7 +120,9 @@ jobs:
 
   # Level 3 (spec §14, Q13): the real app in a WebKitGTK window under Xvfb, driven by tauri-driver and
   # WebKitWebDriver, against a fake daemon. Not blocking until it has been green on a runner (B1 plan, task 6).
-  # Locally: scripts/gui.sh smoke, in the galleria-gui-dev image.
+  # It runs in the same image as locally (`scripts/gui.sh smoke`, lab/images/gui.Dockerfile, Ubuntu 24.04), not on
+  # the runner's own packages: `ubuntu-latest` moves to a new release and renames them (26.04 has no
+  # `webkit2gtk-driver`, run 45638906906). The image gets the host Rust toolchain mounted, so it is installed here.
   gui-smoke:
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -132,15 +134,4 @@ jobs:
         run: |
           toolchain=$(python3 -c 'import tomllib; print(tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
           rustup toolchain install "$toolchain" --profile minimal --component rustfmt,clippy,llvm-tools-preview
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-      - name: Install the system libraries Tauri needs, WebKitWebDriver, Xvfb and xclip
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential curl wget file libwebkit2gtk-4.1-dev \
-            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev webkit2gtk-driver xvfb xauth xclip dbus \
-            fonts-dejavu-core
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-      - run: npm install --global "pnpm@$(scripts/gui.sh pnpm-version)"
-      - run: scripts/gui.sh smoke-here
+      - run: scripts/gui.sh smoke

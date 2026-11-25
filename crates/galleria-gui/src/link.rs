@@ -141,8 +141,27 @@ pub async fn attempt(
     let hello = client
         .hello("galleria-gui", client_version)
         .await
-        .map_err(|e| classify(&e))?;
+        .map_err(|e| classify_hello(&e))?;
     Ok((client, hello))
+}
+
+/// Like [`classify`], for an error during `hello`, after `connect()` succeeded. The daemon refuses a peer outside
+/// its group right after `accept`, without reading the request, so the client sees a clean close only if its read
+/// comes first; if its write comes first, or the kernel resets the connection because unread bytes were left, it
+/// sees a broken pipe or a reset. After a successful `connect()` the three mean the same: permission denied.
+fn classify_hello(err: &ClientError) -> LinkFailure {
+    match err {
+        ClientError::Io(e)
+            if matches!(e.kind(), ErrorKind::BrokenPipe | ErrorKind::ConnectionReset) =>
+        {
+            LinkFailure {
+                state: LinkState::PermissionDenied,
+                incompatible: None,
+                detail: describe(err),
+            }
+        }
+        _ => classify(err),
+    }
 }
 
 /// The daemon socket: `GALLERIA_SOCKET` when it is set and not empty, the default path otherwise. The caller
@@ -183,6 +202,28 @@ mod tests {
     #[case::other_io(io(ErrorKind::InvalidData), LinkState::DaemonNotRunning)]
     fn classify_follows_the_spec_table(#[case] err: ClientError, #[case] expected: LinkState) {
         assert_eq!(classify(&err).state, expected);
+    }
+
+    #[rstest]
+    #[case::broken_pipe(io(ErrorKind::BrokenPipe), LinkState::PermissionDenied)]
+    #[case::reset(io(ErrorKind::ConnectionReset), LinkState::PermissionDenied)]
+    #[case::closed(ClientError::Closed, LinkState::PermissionDenied)]
+    #[case::refused(io(ErrorKind::ConnectionRefused), LinkState::DaemonNotRunning)]
+    #[case::too_many_clients(rpc("too_many_clients"), LinkState::DaemonNotRunning)]
+    fn an_error_during_hello_after_a_connect_follows_the_same_table(
+        #[case] err: ClientError,
+        #[case] expected: LinkState,
+    ) {
+        assert_eq!(classify_hello(&err).state, expected);
+    }
+
+    #[test]
+    fn a_broken_pipe_outside_hello_is_still_daemon_not_running() {
+        // `connect()` errors keep their classification: a reset there is not a refusal by the daemon.
+        assert_eq!(
+            classify(&io(ErrorKind::BrokenPipe)).state,
+            LinkState::DaemonNotRunning
+        );
     }
 
     #[test]

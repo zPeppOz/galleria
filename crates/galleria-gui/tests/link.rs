@@ -94,7 +94,7 @@ async fn unreadable_socket_is_permission_denied() {
 #[tokio::test]
 async fn daemon_closing_before_hello_reply_is_permission_denied() {
     let dir = tempfile::tempdir().unwrap();
-    // The daemon refuses a peer outside the group by reading the request and closing without an answer (F1 §5.1).
+    // A daemon that reads the request and closes without an answer: the client sees the close as `Closed`.
     let server = Scripted::listen(dir.path(), |stream| async move {
         let (reader, _) = read_hello(stream).await;
         drop(reader);
@@ -103,6 +103,24 @@ async fn daemon_closing_before_hello_reply_is_permission_denied() {
         failure(attempt(&server.socket, "0.0.1").await).state,
         LinkState::PermissionDenied
     );
+}
+
+/// The real daemon refuses a peer outside the group right after `accept`, without reading `hello` (F1 §5.1). The
+/// client then sees a broken pipe or a reset, depending on whether its write or its read comes first, and both
+/// mean the same as a clean close: the user is outside the group.
+#[tokio::test]
+async fn daemon_closing_right_after_accept_is_permission_denied() {
+    let dir = tempfile::tempdir().unwrap();
+    let server = Scripted::listen(dir.path(), |stream| async move { drop(stream) });
+    for round in 0..200 {
+        let failure = failure(attempt(&server.socket, "0.0.1").await);
+        assert_eq!(
+            failure.state,
+            LinkState::PermissionDenied,
+            "attempt {round}: {}",
+            failure.detail
+        );
+    }
 }
 
 #[tokio::test]

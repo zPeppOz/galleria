@@ -29,4 +29,12 @@ pub const GUI_CODES: &[&str] = &[
     "gui_group_not_found",
     "gui_profile_in_use",
     "gui_export_failed",
+    "import_syntax",
+    "import_missing_file",
+    "import_outside_folder",
+    "import_invalid",
+    "gui_import_unreadable",
+    "gui_import_too_large",
+    "gui_import_unsupported_file",
+    "gui_import_expired",
 ];

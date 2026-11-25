@@ -18,6 +18,9 @@ const COMMANDS: &[&str] = &[
     "group_rename",
     "group_delete",
     "groups_reorder",
+    "import_from_text",
+    "import_commit",
+    "import_discard",
 ];
 
 fn main() {

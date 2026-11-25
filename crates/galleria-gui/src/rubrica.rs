@@ -174,6 +174,7 @@ pub enum RubricaError {
 
 mod actions;
 mod groups;
+mod imported;
 
 /// Opens the archive of the secrets of the folder of the rubrica: the one place that says which archive it is (B5 puts
 /// the layered one here), and what the tests replace to see a write fail.

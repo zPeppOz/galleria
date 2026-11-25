@@ -1015,3 +1015,29 @@ Dopo l'esito, Orca dice il controllo dove il fuoco è tornato («More actions co
 - Il job `gui` e `gui-smoke` di CI su un runner con il binario `galleria` costruito dalla nuova riga di `scripts/gui.sh`: non girato.
 - **Una prova instabile, già in T2 e fuori dalla correzione:** `atk::the_signal_atk_has_is_emitted_with_the_text_and_the_urgency` (`tests/announce.rs`) fallisce in circa 1 giro su 10 di `cargo test -p galleria-gui` (28 su 300 lanci del binario `announce`; 0 su 300 con `--test-threads=1` e 0 su 300 da sola): `assertion failed: self.is::<T>()` in `NoOpObject::new`, una gara tra le prove del modulo `atk` che girano in parallelo. Si vede anche in `scripts/gui.sh check` e nel job `gui` di CI; non è stata corretta qui (scope).
 - Il campo del gruppo (`select` nativo) è provato in jsdom con un `change` (jsdom non lo guida con i tasti): il cambio di gruppo con la sola tastiera in WebKitGTK non è provato.
+
+## B4 · Import
+
+Piano: `docs/superpowers/plans/2026-11-25-fase2-b4-import.md`. Q36–Q41 approvate da Aitano il 25/11/2026 su delega di Peppe, tutte come raccomandate, con un'aggiunta su Q36 (cartella `0700`, socket `0600`, stesso uid con `SO_PEERCRED`): spec §18.
+
+### Il cuore dell'import in Rust, con l'anteprima in memoria (T1)
+
+- **`galleria-profile`, solo aggiunte** (Q29; `git diff main -- crates/galleria-profile/src` ha solo righe aggiunte): `import_file.rs` con `detect_protocol`, `import_text`, `import_file`, e `read_import_file` + `import_read_file` (la stessa cosa in due metà, perché la finestra rilegge il testo per sapere quale script era una direttiva tolta). Un percorso che arriva da fuori si apre con `O_NONBLOCK`, si guarda **il file aperto** (file normale, al più 1 MiB, UTF-8) e i file a cui un `.ovpn` rimanda si leggono solo dalla cartella vera del profilo (`canonicalize` poi `starts_with`), con lo stesso tetto. Una FIFO senza scrittore, `/dev/zero` (anche dietro un collegamento), un file di 2 MiB e un `.ovpn` che rimanda a un file di 2 MiB tornano entro 2 s (`a_fifo_a_device_and_a_huge_file_are_refused_without_hanging`).
+- **`galleria-gui`**: `import.rs` (`Imports`, `ImportPreview`, `ImportNotice`, `ImportFailure`, senza `tauri`), `rubrica/imported.rs` (`Rubrica::commit_import`: prima i segreti, poi il profilo, tutto o niente; nome e gruppo controllati **prima** di aprire la cartella in scrittura), `commands/import.rs` (`import_from_text`, `import_commit`, `import_discard`), otto codici in `GUI_CODES` e nei due cataloghi.
+- **Anteprima**: contiene i **nomi** dei segreti (`found`), mai i valori né il testo; degli avvisi solo riga e nome della direttiva e un sì/no (`dns_script`); del file solo il nome. Dura 10 minuti, al più 4 insieme (la più vecchia si butta), si consuma con `import_commit` e `import_discard`. Un nome o un gruppo rifiutati lasciano l'anteprima dov'è; anche un archivio che non si scrive. Ordine del salvataggio e tutto-o-niente provati (`commit_is_all_or_nothing`: primo segreto, secondo segreto, il profilo stesso).
+- **Il formato** (Q39): `.ovpn` è OpenVPN; `.conf` e il testo incollato si decidono dalla prima riga che non è vuota né un commento (`#` o `;`): `[Interface]`, senza badare alle maiuscole (come `wg-quick`), è WireGuard, il resto OpenVPN.
+
+**Punti [S].**
+
+| # | Esito | Ripiego |
+|---|---|---|
+| S29 | **Vero.** `Secret` (`galleria-ipc/src/secret.rs`) deriva `ZeroizeOnDrop`: i segreti di un'anteprima si azzerano quando cade (letto nel sorgente, non misurato in memoria) | nessuno |
+
+**Cosa si è visto e che il piano non diceva** (tutto misurato oggi con le prove di T1):
+
+- Il **profilo malevolo del laboratorio** dà **5 direttive rimosse con avviso**: `up`, `plugin`, `status`, `writepid`, `setenv` (tutte *dangerous*, ognuna con la sua riga). `dev`, `verb`, `script-security` e `management` sono del demone e l'import della fase 1 le toglie **senza avviso**: non sono nell'elenco e non contano in «N direttive rimosse». Il «6» che il piano ipotizzava era sbagliato; la finestra mostra ciò che l'import dice, e la fase 1 non si tocca.
+- L'import OpenVPN della fase 1 è **indulgente**: un testo che non è un profilo (o un `.ovpn` che contiene WireGuard) dà un profilo OpenVPN senza `client`, con un avviso `no_tls_client` e le righe sconosciute tolte. L'errore «non valido» c'è solo per un blocco che non si chiude o una riga che non si legge. Per quel caso `ImportError::Invalid` non porta la riga: la finestra rilegge il testo con il parser e dice `import_syntax` con la riga.
+- `dns_script` vale solo per le direttive che lanciano uno script (l'elenco `SCRIPT_DIRECTIVES` di `import.rs`, uguale a quello di `Configuration.tsx`; da T2 anche a `ui/src/rubrica/scripts.ts`), non per `status /tmp/update-resolv-conf`.
+- Il nome proposto per un testo incollato è vuoto: lo dice la pagina («Profilo importato», dal catalogo).
+
+**Prove.** `galleria-profile/tests/import_file.rs` (17) e `galleria-gui/tests/import.rs` (33). `seed-rubrica --fixtures <cartella>` scrive i file di prova (`tests/support/fixtures.rs`, uguali a quelli di `galleria-profile`) e `lab/tests/gui-lib.sh` genera lo script `import-fixtures` accanto a `rubrica-seed`.

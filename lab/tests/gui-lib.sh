@@ -62,6 +62,16 @@ XDG_CONFIG_HOME="$tmp/config" exec "$GALLERIA_SMOKE_SEED" "\$@"
 SCRIPT
   chmod +x "$bin/rubrica-seed"
 
+  # The files an import is tried on (plan B4): written fresh into `$tmp/fixtures` every time, and printed as `name=path`.
+  # They are outside the rubrica, so a run that wipes the profiles does not touch them.
+  cat > "$bin/import-fixtures" <<SCRIPT
+#!/usr/bin/env bash
+set -euo pipefail
+rm -rf -- "$tmp/fixtures"
+exec "$GALLERIA_SMOKE_SEED" --fixtures "$tmp/fixtures"
+SCRIPT
+  chmod +x "$bin/import-fixtures"
+
   gui_cleanup() {
     status=$?
     "$bin/daemon-stop" || true

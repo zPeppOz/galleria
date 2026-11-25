@@ -471,8 +471,17 @@ Le questioni da Q28 in poi stanno nel piano del blocco che le apre (B3: `docs/su
 | Q35 | Chiusura della finestra con modifiche non salvate (aperta dall'esito di B3, T5) | **Decisa: va in B6.** Riportata qui dalla card `t_73168fca`: il testo della decisione non era ancora nel repo | B6 |
 
 Q36–Q41 (istanza unica, laboratorio di G3, percorsi del trascinamento, riconoscimento del formato, più file insieme,
-associazione dei `.ovpn`) sono **aperte**, con la raccomandazione, nel piano di B4:
+associazione dei `.ovpn`): testo e raccomandazione nel piano di B4,
 `docs/superpowers/plans/2026-11-25-fase2-b4-import.md`.
+
+| # | Questione | Esito |
+|---|---|---|
+| Q36 | Istanza unica | **Approvata (b)** da Aitano il 25/11/2026 su delega di Peppe: codice nostro, con un blocco su file e un socket Unix in `$XDG_RUNTIME_DIR/galleria`, senza plugin. **Aggiunta di Aitano:** la cartella ha permessi `0700`, il socket `0600`, e chi si collega deve avere lo stesso uid, controllato con `SO_PEERCRED`; una prova rifiuta un uid diverso o un socket con permessi più larghi. Scostamento dal §7 (plugin ufficiale) |
+| Q37 | Dove gira il fumo di G3 | **Approvata (a)**: la finestra gira nell'immagine `galleria-gui-dev`; i profili passano ai client del laboratorio |
+| Q38 | Percorsi del trascinamento che Tauri manda anche alla pagina | **Approvata (a)**: `tauri://drag-drop` resta com'è; la pagina non lo ascolta, e una prova fallisce se qualcuno aggiunge l'ascolto |
+| Q39 | Riconoscimento del formato | **Approvata (a)**: `.ovpn` vale come OpenVPN; per `.conf` e per il testo incollato il formato si ricava dal contenuto |
+| Q40 | Più file insieme | **Approvata (a)**: un solo file per gesto |
+| Q41 | Associazione dei `.ovpn` | **Approvata (a)**: `bundle.fileAssociations` più un file `.desktop` nostro in `packaging/linux/`, tenuti uguali da una prova |
 
 ## 19. Cosa non ho verificato
 

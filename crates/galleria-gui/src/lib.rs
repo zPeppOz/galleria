@@ -12,6 +12,7 @@ pub mod events;
 pub mod export;
 #[cfg(target_os = "linux")]
 pub mod export_gtk;
+pub mod import;
 pub mod link;
 pub mod rubrica;
 pub mod supervisor;
@@ -21,6 +22,7 @@ pub mod window;
 use announce::Announcer;
 use commands::app::AppInfo;
 use export::SavePicker;
+use import::Imports;
 use rubrica::Rubrica;
 use std::{path::PathBuf, sync::Arc};
 use supervisor::RelinkPolicy;
@@ -68,7 +70,10 @@ pub fn configure_with<R: Runtime>(
             commands::groups::group_create,
             commands::groups::group_rename,
             commands::groups::group_delete,
-            commands::groups::groups_reorder
+            commands::groups::groups_reorder,
+            commands::import::import_from_text,
+            commands::import::import_commit,
+            commands::import::import_discard
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.
@@ -87,6 +92,9 @@ pub fn configure_with<R: Runtime>(
                 Rubrica::default_dir(),
                 Arc::clone(&state),
             )));
+            // The previews of the import wait over the rubrica that is in the state (the one of the test, when there is one).
+            let rubrica = Arc::clone(&*app.state::<Arc<Rubrica>>());
+            app.manage(Arc::new(Imports::new(rubrica)));
             // The tests of level 2 manage their own announcer before the build, and `manage` keeps the first one.
             app.manage(default_announcer(app.handle()));
             // The same for the window «Save» of «Export»: the tests of level 2 cannot drive a native window and manage theirs.

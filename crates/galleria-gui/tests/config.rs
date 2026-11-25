@@ -26,6 +26,9 @@ const ALLOWED: &[&str] = &[
     "allow-group-rename",
     "allow-group-delete",
     "allow-groups-reorder",
+    "allow-import-from-text",
+    "allow-import-commit",
+    "allow-import-discard",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

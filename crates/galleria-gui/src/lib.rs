@@ -3,6 +3,7 @@
 //! Rust side of the Galleria GUI: builds the Tauri app that hosts the `ui/` frontend.
 
 pub mod link;
+pub mod supervisor;
 
 /// Builds the Tauri application from `tauri.conf.json` and runs it until the last window closes.
 ///

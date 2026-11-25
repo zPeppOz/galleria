@@ -1,9 +1,19 @@
 [advisories]
+# Every entry names the advisory and says why it is accepted; the category is never switched off.
+ignore = [
+    # `proc-macro-error` is unmaintained, with no safe upgrade. It is a compile-time proc-macro dependency of the
+    # GTK3 Rust bindings (`glib-macros`, `gtk3-macros`) that Tauri and wry use on Linux, so it never runs in the
+    # shipped binary. Revisit when Tauri moves off GTK3.
+    { id = "RUSTSEC-2024-0370", reason = "build-time proc-macro of the GTK3 bindings under Tauri; no safe upgrade" },
+]
 
 [licenses]
 allow = [
     "MIT",
     "Apache-2.0",
+    # Apache-2.0 plus an exception that only relaxes it (target-lexicon, via Tauri's system-deps); compatible with
+    # GPL-3.0-or-later like plain Apache-2.0.
+    "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",

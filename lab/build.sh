@@ -33,10 +33,10 @@ if [[ ${LAB_BUILD:-container} != host && ${GLAB_BUILD_INSIDE:-0} != 1 ]]; then
     -v "$HOME/.cargo/bin:/opt/cargo/bin:ro" -v "$HOME/.cargo/registry:/cargo-registry" \
     -e HOME=/work/target/lab-cargo-home -e RUSTUP_HOME=/opt/rustup -e CARGO_HOME=/work/target/lab-cargo-home \
     -e CARGO_TARGET_DIR=/work/target/lab-build -e PATH=/opt/cargo/bin:/usr/bin:/bin \
-    glab-build bash -euc 'mkdir -p "$CARGO_HOME"; ln -sfn /cargo-registry "$CARGO_HOME/registry"; cargo build --workspace; cargo test -p galleria-e2e --no-run --message-format=json > lab/out/artifacts.json'
+    glab-build bash -euc 'mkdir -p "$CARGO_HOME"; ln -sfn /cargo-registry "$CARGO_HOME/registry"; cargo build --workspace --exclude galleria-gui; cargo test -p galleria-e2e --no-run --message-format=json > lab/out/artifacts.json'
   build_target=target/lab-build
 else
-  cargo build --workspace
+  cargo build --workspace --exclude galleria-gui
   cargo test -p galleria-e2e --no-run --message-format=json > lab/out/artifacts.json
   build_target=${CARGO_TARGET_DIR:-target}
 fi

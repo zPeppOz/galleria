@@ -5,3 +5,4 @@ dist/
 *.log
 lab/pki/
 lab/out/
+crates/galleria-gui/gen/

@@ -1,0 +1,25 @@
+[package]
+name = "galleria-gui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+description = "Galleria desktop GUI (Rust side of the Tauri app)"
+
+[features]
+# Set by the Tauri CLI for release builds: embed ui/dist instead of loading the dev server.
+custom-protocol = ["tauri/custom-protocol"]
+
+[dependencies]
+anyhow.workspace = true
+tauri = { version = "2.12", features = [] }
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

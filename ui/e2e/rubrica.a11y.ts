@@ -3,12 +3,14 @@
 // does to the profiles does not reach the next. What Orca said goes into target/gui-a11y/transcript.txt.
 //   R4a  a save is said once, as a notice (Q27: an outcome that does not ask for an answer is *polite*)
 //   R4d  an error is said, and the window says it as *assertive*: the profile was written by someone else meanwhile
+//   R4e  an export through the real «Save» window (GTK, driven over AT-SPI) is said once, as a notice; R4f the cancel of it says nothing
 //   R5a  an error of a field takes the focus, and it is read with the field (Q27, rule 2: no notice for it)
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  atspiTree, bodyText, closeApp, daemon, env, findNode, focusedNode, openApp, orcaDebugLines, record, speechMark, speechSince, waitForBody, waitForSpeech, waitForTree,
+  answerSaveWindow, atspiTree, bodyText, closeApp, daemon, env, findNode, focusedNode, openApp, orcaDebugLines, record, speechMark, speechSince, waitForBody, waitForSpeech, waitForTree,
   type AtNode, type Browser,
 } from "./support";
 
@@ -182,6 +184,69 @@ describe("the form of a profile under a screen reader", () => {
     expect(focusedNode(tree)?.role, "the focus is on a row of the list").toBe("list item");
     expect(findNode(tree, "list item", "Ufficio Napoli"), "the profile is gone from the list").toBeUndefined();
     expect(readdirSync(profilesDir()).map((name) => readFileSync(join(profilesDir(), name), "utf8")).some((text) => text.includes('name = "Ufficio Napoli"'))).toBe(false);
+  });
+
+  // «Export» ends in the GTK window «Save», which belongs to Rust and is not in the page: it is driven over AT-SPI
+  // (lab/tests/atspi-save-window.py). The key that confirms is not awaited, because the command answers when that window closes.
+  async function askExport(): Promise<void> {
+    await openActionsMenu();
+    await key("ArrowDown");
+    await waitForTree(focusedIs("Export"), "«Export» focused");
+    await key("Enter");
+    await waitForTree((t) => !!t.find((n) => (n.role === "alert" || n.role === "dialog") && /^Export Ufficio Napoli\?$/.test(n.name)), "the confirmation open");
+    await reach("Export", ["Tab"], 4);
+    void key("Enter").catch(() => undefined);
+  }
+
+  it("R4e_export_saves_through_the_real_save_window", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "galleria-export-"));
+    const target = join(dir, "Ufficio.ovpn");
+    await askExport();
+    const mark = speechMark();
+    // the window proposes the name of the profile and the extension of its protocol; the full path is typed over it
+    expect(await answerSaveWindow({ save: target })).toEqual({ offered: "Ufficio Napoli.ovpn", pressed: "Save", closed: true });
+    const DONE = "Exported.";
+    await waitForSpeech(mark, DONE, 5000);
+    await settle(1500);
+    const times = speechSince(mark).filter((line) => line.includes(DONE)).length;
+    const tree = atspiTree();
+    record("R4e the export of a profile, saved through the real window", speechSince(mark), tree);
+    expect(times, `Orca said the notice ${times} times: ${JSON.stringify(speechSince(mark))}`).toBe(1);
+    const lines = orcaDebugLines(/Dequeued object:announcement/).filter((line) => line.includes(DONE));
+    expect(lines.length, "Orca dequeued an object:announcement carrying the notice").toBeGreaterThan(0);
+    for (const line of lines) expect(line).toContain(`(1, 0, ${DONE})`);
+    // the file is private, has the keys (Q31) and nothing else was left next to it
+    expect(statSync(target).mode & 0o777).toBe(0o600);
+    const text = readFileSync(target, "utf8");
+    expect(text).toContain("<tls-crypt>");
+    expect(text).toContain("SEED-SECRET-");
+    expect(readdirSync(dir)).toEqual(["Ufficio.ovpn"]);
+    // the page never learns the path or the keys, and the focus is back on the button that asked
+    const body = await bodyText(b);
+    expect(body).toContain(DONE);
+    expect(body).not.toContain(dir);
+    expect(body).not.toContain("SEED-SECRET-");
+    expect(focusedIs("More actions")(tree), "the focus is on «More actions»").toBe(true);
+  });
+
+  it("R4f_export_cancelled_says_nothing", async () => {
+    const before = readdirSync(profilesDir()).sort().map((name) => readFileSync(join(profilesDir(), name), "utf8")).join("\n");
+    await askExport();
+    const mark = speechMark();
+    // Orca's debug file holds the whole run (R4e's «Exported.» is in it): only what comes after this point counts
+    const announced = orcaDebugLines(/Dequeued object:announcement/).length;
+    expect(await answerSaveWindow("cancel")).toEqual({ offered: "Ufficio Napoli.ovpn", pressed: "Cancel", closed: true });
+    // a cancel is not an outcome: no notice, no error, and nothing said by the page
+    await settle(2000);
+    const tree = atspiTree();
+    record("R4f the export of a profile, cancelled in the real window", speechSince(mark), tree);
+    expect(speechSince(mark).filter((line) => /Exported|could not/i.test(line)), "Orca said nothing about an export").toEqual([]);
+    expect(orcaDebugLines(/Dequeued object:announcement/).slice(announced), "no announcement was sent").toEqual([]);
+    const body = await bodyText(b);
+    expect(body).not.toMatch(/Exported\.|could not be saved/i);
+    // the rubrica is as it was (the window of Rust never told the page where it would have written, so there is no place to look in)
+    expect(readdirSync(profilesDir()).sort().map((name) => readFileSync(join(profilesDir(), name), "utf8")).join("\n")).toBe(before);
+    expect(focusedIs("More actions")(tree), "the focus is back on «More actions»").toBe(true);
   });
 
   // The full round, in the order a person would take it. What Orca says goes to the transcript; what is asserted is the

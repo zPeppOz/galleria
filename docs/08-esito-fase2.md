@@ -899,7 +899,7 @@ il caret portato sulla riga e lo scorrimento in WebKitGTK (provato in jsdom: `se
 - **Elimina**: dopo una conferma; rifiutata (`gui_profile_in_use`) se il profilo è quello della sessione aperta dal servizio, e la voce del menu lo dice (`aria-disabled` + descrizione, resta una sosta delle frecce). Dopo l'eliminazione il fuoco va alla lista o, se è vuota, al testo «Nessun profilo».
 - `Rubrica::with_secrets(SecretFactory)` è il punto unico che B5 sostituirà con l'archivio a strati.
 
-Non verificato (T8): la finestra «Salva» GTK vera non è pilotata da nessuna prova (il selettore è finto nei test); smoke ed a11y della conferma di Elimina (S5) non rieseguiti dopo T8.
+Non verificato (T8): smoke ed a11y della conferma di Elimina (S5) non rieseguiti dopo T8 (rieseguiti in T9). La finestra «Salva» GTK vera, non pilotata in T8, lo è dopo la review di B3: `R4e` e `R4f` (sotto, «Tastiera, fumo…»).
 
 ### Tastiera, fumo, screen reader e chiusura del blocco (T9)
 
@@ -920,20 +920,21 @@ Non verificato (T8): la finestra «Salva» GTK vera non è pilotata da nessuna p
 | | `rubrica_works_with_the_daemon_stopped` | a demone fermo: rinomina, duplica, elimina con conferma; i file sul disco sono quelli attesi e il fuoco resta sulla lista |
 | | `no_csp_violation_during_the_rubrica_tour` | ricerca, editor, salva, dialogo dei gruppi, duplica, esporta e elimina (le due conferme): nessuna violazione |
 | Orca (`rubrica.a11y.ts`) | `R4b`, `R4c` | duplica ed elimina detti **una volta**, *polite*, dal processo `galleria-gui`; con `R4a` (salva) e `R4d` (errore) sono le quattro di Q27 |
+| | `R4e`, `R4f` | **dopo la review**: «Esporta» con la finestra «Salva» GTK vera, pilotata via AT-SPI (`lab/tests/atspi-save-window.py`: la finestra non è nella pagina, WebDriver non la vede). `R4e`: il nome proposto è `Ufficio Napoli.ovpn`, col percorso scritto nel campo e «Save» il file nasce `0600` con le chiavi (`<tls-crypt>`, `SEED-SECRET-`) e nessun altro file accanto, «Exported.» detto **una volta**, *polite* (`(1, 0, Exported.)`), il percorso e le chiavi non sono nella pagina, il fuoco torna su «More actions». `R4f`: con «Cancel» nessun avviso (né parlato né `announcement`), niente di scritto nella rubrica, fuoco su «More actions» |
 | | `R5b`…`R5e` | ricerca e stati della lista, rubrica vuota, schede nuove e editor, «Gestisci gruppi» |
 | | `S5` (rimessa) e `S6`, `S6b`, `S6c` (riscritte) | la conferma di Elimina sotto Orca; con «Duplicate» che ora duplica davvero, il testo dell'avviso si legge dalla pagina e non è più scritto nel codice |
 
-Numeri: **499** prove JS in 41 file (`scripts/gui.sh check`: 494 dopo T8, 4 nuove di tastiera e 1 della lista); **221** prove Rust di `galleria-gui`; host **565** (`cargo test --workspace --exclude galleria-gui`);
-fumo **25** prove; `a11y` **32** prove, due giri di fila verdi.
+Numeri: **499** prove JS in 41 file (`scripts/gui.sh check`: 494 dopo T8, 4 nuove di tastiera e 1 della lista); **225** prove Rust di `galleria-gui` (221 al T9, 4 della correzione dopo la review: due su `params_of`/`split_params`, due sull'ordine delle scritture dei gruppi); host **565** (`cargo test --workspace --exclude galleria-gui`);
+fumo **25** prove; `a11y` **34** prove (32 al T9, `R4e` e `R4f` dopo la review), due giri di fila verdi.
 
 **Criteri di uscita del blocco.**
 
 | # | Esito | Prova |
 |---|---|---|
-| R1 | **Verde con una riserva.** Letta, cercata, ordinata, modificata, duplicata, eliminata nella finestra vera, anche a demone fermo, e la CLI della fase 1 la legge. **«Esporta» è provato solo fino alla conferma e con il selettore finto**: la finestra «Salva» GTK vera non è pilotata da nessuna prova | `rubrica_lists_the_seeded_profiles`, `cli_lists_what_the_gui_saved`, `rubrica_works_with_the_daemon_stopped`; `export.rs` (selettore finto) |
+| R1 | **Verde.** Letta, cercata, ordinata, modificata, duplicata, esportata (anche con la finestra «Salva» GTK vera, via AT-SPI), eliminata nella finestra vera, anche a demone fermo, e la CLI della fase 1 la legge. Riserva rimasta: la finestra «Salva» è provata nell'immagine (Xvfb, `GtkFileChooserDialog` semplice), non sotto un portale del desktop né su Wayland (vedi «Non verificato») | `rubrica_lists_the_seeded_profiles`, `cli_lists_what_the_gui_saved`, `rubrica_works_with_the_daemon_stopped`; `R4e`, `R4f`; `export.rs` (selettore finto) |
 | R2 | **Verde** | `ui_state.rs`, `language_and_theme_survive_a_restart`, `window_size_survives_a_restart` (S21, S23) |
-| R3 | **Verde** | `no_read_command_returns_a_secret` e `..._after_a_round_of_edits`, `no_command_takes_a_path` (firme di tutti i comandi, T8), un test della capability: la webview non ha permessi di dialoghi o file |
-| R4 | **Verde, una volta sola, con la trascrizione sotto.** Salva, duplica, elimina: *polite* (`(1, 0, …)`), errore: *assertive* (`(2, 0, …)`); la riga di Orca dice `[application: 'galleria-gui']` | `R4a`, `R4b`, `R4c`, `R4d`, `S6b`, `S6c` |
+| R3 | **Verde** | `no_read_command_returns_a_secret` e `..._after_a_round_of_edits`, `no_command_takes_a_path` (firme di tutti i comandi, T8: dopo la review ogni comando si legge nel suo file, in ordine fisso, fino alla `)` che chiude l'elenco dei parametri; `params_end_at_the_parenthesis_that_closes_the_list` lo tiene fermo), un test della capability: la webview non ha permessi di dialoghi o file |
+| R4 | **Verde, una volta sola, con la trascrizione sotto.** Salva, duplica, elimina, esporta: *polite* (`(1, 0, …)`), errore: *assertive* (`(2, 0, …)`); la riga di Orca dice `[application: 'galleria-gui']` | `R4a`, `R4b`, `R4c`, `R4d`, `R4e`, `R4f`, `S6b`, `S6c` |
 | R5 | **Verde, con i buchi di Orca già dichiarati** (sotto). Tastiera in jsdom per ogni componente e per il giro intero; axe per ogni componente (nei file di prova di ciascuno); albero AT-SPI e Orca nella finestra vera | `keyboard.test.tsx`, `R5a`–`R5e`, `S1`–`S5` |
 | R6 | **Verde** | `git diff 9dfc366 -- crates/galleria-ipc crates/galleriad 'crates/galleria-backend*' crates/galleria-cli` vuoto; in `galleria-profile/src` **zero righe tolte** (solo `export.rs`, `raw.rs` e aggiunte a `lib.rs`, `settings.rs`, `store.rs`); `a_profile_saved_by_the_gui_keeps_the_phase_1_format`; `cli_lists_what_the_gui_saved` |
 
@@ -945,7 +946,7 @@ fumo **25** prove; `a11y` **32** prove, due giri di fila verdi.
 | S19 | **Vero** (T2) | nessuno |
 | S20 | **Vero** (T2); `S6c` ora cerca il testo vero della copia | nessuno |
 | S21 | **Vero** (T1) | nessuno |
-| S22 | **Non usato, per scelta di T8**: niente `tauri-plugin-dialog` (4 crate in più, un secondo major di `toml`, due plugin di comandi); la finestra «Salva» la apre Rust con `gtk::FileChooserNative`. Il ripiego scritto nel piano | applicato (vedi T8); resta da provare con la finestra vera |
+| S22 | **Non usato, per scelta di T8**: niente `tauri-plugin-dialog` (4 crate in più, un secondo major di `toml`, due plugin di comandi); la finestra «Salva» la apre Rust con `gtk::FileChooserNative`. Il ripiego scritto nel piano | applicato (vedi T8); provato con la finestra vera nell'immagine (`R4e`, `R4f`, via AT-SPI), non sotto un portale del desktop né su Wayland |
 | S23 | **Vero** (T1) | nessuno |
 | S24 | **Vero** (T7): il testo salvato com'è scritto passa il validatore del demone. Nota: nella tabella di T5 `S24`–`S26` sono altri punti (errore *assertive*, fuoco su un campo sbagliato, forma dell'urgenza), numerati dopo il piano | nessuno |
 
@@ -971,6 +972,15 @@ SPEECH OUTPUT: The profile and its secrets are removed from this computer. This 
 SPEECH OUTPUT: Cancel push button.
 ## R5e a group added
 SPEECH OUTPUT: Group Casa created.
+## R4e the export of a profile, saved through the real window
+SPEECH OUTPUT: file chooser.
+SPEECH OUTPUT: Name: text.
+SPEECH OUTPUT: /tmp/galleria-export-k4cKia/Ufficio.ovpn.
+SPEECH OUTPUT: Galleria frame.
+SPEECH OUTPUT: Exported.
+## R4f the export of a profile, cancelled in the real window
+SPEECH OUTPUT: More actions combo box.
+SPEECH OUTPUT: opens popup
 ```
 
 La riga dell'evento (file di debug di Orca): `EVENT MANAGER: Dequeued object:announcement for [frame: 'Galleria'] in [application: 'galleria-gui'] (1, 0, Deleted “Ufficio Napoli”.)`; per l'errore `(2, 0, This profile was changed somewhere else since you opened it.)`.
@@ -998,9 +1008,10 @@ Dopo l'esito, Orca dice il controllo dove il fuoco è tornato («More actions co
 - **La voce:** nessun audio, si legge il file di debug di Orca.
 - **GNOME vero con il comando definitivo:** `announce` e gli esiti sono provati nell'immagine (Ubuntu 24.04, Orca 46.1) e con lo spike su due desktop GNOME veri a B2 (`93c309a`); l'app di B3 non è stata riprovata là.
 - **Orca 46 su un desktop vero (Q28):** si decide in B6.
-- **La finestra «Salva» di «Esporta»:** nessuna prova pilota il selettore GTK vero (`GtkSavePicker`); nei test il selettore è finto. Il percorso fino alla conferma, il file scritto con le chiavi e `0600`, il rifiuto e l'annullamento sono provati con il selettore finto.
+- **La finestra «Salva» di «Esporta» (dopo la review):** provata nell'immagine con `R4e` (salva) e `R4f` (annulla), pilotando la finestra GTK via AT-SPI con `lab/tests/atspi-save-window.py` (Xvfb, `GtkFileChooserDialog` semplice: senza portale `FileChooserNative` ricade su quello). **Non provata** sotto un portale di un desktop vero (GNOME: `xdg-desktop-portal`, una finestra d'altro processo, con un altro albero AT-SPI e un altro nome proposto) né su Wayland. Il percorso si scrive nel campo del nome con `set_text_contents`: la scelta con il mouse in una cartella, la creazione di una cartella dalla finestra e la sovrascrittura di un file che c'è (la finestra chiede conferma) non sono provate; che la scrittura sostituisca un file che c'è e lo tenga `0600` lo prova `export_replaces_a_file_that_is_there_and_keeps_it_private`. Orca non è stato ascoltato nella finestra «Salva» stessa, oltre a ciò che la trascrizione registra («file chooser», «Name: text»).
 - **La dimensione della finestra su Wayland:** `window_size_survives_a_restart` gira sotto Xvfb (X11); su Wayland un client non sceglie la propria posizione e la dimensione salvata non è provata (Q34).
 - Il fuoco dopo la conferma di Elimina e dopo Duplica in WebKitGTK sotto Orca è provato (`R4b`, `R4c`: fuoco su «More actions» e su una riga; `R5e`: dopo «Gestisci gruppi» sul suo pulsante). Il caret portato su una riga dell'editor, lo scorrimento di un testo grande e il comportamento con migliaia di righe lo sono solo in jsdom (o per nulla).
 - Il parlato del dialogo «Gestisci gruppi» all'apertura e del primo problema dell'editor (vedi sopra); la parola che Orca usa per il pulsante del problema («Line 18 · up · …»).
 - Il job `gui` e `gui-smoke` di CI su un runner con il binario `galleria` costruito dalla nuova riga di `scripts/gui.sh`: non girato.
+- **Una prova instabile, già in T2 e fuori dalla correzione:** `atk::the_signal_atk_has_is_emitted_with_the_text_and_the_urgency` (`tests/announce.rs`) fallisce in circa 1 giro su 10 di `cargo test -p galleria-gui` (28 su 300 lanci del binario `announce`; 0 su 300 con `--test-threads=1` e 0 su 300 da sola): `assertion failed: self.is::<T>()` in `NoOpObject::new`, una gara tra le prove del modulo `atk` che girano in parallelo. Si vede anche in `scripts/gui.sh check` e nel job `gui` di CI; non è stata corretta qui (scope).
 - Il campo del gruppo (`select` nativo) è provato in jsdom con un `change` (jsdom non lo guida con i tasti): il cambio di gruppo con la sola tastiera in WebKitGTK non è provato.

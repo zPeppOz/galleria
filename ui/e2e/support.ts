@@ -1,6 +1,6 @@
 // Helpers shared by the level 3 tests: the WebDriver smoke test (`*.e2e.ts`, lab/tests/gui-smoke.sh) and the screen
 // reader checks (`*.a11y.ts`, lab/tests/gui-a11y.sh). Nothing here asks the daemon to connect.
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { remote } from "webdriverio";
@@ -95,6 +95,31 @@ export function atspiTree(): AtNode[] {
         relations: (relations ?? "").split(",").filter(Boolean),
       };
     });
+}
+
+export interface SaveWindowAnswer {
+  /** The name the window proposed in its name field. */
+  offered: string;
+  pressed: "Save" | "Cancel";
+  /** The window was gone a moment after the button was pressed. */
+  closed: boolean;
+}
+
+/**
+ * The GTK «Save» window of «Export» is opened by Rust, not by the page, so WebDriver cannot see it: it is driven over
+ * AT-SPI by lab/tests/atspi-save-window.py. `save` puts a full path in its name field and activates «Save» (the folder
+ * must be there); `cancel` activates «Cancel». Throws when the window never appears. It does not block the event loop
+ * (`spawnSync` would): the key that opened the window is still waiting for its answer on it.
+ */
+export async function answerSaveWindow(answer: { save: string } | "cancel"): Promise<SaveWindowAnswer> {
+  const args = answer === "cancel" ? ["cancel"] : ["save", answer.save];
+  const done = await new Promise<{ status: number | null; out: string }>((resolve) => {
+    execFile("python3", [env("GALLERIA_A11Y_SAVE_WINDOW"), ...args], { encoding: "utf8" }, (error, stdout, stderr) =>
+      resolve({ status: error ? ((error.code as number | undefined) ?? 1) : 0, out: `${stdout}${stderr}` }),
+    );
+  });
+  if (done.status !== 0) throw new Error(`the Save window could not be answered (${done.status}): ${done.out}`);
+  return JSON.parse(done.out) as SaveWindowAnswer;
 }
 
 export function descendants(tree: AtNode[], root: AtNode): AtNode[] {

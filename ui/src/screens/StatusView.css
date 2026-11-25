@@ -8,6 +8,3 @@
 .status-view-state-connected { color: var(--ok); }
 .status-view-state-error { color: var(--err); }
 .status-view-state-connecting, .status-view-state-reconnecting, .status-view-state-needs_input, .status-view-state-disconnecting { color: var(--warn); }
-.status-view-facts { display: grid; grid-template-columns: max-content 1fr; gap: var(--sp-2) var(--sp-6); margin: 0; font-family: var(--mono); font-size: var(--fs-md); }
-.status-view-facts dt { color: var(--faint); }
-.status-view-facts dd { margin: 0; overflow-wrap: anywhere; }

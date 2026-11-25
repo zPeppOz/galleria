@@ -4,6 +4,7 @@ import type { DaemonView } from "../daemon/types";
 import { InlineAlert } from "../design/InlineAlert";
 import { errorText, hasKey, useT } from "../i18n";
 import "./StatusView.css";
+import "../design/Facts.css";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -45,7 +46,7 @@ export function StatusView({ view }: { view: DaemonView }) {
     <section className="status-view" aria-labelledby="status-title">
       <h2 id="status-title" className="status-view-title">{t("status.heading")}</h2>
       <p className={`status-view-state status-view-state-${status.state}`}>{t(`state.${status.state}`)}</p>
-      <dl className="status-view-facts">
+      <dl className="gx-facts">
         {status.profile && <Row label={t("status.profile")}>{status.profile.name}</Row>}
         {status.protocol && <Row label={t("status.protocol")}>{PROTOCOL_NAME[status.protocol]}</Row>}
         {status.local_addresses.length > 0 && <Row label={t("status.addresses")}>{status.local_addresses.join(", ")}</Row>}

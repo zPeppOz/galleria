@@ -1,0 +1,4 @@
+/* A list of facts: a grey name, then its value. Shared by the service view and the About window. Only variables of tokens.css. */
+.gx-facts { display: grid; grid-template-columns: max-content 1fr; gap: var(--sp-2) var(--sp-6); margin: 0; font-family: var(--mono); font-size: var(--fs-md); }
+.gx-facts dt { color: var(--faint); }
+.gx-facts dd { margin: 0; overflow-wrap: anywhere; }

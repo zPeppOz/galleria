@@ -1,6 +1,7 @@
 import type { AppInfo } from "../daemon/types";
 import { Dialog } from "../design/Dialog";
 import { useT } from "../i18n";
+import "../design/Facts.css";
 
 /** «About Galleria»: the app version and the socket from `app_info`, the service version from `daemon_view`, the licence. */
 export function AboutDialog(props: { open: boolean; onClose: () => void; info: AppInfo | null; daemonVersion: string | null }) {
@@ -9,7 +10,7 @@ export function AboutDialog(props: { open: boolean; onClose: () => void; info: A
   const unknown = "—";
   return (
     <Dialog open={open} onClose={onClose} title={t("about.title")} description={t("about.description")} closeLabel={t("dialog.close")}>
-      <dl className="facts">
+      <dl className="gx-facts">
         <dt>{t("about.version")}</dt>
         <dd>{info?.version ?? unknown}</dd>
         <dt>{t("about.daemon")}</dt>

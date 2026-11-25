@@ -1332,9 +1332,19 @@ name = "galleria-gui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "galleria-backend",
+ "galleria-ipc",
+ "galleriad",
+ "nix",
+ "rstest",
+ "serde",
  "serde_json",
  "tauri",
  "tauri-build",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]

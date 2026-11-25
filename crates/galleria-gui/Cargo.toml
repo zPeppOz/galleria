@@ -13,13 +13,24 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [dependencies]
 anyhow.workspace = true
+galleria-ipc = { workspace = true, features = ["client"] }
+serde.workspace = true
+serde_json.workspace = true
 tauri = { version = "2.12", features = [] }
+thiserror.workspace = true
+tokio.workspace = true
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }
 
+# The fake daemon of the level-2 tests (spec §14, Q17): the daemon and the fake backend are never normal dependencies.
 [dev-dependencies]
-serde_json.workspace = true
+galleria-backend = { workspace = true, features = ["fake"] }
+galleriad = { path = "../galleriad" }
+nix.workspace = true
+rstest.workspace = true
+tempfile.workspace = true
+tokio-util.workspace = true
 
 [lints]
 workspace = true

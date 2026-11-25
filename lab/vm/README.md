@@ -49,3 +49,27 @@ sudo bash /lab/lab/vm/s15-check.sh
 ```
 
 Dopo ogni riavvio della VM serve di nuovo `vm-lab.sh up <ottetto>`.
+
+## Spike Orca (sessione GNOME vera)
+
+Per provare Orca con la GUI di Galleria nel desktop vero delle due VM (esito in `docs/08-esito-fase2.md`, «Spike Orca»).
+`DISPLAY_OPT=vnc=127.0.0.1:1 vmctl.sh start ubuntu` (`:2` per Fedora) apre un VNC locale; il monitor qemu è sempre su
+`/mnt/b/vm/<vm>.mon`.
+
+| File | Cosa fa |
+| --- | --- |
+| `vmkeys.py` | dall'host: `sendkey` dal monitor qemu (tastiera vera: `tab`, `shift-tab`, `ret`, `esc`…) |
+| `vncshot.py` | dall'host: fotografia dello schermo dal VNC (RFB senza librerie; `screendump` di qemu non serve con GNOME) |
+| `orca-spike-vm.sh` | in VM, da `lab`: `orca` (Orca con file di debug a righe), `app`, `app-spike`, `speech`, `count`, `since N`, `dump`, `daemon-down/up`, `versions` |
+| `orca-spike-run.py` | dall'host: i giri `fields`, `toast`, `statusbar`, `all`, con parlato, fuoco AT-SPI e trascrizione |
+| `orca-line-buffered.py` | Orca con il file di debug a righe (copia di `lab/tests/orca-line-buffered.py`) |
+| `atspi-announce.py` | in VM: emette `object:announcement` da un programma fuori dall'app (`--register` lo fa comparire come applicazione AT-SPI) |
+| `gtk-announce.py` | in VM e nell'immagine: finestra GTK3 che emette il segnale ATK `announcement` o `notification` |
+| `orca-spike-announce.sh` | in VM: le quattro prove A–D degli annunci, con il parlato di Orca |
+| `docker-announce.sh` | dall'host: le prove C e D nell'immagine `galleria-gui-dev` (Orca 46.1, Xvfb) |
+| `orca-spike-inapp.patch` | **non applicato nel repo**: emette gli annunci da dentro `galleria-gui` (build di prova, `GALLERIA_SPIKE_ANNOUNCE=1`) |
+
+Passi: copiare `galleria-gui`, `fake-daemon`, `atspi-dump.py` e gli script in `~lab/spike/` della VM, poi
+`orca-spike-vm.sh orca`, `orca-spike-vm.sh app` e `orca-spike-run.py <vm> all`. GNOME blocca lo schermo dopo 5 minuti:
+`gsettings set org.gnome.desktop.session idle-delay 0` e `…screensaver lock-enabled false`. Su Fedora, al primo accesso,
+chiudere la panoramica (`Esc`) prima di avviare l'app, altrimenti non ha il fuoco.

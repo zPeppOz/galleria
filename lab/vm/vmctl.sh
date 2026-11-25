@@ -1,6 +1,7 @@
 #!/bin/bash
 # Galleria desktop VMs: qemu diretto, rete utente, tutto in /mnt/b/vm.
 # Uso: vmctl.sh start|stop|ssh|status <ubuntu|fedora> [comando...]
+# DISPLAY_OPT=vnc=127.0.0.1:N apre un display VNC locale; il monitor qemu è sempre su /mnt/b/vm/<vm>.mon (sendkey, screendump).
 set -euo pipefail
 cmd=$1 vm=$2; shift 2
 B=/mnt/b/vm
@@ -18,7 +19,7 @@ start)
     -drive if=pflash,format=raw,file=$B/ovmf/$vm.VARS.fd \
     -drive file=$B/disks/$vm.qcow2,if=virtio,format=qcow2 $seed \
     -nic user,model=virtio-net-pci,hostfwd=tcp:127.0.0.1:$port-:22 \
-    -device virtio-vga -display none -serial file:$B/logs/$vm.serial.log \
+    -device virtio-vga -display ${DISPLAY_OPT:-none} -monitor unix:$B/$vm.mon,server,nowait -serial file:$B/logs/$vm.serial.log \
     -object rng-random,id=rng0,filename=/dev/urandom -device virtio-rng-pci,rng=rng0 \
     -name galleria-$vm -daemonize -pidfile $pidf"
   ;;

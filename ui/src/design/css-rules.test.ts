@@ -5,8 +5,6 @@ import { describe, expect, it } from "vitest";
 
 const SRC = join(import.meta.dirname, "..");
 const TOKENS = join("design", "tokens.css");
-// styles.css still carries the sizes of B1; it disappears in T6 and takes this exception with it.
-const SCALE_EXCEPTIONS = new Set(["styles.css"]);
 
 function cssFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -55,7 +53,7 @@ describe("css rules", () => {
       "border-radius": /^(var\(--r-(xs|sm|md|lg|full)\)\s*)+$|^(inherit|0|50%)$/,
       "font-size": /^(var\(--fs-(xs|sm|md|base|lg|xl)\)|inherit)$/,
     };
-    const off = all.filter((d) => !SCALE_EXCEPTIONS.has(d.file) && scale[d.property] && !scale[d.property].test(d.value));
+    const off = all.filter((d) => scale[d.property] && !scale[d.property].test(d.value));
     expect(off.map(show)).toEqual([]);
   });
 });

@@ -245,3 +245,37 @@ tiene ora solo la cornice di B1 (titolo, contenuto, barra) fino al T6.
   Testi, ruoli e prove di B1 invariati.
 - Verifiche: 185 prove Vitest verdi; mutazione provata (tempo di permanenza e pausa tolti → `toast_leaves_by_itself…` rossa);
   `scripts/gui.sh smoke` 8/8 (S8: 1,30 per canale), `a11y` 11/11, gate dell'host verdi.
+
+### Guscio con lista e dettaglio (T6)
+
+`ui/src/shell/`: `Shell` (cornice: barra in alto, lista a sinistra di 300 px, contenuto, barra di stato; sotto 860 px una
+colonna con la lista sopra), `TopBar`, `ProfileList`, `ProfileDetail`, `ServiceArea`, `StatusBar`, `ProtocolTag`, `demo-data.ts`,
+ciascuno con il suo `.css`. `ui/src/styles.css` non esiste più e `css-rules.test.ts` non ha più eccezioni. `App.tsx` ora è
+soltanto il collegamento al demone (`useDaemon`) dentro `Shell`; `Shell` tiene il `ToastProvider`.
+
+- **Dati finti**: cinque profili del mockup su domini `example` (`DemoProfile[]`, nessun segreto), gruppi con titolo dal catalogo
+  (`group.work|personal|clients`) per cambiare lingua a caldo. Il segno «Dati di esempio» sta nella barra in alto, `--ink` su
+  tinta di `--warn` con bordo `--warn`. `shell/boundary.test.ts`: nessun `invoke(`, nessun import di `@tauri-apps` o di
+  `daemon/store` nei sorgenti del guscio.
+- **Lista**: `listbox` con un `group` (nome = titolo) per gruppo e righe `option` con **tabindex a rotazione**: un solo punto di
+  sosta (la riga scelta), frecce, Home, End e la prima lettera spostano fuoco e scelta insieme. Nome della riga = nome del
+  profilo; server, protocollo («WireGuard»/«OpenVPN» in testo nascosto accanto alla sigla) e «Preferito» stanno nella
+  descrizione (`aria-describedby`). La selezione si vede con un riempimento e una barra `--accent` (mai testo).
+- **Dettaglio**: nome come unico `h1` del documento; «Altre azioni» (Duplica · Esporta · Elimina) con testo visibile; striscia di
+  quattro celle «—» (con «non disponibile» per lo screen reader); cinque schede; «Generale» con `Field`, `Field as="select"`,
+  `Segmented` di sola lettura (solo OpenVPN) e `Switch`. «Elimina» apre `ConfirmDialog` (fuoco su «Annulla»), alla conferma
+  l'avviso `demo.no_change`; «Duplica» ed «Esporta» mostrano lo stesso avviso. I profili restano cinque.
+- **ServiceArea (Q26)**: senza collegamento il pannello di `FirstRun`; prima della prima risposta un pannello «Collegamento al
+  servizio»; con collegamento gli avvisi dei backend (`BackendWarnings`, estratto da `StatusView`) e, con una sessione non
+  `disconnected`, `StatusView` (che porta già gli avvisi: mostrati una volta sola). La lista resta sempre usabile.
+- **StatusBar**: a sinistra lo stato vero (`state.<s>`, o «Nessuno stato della connessione» senza sessione), a destra il collegamento
+  (`bar.*`) e la versione dell'app; `aria-live="polite"`. Il fumo di B1 cerca ancora «Disconnected» e «Connected to the service».
+- **Ordine del `Tab`** (DOM): «Menu» → lista → pannello di primo avvio («Copia», «Riprova») → «Altre azioni» → schede → primo
+  controllo della scheda. Il T7 lo fissa con `keyboard.test.tsx`.
+- Il piano non aveva il campo di ricerca (B3) e non lo ho messo. `daemon/protocol.ts` raccoglie i nomi dei protocolli (nomi propri,
+  uguali in ogni lingua, fuori dai cataloghi).
+- Verifiche: 238 prove Vitest (T5: 185) e 7 di `tests/catalogs.rs` verdi; `scripts/gui.sh check`, `smoke` 8/8 (S8: 1,30),
+  `a11y` 11/11 e i gate dell'host verdi. **Guardato in una finestra vera** (fotografie di WebKitGTK sotto Xvfb, tema chiaro e scuro,
+  primo avvio, menu aperto): lista, dettaglio, striscia e schede si disegnano senza sovrapposizioni; la scheda «Trasporto»
+  non aveva etichetta visibile (aggiunta). Le fotografie non sono nel repo. Non guardato: sotto 860 px, la scheda «Log» e la
+  finestra di conferma nella finestra vera.

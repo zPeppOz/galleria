@@ -1,5 +1,5 @@
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -22,13 +22,15 @@ function backend(view: DaemonView) {
   mockIPC((cmd) => { calls.push(cmd); return cmd === "daemon_view" ? view : cmd === "app_info" ? makeInfo() : undefined; }, { shouldMockEvents: true });
   return calls;
 }
-const ready = () => screen.findByRole("region");
+// The first answer of the backend brings the app version into the bar at the bottom.
+const ready = () => waitFor(() => expect(within(screen.getByRole("contentinfo")).getByText(/App 0\.1\.0/)).toBeTruthy());
 
 describe("App", () => {
   it("renders_the_app_title", async () => {
     backend(VIEWS.connected);
     render(<App lang="it" />);
-    expect(screen.getByRole("heading", { level: 1, name: "Galleria" })).toBeTruthy();
+    expect(within(screen.getByRole("banner")).getByText("Galleria")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Ufficio Napoli");
     await ready();
   });
 
@@ -47,6 +49,8 @@ describe("App", () => {
     await ready();
     await user.tab(); // the menu button of the title bar comes first
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }));
+    await user.tab(); // then the list (one stop)
+    expect(document.activeElement).toBe(screen.getByRole("option", { name: "Ufficio Napoli" }));
     await user.tab();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Copia" }));
     await user.keyboard("{Enter}");
@@ -62,7 +66,11 @@ describe("App", () => {
     const user = userEvent.setup();
     render(<App lang="it" />);
     await ready();
-    for (const button of screen.queryAllByRole("button")) await user.click(button);
+    // every button of the page, the menu and the dialog it opens included
+    for (const button of screen.queryAllByRole("button")) {
+      if (button.getAttribute("aria-haspopup")) continue;
+      await user.click(button);
+    }
     expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", ...(calls.includes("daemon_retry") ? ["daemon_retry"] : [])]));
   });
 });

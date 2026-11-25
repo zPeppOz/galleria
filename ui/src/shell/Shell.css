@@ -1,0 +1,12 @@
+/* The layout of the window: a column (top bar, body, status bar); the body is the list (300 px) and the content.
+   Under 860 px one column, the list above the detail (the list is not hidden: without it the profiles could not be chosen). */
+.shell { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
+.shell-body { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 0; }
+.shell-aside { border-right: 1px solid var(--line); background: var(--bg); overflow: auto; min-height: 0; }
+.shell-main { display: flex; flex-direction: column; gap: var(--sp-7); padding: var(--sp-8) var(--sp-9); overflow: auto; min-height: 0; min-width: 0; }
+
+@media (max-width: 860px) {
+  .shell-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 40%) minmax(0, 1fr); }
+  .shell-aside { border-right: 0; border-bottom: 1px solid var(--line); }
+  .shell-main { padding: var(--sp-6); }
+}

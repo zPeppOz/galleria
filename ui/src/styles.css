@@ -1,8 +1,0 @@
-/* The frame of B1 (title bar, content, status bar). The shell of T6 replaces it and this file goes away with it; the panels
-   of the screens have their own css next to them. Until then it keeps the old sizes, named as an exception in
-   design/css-rules.test.ts. */
-#root { display: grid; grid-template-rows: auto 1fr 28px; }
-header { padding: 10px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
-h1 { margin: 0; font-size: 15px; font-weight: var(--fw-strong); }
-main { padding: 28px; overflow: auto; }
-.bar { padding: 4px 18px; border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); }

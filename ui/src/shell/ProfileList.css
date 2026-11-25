@@ -1,0 +1,19 @@
+/* The list of profiles: only variables of tokens.css. The selection is a fill and a bar of the accent (never a text colour). */
+.profile-list { display: flex; flex-direction: column; gap: var(--sp-5); padding: var(--sp-4); }
+.profile-group { display: flex; flex-direction: column; gap: var(--sp-1); }
+.profile-group-title {
+  display: flex; justify-content: space-between; padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-xs); font-weight: var(--fw-strong); letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
+}
+.profile-option {
+  display: grid; grid-template-columns: var(--sp-4) minmax(0, 1fr) auto; align-items: center; gap: var(--sp-5);
+  min-height: var(--h-row); padding: var(--sp-4) var(--sp-5); border-radius: var(--r-sm); cursor: pointer;
+}
+.profile-option:hover { background: var(--panel); }
+.profile-option[aria-selected="true"] { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--accent); }
+.profile-dot { width: var(--sp-4); height: var(--sp-4); border-radius: 50%; background: var(--faint); opacity: 0.5; }
+.profile-text { display: flex; flex-direction: column; min-width: 0; }
+.profile-name { display: flex; align-items: center; gap: var(--sp-2); font-weight: var(--fw-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-star { display: inline-grid; }
+.profile-star .gx-icon { fill: var(--accent); stroke: var(--accent); }
+.profile-server { font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -53,7 +53,7 @@
   nell'elenco della macro `every_variant!`.
 - `Tabs.Panel` di Base UI ha `tabindex="0"`: dalla lista il Tab va al pannello. Il `Tabs.Indicator` non è ancora provato nella
   finestra vera (T7).
-- Restano T6 (guscio) e T7 (tastiera, fumo, Orca, esito, roadmap): card successive. `styles.css` sparisce al T6.
+- Restano T7 (tastiera, fumo, Orca, esito, roadmap): card successiva. `styles.css` è sparito al T6.
 
 ## Scelte da sapere (T5)
 
@@ -64,3 +64,19 @@
 - `ConfirmDialog` è `AlertDialog` di Base UI; i due pulsanti sono `<button class="gx-button …">` perché `initialFocus` vuole un
   riferimento (`Button` non lo inoltra).
 - `FirstRun` e `StatusView` hanno `screens/*.css` loro; `App.tsx` avvolge tutto in `ToastProvider` (`toast.close`).
+
+## Scelte da sapere (T6)
+
+- `ui/src/shell/`: `Shell` tiene il `ToastProvider` e non chiama mai il demone (`boundary.test.ts`); `App.tsx` passa solo
+  `view`, `info` e `retry` da `useDaemon`. `ui/src/styles.css` non esiste più, `css-rules.test.ts` senza eccezioni.
+- Lista: tabindex a rotazione (una sosta, la riga scelta); la scelta segue il fuoco; la prima lettera salta. Il protocollo si dice
+  con `ProtocolTag` («WG» nascosto + «WireGuard» in testo nascosto). I titoli dei gruppi vengono dal catalogo.
+- `BackendWarnings` è esportato da `screens/StatusView.tsx`; `ServiceArea` lo usa da solo con sessione `disconnected` e lascia
+  `StatusView` (che lo contiene) quando c'è una sessione: l'avviso compare una volta sola.
+- Per i test del guscio: `getAllByRole("option")` prende anche le `<option>` del `<select>` della scheda Generale: va ristretto a
+  `listbox`. Le regioni vive dei toast (`status`, `alert`) ci sono sempre: per cercare un avviso in linea usare `.gx-alert`.
+- Il campo di ricerca non c'è (B3). Le stelle (`--accent`) sono `fill`/`stroke`, non `color`: la regola «accento mai testo» le vede.
+- Nella finestra vera si vede l'indicatore della scheda (sottolineatura sotto «Generale»); la prova esplicita di nessuna violazione
+  della CSP con il guscio resta al T7 (`no_csp_violation_during_the_tour`).
+- Merge: il ramo di T5/T6 non era in avanzamento rapido sul ramo di T1–T4 (main aveva i commit delle VM): fatto un merge
+  `bbb54e7` invece del `--ff-only`.

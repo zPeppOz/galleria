@@ -1,0 +1,7 @@
+/* The text is --ink on a tint of the protocol colour; the colour itself only goes to the border (C7). */
+.protocol-tag {
+  display: inline-block; padding: var(--sp-1) var(--sp-3); border-radius: var(--r-xs); color: var(--ink);
+  font: var(--fw-strong) var(--fs-xs) var(--mono); letter-spacing: 0.04em;
+}
+.protocol-tag-wireguard { background: color-mix(in oklch, var(--wg) var(--tint), transparent); box-shadow: inset 0 0 0 1px var(--wg); }
+.protocol-tag-openvpn { background: color-mix(in oklch, var(--ovpn) var(--tint), transparent); box-shadow: inset 0 0 0 1px var(--ovpn); }

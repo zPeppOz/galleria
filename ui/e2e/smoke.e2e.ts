@@ -531,7 +531,8 @@ describe("the shell in the real window", () => {
     await (await byText(b, "[role=tab]", "General")).click();
     await b.$("button=More actions").click();
     await (await byText(b, "[role=menuitem]", "Delete")).click();
-    await waitForBody(b, "This action arrives in a later release.", "the notice never appeared");
+    await waitForBody(b, "Delete Homelab?", "the confirmation never appeared");
+    await press(b, "Escape");
     await b.$("button=Menu").click();
     await (await byText(b, "[role=menuitem]", "About Galleria")).click();
     await b.$('[role="dialog"]').waitForDisplayed({ timeout: TEN_SECONDS });

@@ -1,0 +1,4 @@
+/* The search field and the count of the results: only variables of tokens.css. */
+.search-box { display: flex; flex-direction: column; gap: var(--sp-2); }
+.search-box-field { width: 100%; }
+.search-count { margin: 0; min-height: var(--sp-6); font-size: var(--fs-sm); color: var(--muted); }

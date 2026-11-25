@@ -34,3 +34,6 @@ export function errorText(t: Translate, code: string, fallback: string): string 
   const key = `error.${code}`;
   return hasKey(key) ? t(key) : fallback;
 }
+
+/** The language the window is in. */
+export const useLang = (): Lang => useContext(LangContext);

@@ -17,3 +17,9 @@
 .profile-star { display: inline-grid; }
 .profile-star .gx-icon { fill: var(--accent); stroke: var(--accent); }
 .profile-server { font-size: var(--fs-sm); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The session that uses a profile: the word is the sign (--ink), the dot only adds the colour. */
+.profile-state { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-dot-connected { background: var(--ok); opacity: 1; }
+.profile-dot-connecting, .profile-dot-reconnecting, .profile-dot-needs_input, .profile-dot-disconnecting { background: var(--warn); opacity: 1; }
+.profile-dot-error { background: var(--err); opacity: 1; }
+.profile-list-empty { margin: 0; padding: var(--sp-5) var(--sp-6); color: var(--muted); }

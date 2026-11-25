@@ -723,3 +723,29 @@ host: `cargo fmt --check`, `clippy -D warnings`, `cargo test` (535), `cargo deny
 Non verificato (T3): permessi sbagliati sul vero `~/.config/galleria` di una persona (provato solo su cartelle temporanee); una rubrica con
 molte centinaia di profili (la lettura è sincrona nel comando async, non misurata); `galleria.toml` rotto fa fallire la lista intera con
 `gui_store_unreadable` (scelta: meglio un errore chiaro che gruppi che spariscono in silenzio).
+
+### Ricerca, preferiti, ordinamento e stato sulla riga (T4)
+
+- **`rubrica/arrange.ts`** (puro, senza React né Tauri) ha ora tutte le regole del piano: i gruppi nell'ordine di `galleria.toml`, poi quelli noti solo ai
+  profili in ordine alfabetico, in fondo «Senza gruppo»; un gruppo senza profili si vede solo a ricerca vuota; dentro il gruppo i preferiti prima (P5) in
+  tutti e due gli ordinamenti, poi per nome (`Intl.Collator` della lingua della finestra, a parità per id) oppure, per «Più recenti» (P6), per ultimo uso
+  decrescente e poi per nome (chi non è mai stato usato, o ha una data illeggibile, viene dopo). La ricerca guarda nome, server e gruppo, senza maiuscole né
+  accenti, e ogni parola deve comparire («citta mi» trova «Città Milano»).
+- **`SearchBox`**: etichetta visibile solo allo screen reader («Cerca connessioni»), `Ctrl+K` porta il fuoco lì da qualunque punto, `Esc` svuota, `↓`
+  passa alla lista (`ProfileList` espone `focusRef`). Il conto dei risultati è testo visibile in un elemento `role="status"` e **non** passa da `announce`
+  (limite dichiarato, spec §12.1 regola 3; prova `result_count_is_a_status_and_is_not_announced`).
+- **`SortControl`**: `Segmented` «Per nome · Più recenti», scrive con `ui_state_set` e, se la scrittura fallisce, dice `gui_state_not_saved` come lingua e tema.
+  L'ordinamento salvato lo legge `main.tsx` insieme a lingua e tema (`App sort=…`); lo tiene `App` perché serve anche alla selezione (il profilo che prende
+  il posto di uno che sparisce è il successivo **nell'ordine che la lista mostra**, `displayOrder(view, sort, lang)`).
+- **Stato sulla riga**: se `status.profile.id` è un profilo della rubrica e lo stato non è `disconnected`, la riga mostra l'etichetta `state.<s>` come testo e la porta
+  nel nome accessibile («Homelab Connected»); il pallino ha solo il colore in più. Una sessione di un profilo che non è in rubrica non compare in nessuna riga (D21 è B5).
+- **Nessun risultato**: la `listbox` resta nel documento, senza opzioni, e `search.no_match` lo dice; il dettaglio resta quello che era aperto (una ricerca non cambia
+  il profilo aperto).
+- **Effetti sulle prove di B2/T3**: l'ordine di Tab diventa «Menu» → ricerca → ordinamento → lista → … (`keyboard.test.tsx`, `App.test.tsx`, fumo, Orca); con i preferiti in cima
+  il primo profilo torna «Ufficio Napoli» (in T3 era «Datacenter Milano»). `search-count` è un secondo `status` nella pagina: le prove degli avvisi cercano la regione
+  dentro `.gx-toasts`. `ui/src/test/shell.tsx` (`renderShell`) porta anche l'ordinamento.
+- Fumo nuovo: `search_filters_the_list_and_sort_order_survives_a_restart` (cerca «milano», svuota, sceglie «Più recenti», legge `sort = "recent"` in `state.toml`, riavvia e
+  ritrova la scelta).
+
+Non verificato (T4): «Più recenti» con date vere (nessuno scrive `last_used` prima di B5: provato solo con date messe a mano nelle prove); `Ctrl+K` sotto Wayland o con un
+gestore di scorciatoie del desktop che lo prenda prima; il comportamento di Orca sul campo di ricerca (stesso limite del campo di testo nudo nell'immagine, Orca 46.1).

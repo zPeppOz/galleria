@@ -5,6 +5,7 @@
 // Orca in `ui/e2e/shell.a11y.ts`.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { mockIPC } from "@tauri-apps/api/mocks";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -18,6 +19,9 @@ const show = (view: DaemonView | null = makeView(), onRetry = () => undefined) =
   renderShell(view, { onRetry });
 
 const firstRun = () => makeView({ link: "daemon_not_running", status: null });
+
+/** The live region of the notices (the search count is a `status` too). */
+const toastStatus = (): HTMLElement => document.querySelector(".gx-toasts [role=\"status\"]") as HTMLElement;
 
 /** What a screen reader would call the element. */
 function nameOf(el: Element): string {
@@ -76,11 +80,12 @@ describe("keyboard on the whole shell", () => {
     show(firstRun());
     const stops = await tabStops(user);
     const seen = stops.map((el) => `${roleOf(el)}:${nameOf(el)}`);
-    // The menu button, the list (one stop: the chosen row), the first-run panel («Copy», «Try again»), «More actions»,
-    // the tab strip (one stop: the chosen tab) and then the panel itself and its first control.
-    expect(seen.slice(0, 5)).toEqual(["button:Menu", "option:Ufficio Napoli", "button:Copy", "button:Try again", "button:More actions"]);
-    expect(seen[5]).toBe("tab:General");
-    const rest = seen.slice(6);
+    // The menu button, the search field, the sort order (one stop: the chosen radio), the list (one stop: the chosen row), the
+    // first-run panel («Copy», «Try again»), «More actions», the tab strip (one stop: the chosen tab) and then the panel
+    // itself and its first control.
+    expect(seen.slice(0, 7)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Copy", "button:Try again", "button:More actions"]);
+    expect(seen[7]).toBe("tab:General");
+    const rest = seen.slice(8);
     // After the strip comes the panel of the chosen tab (Base UI makes it a stop) or straight its first control; the
     // first control is the name field either way.
     expect(rest.some((s) => s === "input:Name")).toBe(true);
@@ -91,12 +96,14 @@ describe("keyboard on the whole shell", () => {
     const user = userEvent.setup();
     show();
     const seen = (await tabStops(user)).map((el) => `${roleOf(el)}:${nameOf(el)}`);
-    expect(seen.slice(0, 4)).toEqual(["button:Menu", "option:Ufficio Napoli", "button:More actions", "tab:General"]);
+    expect(seen.slice(0, 6)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:More actions", "tab:General"]);
     expect(seen).not.toContain("button:Copy");
   });
 
   it("every_interactive_element_is_reachable", async () => {
     const user = userEvent.setup();
+    // the arrows on the sort order write `state.toml`: here the app answers, so no notice comes of it
+    mockIPC(() => undefined);
     // «Ufficio Napoli» is OpenVPN: its «General» tab has the transport choice (radios) as well.
     show(firstRun());
     const key = (el: Element) => `${roleOf(el)}:${nameOf(el)}`;
@@ -121,13 +128,16 @@ describe("keyboard on the whole shell", () => {
     }
     reached.add(key(document.activeElement as HTMLElement));
     await user.keyboard("{Home}");
-    const radios = screen.getAllByRole("radio");
-    radios[0].focus();
-    for (let i = 0; i < radios.length; i++) {
+    // each group of radios on its own: the sort order and the transport
+    for (const group of screen.getAllByRole("radiogroup")) {
+      const radios = within(group).getAllByRole("radio");
+      radios[0].focus();
+      for (let i = 0; i < radios.length; i++) {
+        reached.add(key(document.activeElement as HTMLElement));
+        await user.keyboard("{ArrowRight}");
+      }
       reached.add(key(document.activeElement as HTMLElement));
-      await user.keyboard("{ArrowRight}");
     }
-    reached.add(key(document.activeElement as HTMLElement));
 
     const missed = interactiveElements().filter((el) => !reached.has(key(el)));
     expect(missed.map((el) => `${roleOf(el)}:${nameOf(el)}`)).toEqual([]);
@@ -207,7 +217,7 @@ describe("keyboard on the whole shell", () => {
     await user.keyboard("{Enter}");
     await menuOpen("More actions");
     await user.keyboard("{Home}{Enter}");
-    const status = screen.getByRole("status");
+    const status = toastStatus();
     await waitFor(() => expect(status.textContent).toContain("This action arrives in a later release."));
     expect(document.activeElement).toBe(more); // the notice did not take the focus
     // a person who wants to read it or close it gets there with Tab (it comes after the main area)
@@ -224,10 +234,12 @@ describe("keyboard on the whole shell", () => {
     show();
     const active = () => document.activeElement as HTMLElement;
     const title = () => screen.getByRole("heading", { level: 1 }).textContent;
-
-    // a profile: Menu → list → the arrows move the choice
+    // a profile: Menu → search → sort order → list → the arrows move the choice
     await user.tab();
     await user.tab();
+    await user.tab();
+    await user.tab();
+    expect(nameOf(active())).toBe("Ufficio Napoli");
     expect(nameOf(active())).toBe("Ufficio Napoli");
     await user.keyboard("{ArrowDown}");
     expect(title()).toBe("Datacenter Milano");
@@ -259,7 +271,7 @@ describe("keyboard on the whole shell", () => {
     await user.keyboard("{Enter}");
     await menuOpen("More actions");
     await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
-    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("This action arrives in a later release."));
+    await waitFor(() => expect(toastStatus().textContent).toContain("This action arrives in a later release."));
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(5);
 

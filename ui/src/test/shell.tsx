@@ -1,5 +1,6 @@
 import { render } from "@testing-library/react";
 import { useState } from "react";
+import type { SortOrder } from "../app/uiState";
 import type { DaemonView } from "../daemon/types";
 import type { Announce } from "../design/Toast";
 import { Preferences } from "../prefs";
@@ -16,12 +17,15 @@ interface Options {
   /** The rubrica the shell shows; null is a read that has not answered yet. */
   rubrica?: RubricaView | null;
   error?: CmdError | null;
+  /** The saved sort order the window starts with. */
+  sort?: SortOrder;
 }
 
-/** The shell with a rubrica that answers at once and keeps its own selection: no app behind it, nothing to wait for. */
+/** The shell with a rubrica that answers at once and keeps its own selection and sort order: no app behind it, nothing to wait for. */
 function Harness({ view, options }: { view: DaemonView | null; options: Options }) {
   const list = options.rubrica === undefined ? makeRubricaView() : options.rubrica;
-  const first = list ? arrange(list).groups.flatMap((g) => g.profiles)[0]?.id ?? null : null;
+  const [sort, setSort] = useState<SortOrder>(options.sort ?? "name");
+  const first = list ? arrange({ profiles: list.profiles, groups: list.groups, query: "", sort }).groups.flatMap((g) => g.profiles)[0]?.id ?? null : null;
   const [selectedId, select] = useState<string | null>(first);
   const selected = list?.profiles.find((p) => p.id === selectedId) ?? null;
   const rubrica: Rubrica = {
@@ -34,7 +38,9 @@ function Harness({ view, options }: { view: DaemonView | null; options: Options 
     detailError: null,
     reload: async () => undefined,
   };
-  return <Shell view={view} info={view ? makeInfo() : null} onRetry={options.onRetry ?? (() => undefined)} announce={options.announce} rubrica={rubrica} />;
+  return (
+    <Shell view={view} info={view ? makeInfo() : null} onRetry={options.onRetry ?? (() => undefined)} announce={options.announce} rubrica={rubrica} sort={sort} onSortChange={setSort} />
+  );
 }
 
 export const renderShell = (view: DaemonView | null = makeView(), options: Options = {}) =>

@@ -132,3 +132,67 @@ describe("ProfileList", () => {
     await expectNoAccessibilityViolations(container);
   });
 });
+
+describe("ProfileList: the session and the search", () => {
+  const withState: ListGroup[] = [
+    { id: "g", title: "Work", profiles: [{ id: "a", name: "Alpha", server: "a.example:1194", protocol: "openvpn", state: "connected" }, { id: "b", name: "Bravo", server: "b.example:51820", protocol: "wireguard" }] },
+  ];
+  const show = (groups: ListGroup[], empty?: string) =>
+    render(
+      <I18n lang="en">
+        <ProfileList label="Connections" groups={groups} selectedId="b" onSelect={() => undefined} empty={empty} />
+      </I18n>,
+    );
+
+  it("active_session_row_says_its_state_in_words", () => {
+    show(withState);
+    // the state is a text on the row and a part of the name: not only the colour of the dot
+    const row = screen.getByRole("option", { name: "Alpha Connected" });
+    expect(row.textContent).toContain("Connected");
+    expect(row.querySelector(".profile-dot")?.getAttribute("aria-hidden")).toBe("true");
+    expect(row.querySelector(".profile-dot")?.className).toContain("profile-dot-connected");
+  });
+
+  it.each([["connecting", "Connecting"], ["reconnecting", "Reconnecting"], ["needs_input", "Waiting for input"], ["error", "Error"]] as const)("every_state_has_its_word: %s", (state, word) => {
+    show([{ id: "g", title: "Work", profiles: [{ ...withState[0].profiles[0], state }] }]);
+    expect(screen.getByRole("option", { name: `Alpha ${word}` })).toBeTruthy();
+  });
+
+  it("a_row_without_a_session_has_no_state", () => {
+    show(withState);
+    const row = screen.getByRole("option", { name: "Bravo" });
+    expect(row.querySelector(".profile-state")).toBeNull();
+    expect(row.querySelector(".profile-dot")?.className).toBe("profile-dot");
+  });
+
+  it("no_match_says_so", async () => {
+    const { container } = render(
+      <I18n lang="en">
+        <main>
+          <ProfileList label="Connections" groups={[]} selectedId="" onSelect={() => undefined} empty="No connection matches your search." />
+        </main>
+      </I18n>,
+    );
+    // the listbox stays in the page, with no option, and the text says why
+    expect(screen.getByRole("listbox", { name: "Connections" })).toBeTruthy();
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    expect(screen.getByText("No connection matches your search.")).toBeTruthy();
+    await expectNoAccessibilityViolations(container);
+  });
+
+  it("the_empty_text_is_not_shown_while_there_are_profiles", () => {
+    show(withState, "No connection matches your search.");
+    expect(screen.queryByText("No connection matches your search.")).toBeNull();
+  });
+
+  it("the_focus_ref_hands_the_focus_to_the_chosen_row", () => {
+    const ref = { current: null as { focus: () => void } | null };
+    render(
+      <I18n lang="en">
+        <ProfileList label="Connections" groups={withState} selectedId="b" onSelect={() => undefined} focusRef={ref} />
+      </I18n>,
+    );
+    ref.current?.focus();
+    expect(document.activeElement).toBe(screen.getByRole("option", { name: "Bravo" }));
+  });
+});

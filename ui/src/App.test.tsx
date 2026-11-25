@@ -63,7 +63,11 @@ describe("App", () => {
     await ready();
     await user.tab(); // the menu button of the title bar comes first
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Menu" }));
-    await user.tab(); // then the list (one stop)
+    await user.tab(); // then the search field, the sort order (one stop) and the list (one stop)
+    expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Cerca connessioni" }));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole("radio", { name: "Per nome" }));
+    await user.tab();
     expect(document.activeElement).toBe(screen.getByRole("option", { name: "Ufficio Napoli" }));
     await user.tab();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Copia" }));

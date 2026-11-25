@@ -17,7 +17,7 @@ async function start() {
   if (root) {
     createRoot(root).render(
       <StrictMode>
-        <App lang={prefs.lang} theme={prefs.theme} />
+        <App lang={prefs.lang} theme={prefs.theme} sort={prefs.sort} />
       </StrictMode>,
     );
   }

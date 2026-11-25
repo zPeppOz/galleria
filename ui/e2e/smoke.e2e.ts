@@ -290,9 +290,9 @@ describe("the shell in the real window", () => {
     expect(groups).toEqual(["Lavoro", "Personale", "Clienti"]);
     // the server of the chosen profile is on the page, and the secrets of the seed are nowhere in it
     const text = await bodyText(b);
-    expect(text).toContain("gw.dc-mi.example:443");
+    expect(text).toContain("vpn.ufficio.example:1194");
     expect(text).not.toContain("SEED-SECRET");
-    expect(await title(b)).toBe("Datacenter Milano");
+    expect(await title(b)).toBe("Ufficio Napoli");
   });
 
   it("empty_rubrica_shows_the_import_hint", async () => {
@@ -303,25 +303,47 @@ describe("the shell in the real window", () => {
     expect(await b.$$('[role="option"]')).toHaveLength(0);
   });
 
+  // R1, D32: the search narrows the list and the sort order chosen comes back after a restart. Every key goes through the
+  // real window: the search field is typed in, the sort order is chosen with a click and read back from state.toml.
+  it("search_filters_the_list_and_sort_order_survives_a_restart", async () => {
+    daemon("stop");
+    const first = await openApp();
+    await waitForBody(first, START_THE_SERVICE, "the «Start the service» panel never appeared");
+    const rows = async () => (await first.execute(() => [...document.querySelectorAll('[role="listbox"] [role="option"] span.profile-name')].map((el) => (el.textContent ?? "").trim()))) as string[];
+    await waitFor(first, async () => (await rows()).length === 5, "the list never showed the five profiles");
+    await first.$('input[type="search"]').setValue("milano");
+    await waitFor(first, async () => (await rows()).join() === "Datacenter Milano", "the search did not narrow the list to «Datacenter Milano»");
+    expect(await bodyText(first)).toContain("1 result");
+    await first.keys(["Escape"]); // the field still has the focus after the typing: Esc empties it, like the user would
+    await waitFor(first, async () => (await rows()).length === 5, "emptying the search did not bring the list back");
+    await (await byText(first, "label.gx-segmented-option", "Most recent")).click();
+    await first.waitUntil(async () => readState().includes('sort = "recent"'), { timeout: TEN_SECONDS, interval: 250, timeoutMsg: `the app did not write the sort order; state.toml holds: ${readState()}` });
+    await closeApp();
+
+    const second = await openApp(true);
+    await waitForBody(second, START_THE_SERVICE, "the new window never rendered");
+    const checked = await second.execute(() => (document.querySelector('input[type="radio"][value="recent"]') as HTMLInputElement | null)?.checked ?? null);
+    expect(checked, "the sort order «Most recent» is the one chosen when the window opens again").toBe(true);
+  });
+
   it("shell_is_navigable_with_the_seeded_rubrica", async () => {
     const b = await openShell();
     expect(await bodyText(b)).not.toContain("Sample data");
     const names: string[] = [];
     for (const row of await b.$$('[role="listbox"] [role="option"]')) names.push((await row.$("span.profile-name").getText()).trim());
-    // the groups of the seed in their order, the profiles of each by name (the favourites come first with T4)
-    expect(names).toEqual(["Datacenter Milano", "Ufficio Napoli", "Homelab", "VPS Hetzner", "Cliente Rossi"]);
-    expect(await title(b)).toBe("Datacenter Milano");
+    // the groups of the seed in their order, in each the favourites first and then by name
+    expect(names).toEqual(["Ufficio Napoli", "Datacenter Milano", "Homelab", "VPS Hetzner", "Cliente Rossi"]);
+    expect(await title(b)).toBe("Ufficio Napoli");
 
-    // Menu, then the list: one stop for the chosen row; ↓ moves the choice and the detail follows
-    await press(b, "Tab");
-    await press(b, "Tab");
+    // Menu, the search field, the sort order, then the list: one stop for the chosen row; ↓ moves the choice and the detail follows
+    for (let step = 0; step < 4; step++) await press(b, "Tab");
     expect(await activeRole(b)).toBe("option");
     await press(b, "ArrowDown");
-    await waitFor(b, async () => (await title(b)) === "Ufficio Napoli", "↓ in the list did not change the title of the detail");
+    await waitFor(b, async () => (await title(b)) === "Datacenter Milano", "↓ in the list did not change the title of the detail");
     await press(b, "End");
     await waitFor(b, async () => (await title(b)) === "Cliente Rossi", "End in the list did not choose the last profile");
     await press(b, "Home");
-    await waitFor(b, async () => (await title(b)) === "Datacenter Milano", "Home in the list did not choose the first profile");
+    await waitFor(b, async () => (await title(b)) === "Ufficio Napoli", "Home in the list did not choose the first profile");
 
     // «More actions», then the tab strip: the arrows open the tabs, down to «Log»
     await press(b, "Tab");

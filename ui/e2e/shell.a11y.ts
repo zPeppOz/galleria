@@ -48,28 +48,28 @@ describe("the shell under a screen reader", () => {
     const mark = speechMark();
     await key("Tab");
     await waitForTree(focusedIs("Menu"), "the Menu button focused");
-    await key("Tab");
-    const tree = await waitForTree(focusedIs("Datacenter Milano"), "the chosen row «Datacenter Milano» focused");
+    // Menu → the search field → the sort order → the list: Tab until the chosen row has the focus
+    const tree = await reach("Ufficio Napoli", ["Tab"], 8);
     const listbox = findNode(tree, "list box", "Connections");
     expect(listbox, "a list box named «Connections»").toBeTruthy();
     const rows = descendants(tree, listbox as AtNode).filter((n) => n.role === "list item");
-    // the order of the list: the groups of the seed, the profiles of each by name (the favourites come first with T4)
-    expect(rows.map((n) => n.name)).toEqual(["Datacenter Milano", "Ufficio Napoli", "Homelab", "VPS Hetzner", "Cliente Rossi"]);
+    // the order of the list: the groups of the seed, in each the favourites first and then by name
+    expect(rows.map((n) => n.name)).toEqual(["Ufficio Napoli", "Datacenter Milano", "Homelab", "VPS Hetzner", "Cliente Rossi"]);
     const row = focusedNode(tree) as AtNode;
     expect(row.states.has("selected")).toBe(true);
     expect(rows.filter((n) => n.states.has("selected"))).toHaveLength(1);
     // the server and the protocol are the description of the row
-    expect(row.description + row.relations.join(",")).toMatch(/gw\.dc-mi\.example|OpenVPN|described-by/);
-    record(`S1 list (role of a row: ${row.role}; description: «${row.description}»)`, await waitForSpeech(mark, "Datacenter Milano"), tree);
+    expect(row.description + row.relations.join(",")).toMatch(/vpn\.ufficio\.example|OpenVPN|described-by/);
+    record(`S1 list (role of a row: ${row.role}; description: «${row.description}»)`, await waitForSpeech(mark, "Ufficio Napoli"), tree);
   });
 
   it("S2_arrow_moves_the_focus_and_the_choice_and_the_new_row_is_spoken", async () => {
     const mark = speechMark();
     await key("ArrowDown");
-    const tree = await waitForTree(focusedIs("Ufficio Napoli"), "«Ufficio Napoli» focused after ↓");
+    const tree = await waitForTree(focusedIs("Datacenter Milano"), "«Datacenter Milano» focused after ↓");
     expect((focusedNode(tree) as AtNode).states.has("selected")).toBe(true);
-    expect(await b.$("h1").getText()).toBe("Ufficio Napoli");
-    record("S2 ArrowDown in the list", await waitForSpeech(mark, "Ufficio Napoli"), tree);
+    expect(await b.$("h1").getText()).toBe("Datacenter Milano");
+    record("S2 ArrowDown in the list", await waitForSpeech(mark, "Datacenter Milano"), tree);
   });
 
   it("S3_tabs_are_a_page_tab_list_and_the_chosen_tab_is_spoken", async () => {

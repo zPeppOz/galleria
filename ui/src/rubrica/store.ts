@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { arrange } from "./arrange";
+import { arrange, type SortKey } from "./arrange";
 import type { CmdError, ProfileDetail, RubricaView } from "./types";
 
 export interface Rubrica {
@@ -20,7 +20,8 @@ export interface Rubrica {
 }
 
 /** The ids in the order the list shows them: what «the next one» means when the selected profile disappears. */
-export const displayOrder = (view: RubricaView): string[] => arrange(view).groups.flatMap((group) => group.profiles.map((p) => p.id));
+export const displayOrder = (view: RubricaView, sort: SortKey = "name", locale?: string): string[] =>
+  arrange({ profiles: view.profiles, groups: view.groups, query: "", sort, locale }).groups.flatMap((group) => group.profiles.map((p) => p.id));
 
 function asError(error: unknown): CmdError {
   if (typeof error === "object" && error !== null && typeof (error as CmdError).code === "string") return error as CmdError;

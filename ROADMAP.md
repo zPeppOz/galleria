@@ -65,10 +65,10 @@ Decidere cosa costruire e provare su Linux e Windows i punti tecnici più rischi
   - [x] `lab` verde su Ubuntu 24.04, Ubuntu 26.04 e Fedora (stesso run: job 26, 27 e 79)
   - [ ] `lab-dco` riparato o tolto per scritto: oggi si ferma all'installazione di `openvpn-dco-dkms` (dpkg, exit 100), è `continue-on-error`
   - [ ] S2 in `docs/06-esito-fase1.md` §4 aggiornato con il link al run
-- [ ] Integra la fase 1 in `main`
-  - [ ] solo dopo l'ok di Peppe: `spike/windows` e la catena `aitano/galleria-fase1-*` entrano in `main` (oggi `main` è a `8964358`)
-  - [ ] `docs/06-esito-fase1.md` §7 corretto: la parte Linux di D15 è già allineata da `556b89e`
-  - [ ] branch superati eliminati con `git branch -d`, compreso il doppione `aitano/galleria-fase1-t6-fix`
+- [x] Integra la fase 1 in `main` <!-- branch: main · commit: e4a2d71 · by: aitano -->
+  - [x] con l'ok di Peppe: `spike/windows` e la catena `aitano/galleria-fase1-*` sono entrati in `main` con un fast-forward a `e4a2d71`
+  - [x] `docs/06-esito-fase1.md` §7 corretto: la parte Linux di D15 è già allineata da `556b89e`
+  - [x] branch locali superati eliminati; il doppione `aitano/galleria-fase1-t6-fix` non è entrato in `main` e resta da solo
 - [ ] Prove su desktop reale: NetworkManager e DCO (S14, S15)
   - [ ] VM Ubuntu desktop e Fedora desktop autorizzate a parte; binari installati con `packaging/linux/install.sh`
   - [ ] `nmcli device` mostra `glr-wg0` e `glr-ovpn0` non gestite; DNS interni applicati prima di connected e ripristinati dopo

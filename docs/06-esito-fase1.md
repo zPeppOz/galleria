@@ -127,6 +127,5 @@ separatamente), Q8 (journald/buffer invece di file di log), Q9 (management Unix 
 solo Windows), Q10 (controllo e visibilità condivisi tra membri del gruppo), Q11 (traduzioni nei client).
 Nessuna nuova decisione è stata presa. Q3, Q6 e Q7 sono risolte nella spec.
 
-La parte Linux di D15 e i rimandi collegati in `docs/01-analisi.md` restano da aggiornare da Aitano con la frase
-della spec §13: un solo blocco IPv6 con rotte unreachable nel modulo comune, anche per OpenVPN. I documenti
-00–05 non sono stati modificati in questa delega.
+La parte Linux di D15 è già allineata da `556b89e`: un solo blocco IPv6 con rotte unreachable nel modulo comune,
+anche per OpenVPN, come nella frase della spec §13. I documenti 00–05 non sono stati modificati in questa delega.

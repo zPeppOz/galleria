@@ -86,10 +86,10 @@ La rubrica in Tauri 2 + React sopra il demone della fase 1, in sei blocchi B1–
 - ~~Completa la validazione dei concorrenti (A7)~~ — tolto per decisione di Peppe del 2026-11-25: Galleria è uno strumento per Peppe e i colleghi, non un prodotto da validare sul mercato
 
 - [ ] Spec della fase 2 e piano del blocco B1
-  - [ ] spec `docs/superpowers/specs/2026-11-25-fase2-gui-design.md` con i criteri G1–G13, sopra le decisioni D19–D32
+  - [x] spec `docs/superpowers/specs/2026-11-25-fase2-gui-design.md` con i criteri G1–G13, sopra le decisioni D19–D32
   - [ ] piano di B1 in `docs/superpowers/plans/`; gli altri blocchi hanno un piano ciascuno, scritto prima di partire
   - [ ] l'IPC della fase 1 resta senza modifiche e la webview passa dai comandi Tauri (D12)
-  - [ ] questioni aperte nuove della spec decise prima di costruire
+  - [ ] questioni aperte nuove della spec (Q12–Q21) decise prima di costruire
 - [ ] B1 · Fondamenta
   - [ ] parte dalla fase 1 integrata in `main`
   - [ ] crate `galleria-gui` e `ui/` nel workspace, job CI della GUI, permessi minimi della webview (D29)

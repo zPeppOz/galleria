@@ -9,12 +9,14 @@ pub mod commands;
 pub mod error;
 pub mod events;
 pub mod link;
+pub mod rubrica;
 pub mod supervisor;
 pub mod ui_state;
 pub mod window;
 
 use announce::Announcer;
 use commands::app::AppInfo;
+use rubrica::Rubrica;
 use std::{path::PathBuf, sync::Arc};
 use supervisor::RelinkPolicy;
 use tauri::{Manager, Runtime};
@@ -50,7 +52,9 @@ pub fn configure_with<R: Runtime>(
             commands::app::app_info,
             commands::ui_state::ui_state_get,
             commands::ui_state::ui_state_set,
-            commands::announce::announce
+            commands::announce::announce,
+            commands::profiles::profiles_list,
+            commands::profiles::profile_get
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.
@@ -64,6 +68,11 @@ pub fn configure_with<R: Runtime>(
             );
             app.manage(handle);
             app.manage(AppInfo::new(&socket));
+            // Like the announcer: the tests of level 2 manage their own rubrica (in a temporary folder) before the build.
+            app.manage(Arc::new(Rubrica::new(
+                Rubrica::default_dir(),
+                Arc::clone(&state),
+            )));
             // The tests of level 2 manage their own announcer before the build, and `manage` keeps the first one.
             app.manage(default_announcer(app.handle()));
             if let Some(main) = app.get_webview_window("main") {

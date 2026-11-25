@@ -1,6 +1,6 @@
 // Plan B2 T7, the shell under a screen reader (Q22 (a): Orca and the AT-SPI tree in the real window, run locally by
-// lab/tests/gui-a11y.sh, i.e. `scripts/gui.sh a11y`). One session of the app, in order: the list, the tabs, the switch,
-// the confirmation of «Delete», a notice that goes away by itself. Assertions are on our own names and on the states
+// lab/tests/gui-a11y.sh, i.e. `scripts/gui.sh a11y`). One session of the app, in order: the list, the tabs, a text field,
+// a notice that goes away by itself (the switch and the confirmation of «Delete» come back with T5 and T8). Assertions are on our own names and on the states
 // AT-SPI reports; the words Orca uses for the role and the state are recorded in target/gui-a11y/transcript.txt and
 // copied into docs/08-esito-fase2.md, because they are Orca's, not ours.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -49,26 +49,27 @@ describe("the shell under a screen reader", () => {
     await key("Tab");
     await waitForTree(focusedIs("Menu"), "the Menu button focused");
     await key("Tab");
-    const tree = await waitForTree(focusedIs("Ufficio Napoli"), "the chosen row «Ufficio Napoli» focused");
+    const tree = await waitForTree(focusedIs("Datacenter Milano"), "the chosen row «Datacenter Milano» focused");
     const listbox = findNode(tree, "list box", "Connections");
     expect(listbox, "a list box named «Connections»").toBeTruthy();
     const rows = descendants(tree, listbox as AtNode).filter((n) => n.role === "list item");
-    expect(rows.map((n) => n.name)).toEqual(["Ufficio Napoli", "Datacenter Milano", "Homelab", "VPS Hetzner", "Cliente Rossi"]);
+    // the order of the list: the groups of the seed, the profiles of each by name (the favourites come first with T4)
+    expect(rows.map((n) => n.name)).toEqual(["Datacenter Milano", "Ufficio Napoli", "Homelab", "VPS Hetzner", "Cliente Rossi"]);
     const row = focusedNode(tree) as AtNode;
     expect(row.states.has("selected")).toBe(true);
     expect(rows.filter((n) => n.states.has("selected"))).toHaveLength(1);
     // the server and the protocol are the description of the row
-    expect(row.description + row.relations.join(",")).toMatch(/vpn\.ufficio\.example|OpenVPN|described-by/);
-    record(`S1 list (role of a row: ${row.role}; description: «${row.description}»)`, await waitForSpeech(mark, "Ufficio Napoli"), tree);
+    expect(row.description + row.relations.join(",")).toMatch(/gw\.dc-mi\.example|OpenVPN|described-by/);
+    record(`S1 list (role of a row: ${row.role}; description: «${row.description}»)`, await waitForSpeech(mark, "Datacenter Milano"), tree);
   });
 
   it("S2_arrow_moves_the_focus_and_the_choice_and_the_new_row_is_spoken", async () => {
     const mark = speechMark();
     await key("ArrowDown");
-    const tree = await waitForTree(focusedIs("Datacenter Milano"), "«Datacenter Milano» focused after ↓");
+    const tree = await waitForTree(focusedIs("Ufficio Napoli"), "«Ufficio Napoli» focused after ↓");
     expect((focusedNode(tree) as AtNode).states.has("selected")).toBe(true);
-    expect(await b.$("h1").getText()).toBe("Datacenter Milano");
-    record("S2 ArrowDown in the list", await waitForSpeech(mark, "Datacenter Milano"), tree);
+    expect(await b.$("h1").getText()).toBe("Ufficio Napoli");
+    record("S2 ArrowDown in the list", await waitForSpeech(mark, "Ufficio Napoli"), tree);
   });
 
   it("S3_tabs_are_a_page_tab_list_and_the_chosen_tab_is_spoken", async () => {
@@ -109,7 +110,9 @@ describe("the shell under a screen reader", () => {
     record("S4b text field reached (Orca 46.1 in the image does not say the name)", speechSince(mark), tree);
   });
 
-  it("S4_switch_state_is_exposed_and_spoken", async () => {
+  // T3 (P10): no switch in the shell until C makes the tab «General» write, so S4 waits for T5; the check of the switch
+  // under Orca came out of B2 with the demo form and comes back with the real one.
+  it.skip("S4_switch_state_is_exposed_and_spoken", async () => {
     const reached = speechMark();
     const tree = await reach(/Reconnect automatically/, ["Tab"]);
     const control = focusedNode(tree) as AtNode;
@@ -130,7 +133,9 @@ describe("the shell under a screen reader", () => {
     record("S4 switch turned on", await waitForSpeech(again, /\bon\b|pressed|checked/i), on);
   });
 
-  it("S5_confirmation_is_an_alert_dialog_with_title_and_text_spoken", async () => {
+  // T3 (P10): «Delete» only says that it arrives later, so the confirmation under Orca waits for T8 (the dialog itself is
+  // still checked in overlays.a11y.ts, D1–D4).
+  it.skip("S5_confirmation_is_an_alert_dialog_with_title_and_text_spoken", async () => {
     await reach("More actions", ["Shift", "Tab"], 20);
     await key("Enter");
     await waitForTree(focusedIs("Duplicate"), "the menu open on «Duplicate»");
@@ -157,6 +162,7 @@ describe("the shell under a screen reader", () => {
   });
 
   it("S6_notice_appears_without_moving_the_focus", async () => {
+    await reach("More actions", ["Shift", "Tab"], 20);
     await key("Enter");
     await waitForTree(focusedIs("Duplicate"), "the menu open on «Duplicate»");
     const mark = speechMark();
@@ -175,7 +181,7 @@ describe("the shell under a screen reader", () => {
   // also sent by the `announce` command, which makes the Rust side emit the ATK `notification` signal on the accessible
   // of the window; the atk-bridge turns it into `object:announcement` and Orca says it. S6b is the positive test the
   // spike called for: after «Duplicate» Orca says the text of the notice, once, and the focus stays on «More actions».
-  const NOTICE = "Sample data: nothing was changed";
+  const NOTICE = "This action arrives in a later release.";
   const noticeShown = (t: AtNode[]) => !!findNode(t, "push button", "Dismiss the notice") && focusedIs("More actions")(t);
 
   it("S6b_notice_is_spoken_by_orca", async () => {

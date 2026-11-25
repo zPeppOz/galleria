@@ -280,24 +280,48 @@ describe("the shell in the real window", () => {
     return b;
   }
 
-  it("shell_is_navigable_with_sample_data", async () => {
+  // R1: the rubrica is read from the disk, with the daemon stopped: the list is there next to the first-run panel.
+  it("rubrica_lists_the_seeded_profiles", async () => {
+    daemon("stop");
+    const b = await openApp();
+    await waitForBody(b, START_THE_SERVICE, "the «Start the service» panel never appeared");
+    await waitFor(b, async () => (await b.$$('[role="listbox"] [role="option"]')).length === 5, "the list never showed the five profiles");
+    const groups = await b.execute(() => [...document.querySelectorAll('[role="listbox"] [role="group"]')].map((g) => g.getAttribute("aria-label")));
+    expect(groups).toEqual(["Lavoro", "Personale", "Clienti"]);
+    // the server of the chosen profile is on the page, and the secrets of the seed are nowhere in it
+    const text = await bodyText(b);
+    expect(text).toContain("gw.dc-mi.example:443");
+    expect(text).not.toContain("SEED-SECRET");
+    expect(await title(b)).toBe("Datacenter Milano");
+  });
+
+  it("empty_rubrica_shows_the_import_hint", async () => {
+    daemon("stop");
+    const b = await openApp(false, "empty");
+    await waitForBody(b, "No connections yet", "the empty rubrica did not say so");
+    await waitForBody(b, "galleria import <file>", "the empty rubrica does not show the command to import a profile");
+    expect(await b.$$('[role="option"]')).toHaveLength(0);
+  });
+
+  it("shell_is_navigable_with_the_seeded_rubrica", async () => {
     const b = await openShell();
-    expect(await bodyText(b)).toContain("Sample data");
+    expect(await bodyText(b)).not.toContain("Sample data");
     const names: string[] = [];
     for (const row of await b.$$('[role="listbox"] [role="option"]')) names.push((await row.$("span.profile-name").getText()).trim());
-    expect(names).toEqual(["Ufficio Napoli", "Datacenter Milano", "Homelab", "VPS Hetzner", "Cliente Rossi"]);
-    expect(await title(b)).toBe("Ufficio Napoli");
+    // the groups of the seed in their order, the profiles of each by name (the favourites come first with T4)
+    expect(names).toEqual(["Datacenter Milano", "Ufficio Napoli", "Homelab", "VPS Hetzner", "Cliente Rossi"]);
+    expect(await title(b)).toBe("Datacenter Milano");
 
     // Menu, then the list: one stop for the chosen row; ↓ moves the choice and the detail follows
     await press(b, "Tab");
     await press(b, "Tab");
     expect(await activeRole(b)).toBe("option");
     await press(b, "ArrowDown");
-    await waitFor(b, async () => (await title(b)) === "Datacenter Milano", "↓ in the list did not change the title of the detail");
+    await waitFor(b, async () => (await title(b)) === "Ufficio Napoli", "↓ in the list did not change the title of the detail");
     await press(b, "End");
     await waitFor(b, async () => (await title(b)) === "Cliente Rossi", "End in the list did not choose the last profile");
     await press(b, "Home");
-    await waitFor(b, async () => (await title(b)) === "Ufficio Napoli", "Home in the list did not choose the first profile");
+    await waitFor(b, async () => (await title(b)) === "Datacenter Milano", "Home in the list did not choose the first profile");
 
     // «More actions», then the tab strip: the arrows open the tabs, down to «Log»
     await press(b, "Tab");
@@ -312,17 +336,17 @@ describe("the shell in the real window", () => {
 
   it("shell_works_in_both_languages", async () => {
     const b = await openShell();
-    expect(await bodyText(b)).toContain("Sample data");
+    expect(await bodyText(b)).toContain("More actions");
     await chooseFromMenu(b, "Italiano");
-    await waitForBody(b, "Dati di esempio", "the window did not switch to Italian");
+    await waitForBody(b, "Altre azioni", "the window did not switch to Italian");
     const italian = await bodyText(b);
     for (const text of ["Generale", "Altre azioni", "Collegato al servizio"]) expect(italian).toContain(text);
-    expect(italian).not.toContain("Sample data");
+    expect(italian).not.toContain("More actions");
     expect(await b.execute(() => document.documentElement.lang)).toBe("it");
     await chooseFromMenu(b, "English");
-    await waitForBody(b, "Sample data", "the window did not switch back to English");
-    expect(await bodyText(b)).toContain("More actions");
-    expect(await bodyText(b)).not.toContain("Dati di esempio");
+    await waitForBody(b, "More actions", "the window did not switch back to English");
+    expect(await bodyText(b)).toContain("General");
+    expect(await bodyText(b)).not.toContain("Altre azioni");
     expect(await cspViolations(b)).toEqual([]);
   });
 
@@ -369,23 +393,20 @@ describe("the shell in the real window", () => {
   it("no_csp_violation_during_the_tour", async () => {
     const b = await openShell();
     // the list, the tabs (the indicator of the strip sets its size with a script, not with a style element), the menu,
-    // the About dialog, the confirmation, the switch, a notice, both languages and both themes
+    // the About dialog, the three actions that arrive later, the notice, both languages and both themes
     await (await byText(b, "[role=option] span.profile-name", "Homelab")).click();
     await waitFor(b, async () => (await title(b)) === "Homelab", "the list did not choose Homelab");
     for (const tab of await b.$$('[role="tab"]')) await tab.click();
     await (await byText(b, "[role=tab]", "General")).click();
-    await b.$('[role="switch"]').click();
     await b.$("button=More actions").click();
     await (await byText(b, "[role=menuitem]", "Delete")).click();
-    await b.$('[role="alertdialog"]').waitForDisplayed({ timeout: TEN_SECONDS });
-    await (await byText(b, "[role=alertdialog] button", "Delete")).click();
-    await waitForBody(b, "Sample data: nothing was changed", "the notice never appeared");
+    await waitForBody(b, "This action arrives in a later release.", "the notice never appeared");
     await b.$("button=Menu").click();
     await (await byText(b, "[role=menuitem]", "About Galleria")).click();
     await b.$('[role="dialog"]').waitForDisplayed({ timeout: TEN_SECONDS });
     await press(b, "Escape");
     await chooseFromMenu(b, "Italiano");
-    await waitForBody(b, "Dati di esempio", "the window did not switch to Italian");
+    await waitForBody(b, "Altre azioni", "the window did not switch to Italian");
     await chooseFromMenu(b, "Scuro");
     await chooseFromMenu(b, "Chiaro");
     expect(await cspViolations(b)).toEqual([]);

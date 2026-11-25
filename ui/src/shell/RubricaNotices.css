@@ -1,0 +1,7 @@
+/* The notices of the rubrica above the profile: only variables of tokens.css. */
+.rubrica-notice { display: flex; flex-direction: column; gap: var(--sp-5); max-width: 640px; }
+.rubrica-notice-text { margin: 0; color: var(--muted); }
+.rubrica-notice-path { display: block; margin-top: var(--sp-2); font-family: var(--mono); overflow-wrap: anywhere; }
+.rubrica-empty-title { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-strong); }
+.rubrica-skipped { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }
+.rubrica-skipped code { font-family: var(--mono); overflow-wrap: anywhere; }

@@ -2,7 +2,7 @@
 # Screen reader check of the GUI (spec §12, plan B2 T1/T7, Q22): the real app in a real WebKitGTK window under Orca,
 # with the accessibility tree read over AT-SPI. Local only: it is not a CI job (Q22). Like the smoke test it is
 # driven by tauri-driver + WebKitWebDriver, against the fake daemon; it needs the same variables as gui-smoke.sh
-# (GALLERIA_SMOKE_APP, GALLERIA_SMOKE_DAEMON, GALLERIA_SMOKE_DRIVER) and the packages of the galleria-gui-dev image
+# (GALLERIA_SMOKE_APP, GALLERIA_SMOKE_DAEMON, GALLERIA_SMOKE_SEED, GALLERIA_SMOKE_DRIVER) and the packages of the galleria-gui-dev image
 # (orca, at-spi2-core, speech-dispatcher, python3-gi, gir1.2-atspi-2.0, gsettings).
 #
 # Inside the private session bus and Xvfb it: turns toolkit accessibility on, starts the AT-SPI bus, starts Orca with

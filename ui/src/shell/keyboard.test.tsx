@@ -5,22 +5,17 @@
 // Orca in `ui/e2e/shell.a11y.ts`.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { DaemonView } from "../daemon/types";
-import { Preferences } from "../prefs";
-import { makeInfo, makeView } from "../test/fixtures";
-import { Shell } from "./Shell";
+import { makeView } from "../test/fixtures";
+import { renderShell } from "../test/shell";
 
 type User = ReturnType<typeof userEvent.setup>;
 
 const show = (view: DaemonView | null = makeView(), onRetry = () => undefined) =>
-  render(
-    <Preferences lang="en">
-      <Shell view={view} info={view ? makeInfo() : null} onRetry={onRetry} />
-    </Preferences>,
-  );
+  renderShell(view, { onRetry });
 
 const firstRun = () => makeView({ link: "daemon_not_running", status: null });
 
@@ -188,30 +183,14 @@ describe("keyboard on the whole shell", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     here("button:Menu");
 
-    // «More actions» → Delete → the confirmation: Escape, cancel and confirm all give the focus back
-    const openConfirm = async () => {
-      screen.getByRole("button", { name: "More actions" }).focus();
-      await user.keyboard("{Enter}");
-      await menuOpen("More actions");
-      await user.keyboard("{End}{Enter}");
-      await screen.findByRole("alertdialog");
-      here("button:Cancel");
-    };
-    await openConfirm();
-    await user.keyboard("{Escape}");
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    here("button:More actions");
-    await openConfirm();
-    await user.keyboard("{Enter}"); // Cancel
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    here("button:More actions");
-    await openConfirm();
-    await user.tab();
-    here("button:Delete");
+    // «More actions» → Delete: nothing to confirm yet (it arrives with D), so a notice and the focus stays on the button
+    screen.getByRole("button", { name: "More actions" }).focus();
     await user.keyboard("{Enter}");
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await menuOpen("More actions");
+    await user.keyboard("{End}{Enter}");
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     here("button:More actions");
-
     // «Duplicate» closes the menu and shows a notice, without taking the focus
     await user.keyboard("{Enter}");
     await menuOpen("More actions");
@@ -229,7 +208,7 @@ describe("keyboard on the whole shell", () => {
     await menuOpen("More actions");
     await user.keyboard("{Home}{Enter}");
     const status = screen.getByRole("status");
-    await waitFor(() => expect(status.textContent).toContain("Sample data: nothing was changed"));
+    await waitFor(() => expect(status.textContent).toContain("This action arrives in a later release."));
     expect(document.activeElement).toBe(more); // the notice did not take the focus
     // a person who wants to read it or close it gets there with Tab (it comes after the main area)
     const close = within(status).getByRole("button", { name: "Dismiss the notice" });
@@ -268,26 +247,20 @@ describe("keyboard on the whole shell", () => {
     await user.keyboard("{Home}");
     expect(screen.getByRole("tab", { name: "General" }).getAttribute("aria-selected")).toBe("true");
 
-    // the switch: Space turns it off, again on
-    for (let step = 0; step < 12 && active().getAttribute("role") !== "switch"; step++) await user.tab();
-    expect(active().getAttribute("role")).toBe("switch");
-    expect(active().getAttribute("aria-checked")).toBe("true");
-    await user.keyboard(" ");
-    expect(active().getAttribute("aria-checked")).toBe("false");
-    await user.keyboard("{Enter}");
-    expect(active().getAttribute("aria-checked")).toBe("true");
+    // the read-only fields are stops of the panel, and none of them is a switch yet: C makes the switch come back
+    for (let step = 0; step < 12 && !(active() instanceof HTMLInputElement); step++) await user.tab();
+    expect(nameOf(active())).toBe("Name");
+    expect((active() as HTMLInputElement).readOnly).toBe(true);
+    await user.keyboard("x");
+    expect((active() as HTMLInputElement).value).toBe("Ufficio Napoli");
 
-    // delete with the confirmation
+    // «Delete» says that it arrives later, and nothing changes
     screen.getByRole("button", { name: "More actions" }).focus();
     await user.keyboard("{Enter}");
     await menuOpen("More actions");
     await user.keyboard("{ArrowDown}{ArrowDown}{Enter}");
-    const dialog = await screen.findByRole("alertdialog", { name: /Delete/ });
-    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBe(active());
-    await user.tab();
-    await user.keyboard("{Enter}");
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(screen.getByRole("status").textContent).toContain("Sample data: nothing was changed");
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("This action arrives in a later release."));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(5);
 
     // the language and the theme from the menu

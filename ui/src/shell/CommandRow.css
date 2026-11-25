@@ -1,0 +1,7 @@
+/* A command with its «Copy» button: only variables of tokens.css. */
+.command-row { display: flex; gap: var(--sp-4); align-items: center; }
+.command-row-text {
+  flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: var(--sp-4) var(--sp-5);
+  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--r-sm);
+  font-family: var(--mono); font-size: var(--fs-md); line-height: var(--lh-mono);
+}

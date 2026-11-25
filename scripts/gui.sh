@@ -6,7 +6,7 @@
 #   scripts/gui.sh check          the gui checks: ui tests, ui build, clippy and tests of galleria-gui
 #   scripts/gui.sh check-here     the same checks on this machine (used inside the image and by the `gui` CI job)
 #   scripts/gui.sh build          build ui/ and the app as for a release, without bundles: target/gui-image/release/galleria-gui
-#   scripts/gui.sh smoke          build the app and the fake daemon, then the WebDriver smoke test (lab/tests/gui-smoke.sh)
+#   scripts/gui.sh smoke          build the app, the fake daemon and the seed of the rubrica, then the WebDriver smoke test (lab/tests/gui-smoke.sh)
 #   scripts/gui.sh a11y           the same build, then the screen reader check under Orca and AT-SPI (lab/tests/gui-a11y.sh);
 #                                 local only (Q22), writes target/gui-a11y/
 #   scripts/gui.sh pnpm-version   print the pnpm version pinned in package.json (for CI)
@@ -96,9 +96,10 @@ a11y_here() { run_webdriver_here lab/tests/gui-a11y.sh; }
 run_webdriver_here() {
   local target=${CARGO_TARGET_DIR:-$PWD/target}
   build_here
-  cargo build -p galleria-gui --example fake-daemon
+  cargo build -p galleria-gui --example fake-daemon --example seed-rubrica
   [[ -x target/gui-tools/bin/tauri-driver ]] || cargo install tauri-driver --locked --root target/gui-tools
   GALLERIA_SMOKE_APP="$target/release/galleria-gui" GALLERIA_SMOKE_DAEMON="$target/debug/examples/fake-daemon" \
+    GALLERIA_SMOKE_SEED="$target/debug/examples/seed-rubrica" \
     GALLERIA_SMOKE_DRIVER="$PWD/target/gui-tools/bin/tauri-driver" "$1"
 }
 

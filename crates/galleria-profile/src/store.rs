@@ -82,6 +82,21 @@ pub(crate) fn atomic(path: &Path, text: &str) -> Result<(), StoreError> {
     File::open(dir)?.sync_all()?;
     Ok(())
 }
+/// A file of the profiles folder that [`ProfileStore::list_lenient`] could not use.
+#[derive(Debug)]
+pub struct Skipped {
+    pub file_name: String,
+    pub error: StoreError,
+}
+fn read_profile(path: &Path) -> Result<Profile, StoreError> {
+    let p = Profile::from_toml(&read_private(path)?)?;
+    if path.file_stem().and_then(|s| s.to_str()) != Some(p.id.to_string().as_str()) {
+        return Err(StoreError::Invalid(
+            "Profile ID does not match its filename".into(),
+        ));
+    }
+    Ok(p)
+}
 #[derive(Clone)]
 pub struct ProfileStore {
     dir: PathBuf,
@@ -118,6 +133,34 @@ impl ProfileStore {
         }
         result.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
         Ok(result)
+    }
+    pub(crate) fn root(&self) -> &Path {
+        &self.dir
+    }
+    /// Like [`list`](Self::list), but a profile that cannot be read does not hide the others: it comes back in the
+    /// second list with the name of its file and the reason. The folder itself is still checked and still fails
+    /// the whole call (permissions, owner, not a folder): that is a problem of the store, not of one profile.
+    pub fn list_lenient(&self) -> Result<(Vec<Profile>, Vec<Skipped>), StoreError> {
+        let dir = self.dir.join("profiles");
+        check(&dir, &fs::symlink_metadata(&dir)?)?;
+        let (mut profiles, mut skipped) = (vec![], vec![]);
+        for entry in fs::read_dir(&dir)? {
+            let path = entry?.path();
+            if path.extension().is_none_or(|s| s != "toml") {
+                continue;
+            }
+            let file_name = path
+                .file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            match read_profile(&path) {
+                Ok(p) => profiles.push(p),
+                Err(error) => skipped.push(Skipped { file_name, error }),
+            }
+        }
+        profiles.sort_by(|a, b| a.name.cmp(&b.name).then(a.id.cmp(&b.id)));
+        skipped.sort_by(|a, b| a.file_name.cmp(&b.file_name));
+        Ok((profiles, skipped))
     }
     pub fn find(&self, name_or_id: &str) -> Result<Profile, StoreError> {
         if let Ok(id) = Uuid::parse_str(name_or_id) {

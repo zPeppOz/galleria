@@ -10,3 +10,4 @@
   .shell-aside { border-right: 0; border-bottom: 1px solid var(--line); }
   .shell-main { padding: var(--sp-6); }
 }
+.shell-aside-empty { margin: 0; padding: var(--sp-6); color: var(--muted); }

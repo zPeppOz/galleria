@@ -2,14 +2,17 @@
 # Shared by lab/tests/gui-smoke.sh and lab/tests/gui-a11y.sh (source it, do not run it).
 #
 # gui_prepare_outer: creates a temporary directory with the fake daemon's socket, the `daemon-start` and
-#   `daemon-stop` scripts the tests run from Node (the daemon is part of the scenario, not of the webview), and a
-#   cleanup that stops the daemon and deletes the directory. Needs GALLERIA_SMOKE_DAEMON. Sets and exports
+#   `daemon-stop` scripts the tests run from Node (the daemon is part of the scenario, not of the webview), a
+#   `rubrica-seed` script that writes the made-up rubrica of the tests (the `seed-rubrica` example of galleria-gui, with
+#   the profiles of the phase 1 import functions) into the temporary XDG_CONFIG_HOME, and a cleanup that stops the
+#   daemon and deletes the directory. Needs GALLERIA_SMOKE_DAEMON and GALLERIA_SMOKE_SEED. Sets and exports
 #   GALLERIA_SOCKET, GALLERIA_SMOKE_BIN and GALLERIA_SMOKE_REPO. Call it from the outer half of a script.
 # gui_start_driver: starts tauri-driver (GALLERIA_SMOKE_DRIVER, default from PATH) on GALLERIA_SMOKE_DRIVER_PORT
 #   (default 4444) and waits for the port; the driver is stopped on exit. Call it from the inner half.
 
 gui_prepare_outer() {
   : "${GALLERIA_SMOKE_DAEMON:?path of the fake-daemon binary}"
+  : "${GALLERIA_SMOKE_SEED:?path of the seed-rubrica binary}"
   repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
   tmp=$(mktemp -d)
   # The app reads and writes `state.toml` (D32) and, from B3, the profiles: both inside the temporary directory, never
@@ -47,6 +50,17 @@ rm -f "$tmp/galleriad.sock"
 exit 0
 SCRIPT
   chmod +x "$bin/daemon-start" "$bin/daemon-stop"
+
+  # The tests start every run from a rubrica they know: this wipes the profiles and writes the seed again (`--empty`:
+  # the store only). It writes inside $XDG_CONFIG_HOME of the run and refuses to run without it.
+  cat > "$bin/rubrica-seed" <<SCRIPT
+#!/usr/bin/env bash
+set -euo pipefail
+rm -rf -- "$tmp/config/galleria"
+mkdir -p "$tmp/config"
+XDG_CONFIG_HOME="$tmp/config" exec "$GALLERIA_SMOKE_SEED" "\$@"
+SCRIPT
+  chmod +x "$bin/rubrica-seed"
 
   gui_cleanup() {
     status=$?

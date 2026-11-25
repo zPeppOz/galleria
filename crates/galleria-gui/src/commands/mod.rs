@@ -3,4 +3,5 @@
 pub mod announce;
 pub mod app;
 pub mod daemon;
+pub mod profiles;
 pub mod ui_state;

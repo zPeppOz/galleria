@@ -11,6 +11,8 @@
     "allow-app-info",
     "allow-ui-state-get",
     "allow-ui-state-set",
-    "allow-announce"
+    "allow-announce",
+    "allow-profiles-list",
+    "allow-profile-get"
   ]
 }

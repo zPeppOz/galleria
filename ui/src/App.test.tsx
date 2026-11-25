@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { DaemonView } from "./daemon/types";
-import { makeInfo, makeStatus, makeView } from "./test/fixtures";
+import { makeDetail, makeInfo, makeRubricaView, makeStatus, makeView } from "./test/fixtures";
 import { expectNoAccessibilityViolations } from "./test/axe";
 
 const incompatible = { daemon_min: 2, daemon_max: 3, daemon_version: "0.2.0" };
@@ -19,19 +19,33 @@ const VIEWS: Record<string, DaemonView> = {
 
 function backend(view: DaemonView) {
   const calls: string[] = [];
-  mockIPC((cmd) => { calls.push(cmd); return cmd === "daemon_view" ? view : cmd === "app_info" ? makeInfo() : undefined; }, { shouldMockEvents: true });
+  const rubrica = makeRubricaView();
+  mockIPC(
+    (cmd, args) => {
+      calls.push(cmd);
+      if (cmd === "daemon_view") return view;
+      if (cmd === "app_info") return makeInfo();
+      if (cmd === "profiles_list") return rubrica;
+      if (cmd === "profile_get") return makeDetail(rubrica.profiles.find((p) => p.id === (args as { id: string }).id) ?? rubrica.profiles[0]);
+      return undefined;
+    },
+    { shouldMockEvents: true },
+  );
   return calls;
 }
-// The first answer of the backend brings the app version into the bar at the bottom.
-const ready = () => waitFor(() => expect(within(screen.getByRole("contentinfo")).getByText(/App 0\.1\.0/)).toBeTruthy());
+// The first answers of the backend: the app version in the bar at the bottom, and the profile with its form.
+const ready = async () => {
+  await waitFor(() => expect(within(screen.getByRole("contentinfo")).getByText(/App 0\.1\.0/)).toBeTruthy());
+  await screen.findByRole("textbox", { name: "Nome" });
+};
 
 describe("App", () => {
   it("renders_the_app_title", async () => {
     backend(VIEWS.connected);
     render(<App lang="it" />);
     expect(within(screen.getByRole("banner")).getByText("Galleria")).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Ufficio Napoli");
     await ready();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Ufficio Napoli");
   });
 
   it.each(Object.keys(VIEWS))("has_no_accessibility_violations: %s", async (name) => {
@@ -71,6 +85,6 @@ describe("App", () => {
       if (button.getAttribute("aria-haspopup")) continue;
       await user.click(button);
     }
-    expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", ...(calls.includes("daemon_retry") ? ["daemon_retry"] : [])]));
+    expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", "profiles_list", "profile_get", ...(calls.includes("daemon_retry") ? ["daemon_retry"] : [])]));
   });
 });

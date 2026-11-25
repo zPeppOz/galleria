@@ -670,3 +670,56 @@ errore *assertive* detto da Orca: la strada è provata per il *polite* (urgenza 
 ATK vero in `the_signal_atk_has_is_emitted_with_the_text_and_the_urgency` (il segnale parte con 2) e con lo spike (riga D,
 `notification(testo, 2)` detta con priorità più alta); `R4b` e `R4c` del piano (esito di salvataggio, eliminazione) nascono con
 i task che producono quegli esiti (T5, T8).
+
+### Comandi di lettura e guscio sui profili veri (T3)
+
+Il guscio non ha più dati finti: la lista e il dettaglio vengono dalla cartella dei profili che usa anche la CLI
+(`$XDG_CONFIG_HOME/galleria`, altrimenti `~/.config/galleria`), letta con le funzioni di `galleria-profile`, senza il demone.
+
+- **`galleria-profile`, solo aggiunte** (Q29, Q30): `settings.rs` con `RubricaSettings` e `ProfileStore::settings()` (legge
+  `galleria.toml`; «`schema_version = 1`» da solo resta valido; una chiave sconosciuta è un errore, uno schema più nuovo è
+  `NewerSchema`); `ProfileStore::list_lenient()` e `Skipped` (un profilo che non si legge torna con il nome del file e il motivo, gli
+  altri restano; i permessi o il proprietario della cartella fanno ancora fallire tutto). Nessuna firma esistente cambia.
+- **`galleria-gui`**: `rubrica.rs` (viste `ProfileSummary`, `ProfileDetail`, `OpenVpnView`, `RubricaView`; senza `tauri` e
+  senza segreti: `secret_refs` porta i nomi, mai i valori), `commands/profiles.rs` (`profiles_list`, `profile_get(id: Uuid)`; async,
+  fuori dal thread principale), `galleria-profile` e `galleria-ovpn` come dipendenze normali (`Cargo.lock`: due righe,
+  nessun crate nuovo). `cargo tree -p galleria-gui -e normal` non contiene `galleriad` né un backend.
+- **Codici nuovi** (in `GUI_CODES` e nei due cataloghi): `gui_store_insecure` (`data`: `path`, `mode`, `fix` con il comando `chmod 700|600 '<percorso>'`,
+  o `chown` per un proprietario sbagliato), `gui_store_unreadable` (`data.path`), `gui_profile_not_found`; per un file saltato
+  `gui_profile_newer` e `gui_profile_invalid`.
+- **Webview**: `rubrica/store.ts` (`useRubrica`: legge all'avvio, quando la finestra torna in primo piano e quando `reload()` viene
+  chiamata; tiene la selezione, e se il profilo sparisce sceglie quello che ne prende il posto; vale solo l'ultima risposta se due
+  letture si accavallano), `rubrica/arrange.ts` (puro: gruppi nell'ordine di `galleria.toml`, poi quelli noti solo ai profili in ordine alfabetico,
+  in fondo «Senza gruppo»), `shell/RubricaNotices.tsx` (store illeggibile con il comando da copiare, file saltati per nome, rubrica
+  vuota con `galleria import <file>`), `shell/CommandRow.tsx`. La scheda «Generale» è **in sola lettura** (campi `readOnly`,
+  trasporto come `Segmented` in sola lettura); le altre schede dicono `pane.arrives_later`; Duplica, Esporta ed Elimina dicono
+  `action.arrives_later` (P10). Spariti: `demo-data.ts`, i testi `demo.*`, la fascia «Dati di esempio», il banner, la finestra di conferma
+  di «Elimina» (torna con T8).
+- **Prove**: `galleria-profile/tests/settings.rs` (6), `galleria-gui/tests/rubrica.rs` (31, tra cui `no_read_command_returns_a_secret`, che prima
+  controlla che il seme contenga davvero dei segreti, e `works_without_any_daemon`), `rubrica/{store,arrange}.test.ts`, `Shell.test.tsx` e
+  `ProfileDetail.test.tsx` riscritte sulla rubrica di prova, `boundary.test.ts` (`shell_only_calls_the_listed_commands`: i comandi invocati
+  da `ui/src` sono esattamente quelli di `capabilities/main.json`). `examples/seed-rubrica.rs` (con `tests/support/seed.rs`,
+  incluso con `#[path]`) scrive cinque profili con le funzioni di import, tre gruppi, due preferiti e segreti `SEED-SECRET-…`; `lab/tests/gui-lib.sh`
+  genera lo script `rubrica-seed` e `openApp()` riparte da una rubrica nota (`openApp(false, "empty")` per quella vuota).
+  Fumo nuovo: `rubrica_lists_the_seeded_profiles` (a demone fermo la lista c'è) e `empty_rubrica_shows_the_import_hint`.
+
+Scostamenti dal piano, da sapere:
+
+- `rubrica/arrange.ts` nasce in T3 (con le sole regole dei gruppi e le sue prove) invece che in T4: serve già per mostrare i gruppi
+  e per sapere quale profilo prende il posto di quello che sparisce. T4 ci aggiunge ricerca, preferiti, ordinamento.
+- Il campo «Riconnessione automatica» è un campo di testo in sola lettura («Sì»/«No»), non un interruttore: un interruttore che non
+  risponde è peggio di niente, e C lo riporta com'è. Per questo `S4` (l'interruttore sotto Orca) e `S5` (la conferma di «Elimina» sotto Orca) sono
+  `it.skip` in `shell.a11y.ts` fino a T5 e T8; il dialogo resta provato da `overlays.a11y.ts` (D1–D4) e da `ConfirmDialog.test.tsx`.
+- Dentro un gruppo i profili restano nell'ordine del disco (per nome): «Ufficio Napoli», preferito, sta dopo «Datacenter Milano» finché T4 non
+  mette i preferiti in cima. Le prove di fumo e di Orca che nominavano il primo profilo ora nominano «Datacenter Milano».
+- `no_command_takes_a_path` (sulle firme) è del T8; qui `profile_get_refuses_what_is_not_an_id_and_says_when_there_is_none` prova che un
+  nome o un percorso non passano (l'argomento è un `Uuid`).
+- La prova `shell_never_calls_the_daemon` di B2 è sostituita da `shell_only_calls_the_listed_commands` (come da piano).
+
+Esito dei comandi (T3): `scripts/gui.sh check` verde (289 prove JS e le prove Rust), `smoke` 17/17, `a11y` 21 + 2 saltate, due giri di fila;
+host: `cargo fmt --check`, `clippy -D warnings`, `cargo test` (535), `cargo deny check`, `check-boundaries.sh`.
+`git diff main -- crates/galleria-ipc crates/galleriad crates/galleria-backend*` vuoto.
+
+Non verificato (T3): permessi sbagliati sul vero `~/.config/galleria` di una persona (provato solo su cartelle temporanee); una rubrica con
+molte centinaia di profili (la lettura è sincrona nel comando async, non misurata); `galleria.toml` rotto fa fallire la lista intera con
+`gui_store_unreadable` (scelta: meglio un errore chiaro che gruppi che spariscono in silenzio).

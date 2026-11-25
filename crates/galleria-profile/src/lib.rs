@@ -3,6 +3,7 @@ mod import_ovpn;
 mod import_wg;
 mod model;
 mod secrets;
+mod settings;
 mod store;
 use galleria_ipc::{
     BackendParams, ConnectOptions, ConnectParams, OpenVpnParams, ProfileRef, Protocol,
@@ -12,6 +13,7 @@ pub use import_ovpn::*;
 pub use import_wg::*;
 pub use model::*;
 pub use secrets::*;
+pub use settings::*;
 pub use store::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WarningKind {

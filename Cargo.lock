@@ -1334,6 +1334,8 @@ dependencies = [
  "anyhow",
  "galleria-backend",
  "galleria-ipc",
+ "galleria-ovpn",
+ "galleria-profile",
  "galleriad",
  "gtk",
  "nix",

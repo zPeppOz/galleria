@@ -1,8 +1,4 @@
-/* The top bar: only variables of tokens.css. The sign of sample data is --ink on a tint of --warn, with a --warn border. */
+/* The top bar: only variables of tokens.css. */
 .top-bar { display: flex; align-items: center; gap: var(--sp-5); min-height: var(--h-control-lg); padding: var(--sp-2) var(--sp-5) var(--sp-2) var(--sp-6); border-bottom: 1px solid var(--line); background: var(--panel); }
 .top-bar-brand { font-weight: var(--fw-strong); letter-spacing: 0.2px; }
-.top-bar-demo {
-  padding: var(--sp-1) var(--sp-4); border-radius: var(--r-xs); border: 1px solid var(--warn); color: var(--ink);
-  background: color-mix(in oklch, var(--warn) var(--tint), transparent); font-size: var(--fs-sm); font-weight: var(--fw-medium);
-}
 .top-bar-actions { margin-left: auto; }

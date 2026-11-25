@@ -14,6 +14,10 @@ custom-protocol = ["tauri/custom-protocol"]
 [dependencies]
 anyhow.workspace = true
 galleria-ipc = { workspace = true, features = ["client"] }
+# The rubrica reads the same store as the CLI (plan B3). The parser of the OpenVPN text is the one the profile crate
+# already uses; neither is a backend and neither reaches the daemon.
+galleria-ovpn = { path = "../galleria-ovpn" }
+galleria-profile = { path = "../galleria-profile" }
 nix.workspace = true
 serde.workspace = true
 serde_json.workspace = true

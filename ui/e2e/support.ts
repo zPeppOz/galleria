@@ -27,11 +27,15 @@ export const stateFile = (): string => join(env("XDG_STATE_HOME"), "galleria", "
 export const readState = (): string => (existsSync(stateFile()) ? readFileSync(stateFile(), "utf8") : "");
 
 /**
- * Starts the app. Every test starts from an empty `state.toml`, so what one test chose (Italian, a theme) does not
- * leak into the next; `keepState` is for the test that restarts the app on purpose.
+ * Starts the app. Every test starts from an empty `state.toml` and from the seeded rubrica, so what one test chose
+ * (Italian, a theme) or did to the profiles does not leak into the next; `keepState` is for the test that restarts the
+ * app on purpose and keeps both. `rubrica: "empty"` starts from a store with no profile.
  */
-export async function openApp(keepState = false): Promise<Browser> {
-  if (!keepState) rmSync(stateFile(), { force: true });
+export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "seeded"): Promise<Browser> {
+  if (!keepState) {
+    rmSync(stateFile(), { force: true });
+    seedRubrica(rubrica);
+  }
   current = await remote({
     hostname: "127.0.0.1",
     port: Number(env("GALLERIA_SMOKE_DRIVER_PORT")),
@@ -162,4 +166,12 @@ export function orcaDebugLines(pattern: RegExp): string[] {
   return readFileSync(log, "utf8")
     .split("\n")
     .filter((line) => pattern.test(line));
+}
+
+/**
+ * Writes the made-up rubrica of `crates/galleria-gui/examples/seed-rubrica.rs` into the temporary config directory of the
+ * run, replacing whatever was there: five profiles, three groups, two favourites (`"empty"`: a store with no profile).
+ */
+export function seedRubrica(kind: "seeded" | "empty" = "seeded"): void {
+  execFileSync(`${env("GALLERIA_SMOKE_BIN")}/rubrica-seed`, kind === "empty" ? ["--empty"] : [], { stdio: "inherit" });
 }

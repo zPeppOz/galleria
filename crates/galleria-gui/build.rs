@@ -7,6 +7,8 @@ const COMMANDS: &[&str] = &[
     "ui_state_get",
     "ui_state_set",
     "announce",
+    "profiles_list",
+    "profile_get",
 ];
 
 fn main() {

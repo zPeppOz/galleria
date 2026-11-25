@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
-import { AppMenu, type LangChoice } from "./app/AppMenu";
+import { AppMenu } from "./app/AppMenu";
 import { useDaemon } from "./daemon/store";
-import { detectLang, I18n, useT } from "./i18n";
-import type { Lang } from "./messages";
+import { useT } from "./i18n";
+import { Preferences, type LangChoice } from "./prefs";
 import { FirstRun } from "./screens/FirstRun";
 import { StatusView } from "./screens/StatusView";
 
-function Screen({ langChoice, onLangChoice }: { langChoice: LangChoice; onLangChoice: (choice: LangChoice) => void }) {
+function Screen() {
   const t = useT();
   const { view, info, retry } = useDaemon();
   const link = view?.link ?? "connecting";
@@ -15,7 +14,7 @@ function Screen({ langChoice, onLangChoice }: { langChoice: LangChoice; onLangCh
     <>
       <header>
         <h1>{t("app.title")}</h1>
-        <AppMenu langChoice={langChoice} onLangChoice={onLangChoice} info={info} daemonVersion={view?.daemon_version ?? null} />
+        <AppMenu info={info} daemonVersion={view?.daemon_version ?? null} />
       </header>
       <main>
         {view && info && link === "connected" ? (
@@ -33,16 +32,11 @@ function Screen({ langChoice, onLangChoice }: { langChoice: LangChoice; onLangCh
   );
 }
 
-/** T1: the chosen language lives here, in memory; T3 moves it into the preferences. */
-export function App({ lang }: { lang?: Lang }) {
-  const [langChoice, setLangChoice] = useState<LangChoice>(lang ?? "system");
-  const language = langChoice === "system" ? detectLang() : langChoice;
-  useEffect(() => {
-    document.documentElement.lang = language;
-  }, [language]);
+/** `lang` is the initial choice (the tests give it); without it the language follows the system. */
+export function App({ lang }: { lang?: LangChoice }) {
   return (
-    <I18n lang={language}>
-      <Screen langChoice={langChoice} onLangChoice={setLangChoice} />
-    </I18n>
+    <Preferences lang={lang}>
+      <Screen />
+    </Preferences>
   );
 }

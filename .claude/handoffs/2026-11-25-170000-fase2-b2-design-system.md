@@ -14,6 +14,7 @@
 | --- | --- |
 | T1 | Q12 verificata: **Base UI 1.9.0 regge** (nessuna condizione di stop scattata, niente Radix). `design/{Dialog,Menu,icons}.tsx`, `app/{AppMenu,AboutDialog}.tsx`, controllo licenze JS, `scripts/gui.sh a11y` con Orca + AT-SPI, `ui/e2e/{support,overlays.a11y}.ts` |
 | T2 | `design/{tokens.css,base.css,theme.ts,color.ts}`, prove di contrasto/tema/regole CSS; S8 verde nella finestra vera, S17 falso (via `system-ui`) |
+| T3 | `i18n/{en,it}.json` (74 chiavi, con `error.*` per i 19 codici), `i18n/index.tsx`, `prefs.tsx` (lingua e tema in memoria, Q25), `tests/catalogs.rs` + `GUI_CODES` in `error.rs` (G8), gruppo «Tema» nel menu, fumo `language_switches_without_a_restart` |
 
 ## Scelte da sapere (T1)
 
@@ -27,7 +28,7 @@
 - `lab/tests/gui-lib.sh` è il pezzo condiviso (cartella temporanea, `daemon-start`/`daemon-stop`, driver) di `gui-smoke.sh` e
   `gui-a11y.sh`. Il fumo di B1 è rimasto identico (5 prove su 5).
 - `expectNoAccessibilityViolations(container, { landmarks: false })` spegne la regola `region` per un componente in un portale.
-- `AppMenu` tiene la lingua scelta nello stato di `App` (il T3 la sposta in `prefs`).
+- Lingua e tema stanno in `prefs.tsx` (T3), solo in memoria; `AppMenu` li legge da `usePrefs()`. Il menu ha due gruppi radio: `overlays.a11y.ts` aspetta sei radio e due segnati.
 - Strumenti di sessione: heredoc e `python3 -c` sono bloccati in modalità non presidiata: i file si scrivono con gli strumenti
   di file; per Docker `scripts/gui.sh run` fa da tramite (con `GUI_CONTAINER_NAME=t_fa55d26a-…`).
 

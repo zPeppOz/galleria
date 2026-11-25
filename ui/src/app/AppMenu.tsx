@@ -1,28 +1,40 @@
 import { useState } from "react";
 import type { AppInfo } from "../daemon/types";
 import { Menu, type MenuEntry } from "../design/Menu";
+import type { ThemeChoice } from "../design/theme";
 import { useT } from "../i18n";
-import type { Lang } from "../messages";
+import { usePrefs, type LangChoice } from "../prefs";
 import { AboutDialog } from "./AboutDialog";
 
-export type LangChoice = "system" | Lang;
-
-/** The menu of the title bar: language, and «About Galleria». T3 adds the theme and reads the language from the preferences. */
-export function AppMenu(props: { langChoice: LangChoice; onLangChoice: (choice: LangChoice) => void; info: AppInfo | null; daemonVersion: string | null }) {
+/** The menu of the title bar: language, theme, and «About Galleria». Language and theme are kept by the preferences. */
+export function AppMenu(props: { info: AppInfo | null; daemonVersion: string | null }) {
   const t = useT();
+  const prefs = usePrefs();
   const [aboutOpen, setAboutOpen] = useState(false);
   const entries: MenuEntry[] = [
     {
       kind: "radio",
       id: "lang",
       label: t("menu.language"),
-      value: props.langChoice,
+      value: prefs.lang,
       options: [
         { value: "system", label: t("menu.language.system") },
         { value: "en", label: t("menu.language.en") },
         { value: "it", label: t("menu.language.it") },
       ],
-      onChange: (value) => props.onLangChoice(value as LangChoice),
+      onChange: (value) => prefs.setLang(value as LangChoice),
+    },
+    {
+      kind: "radio",
+      id: "theme",
+      label: t("menu.theme"),
+      value: prefs.theme,
+      options: [
+        { value: "system", label: t("menu.theme.system") },
+        { value: "light", label: t("menu.theme.light") },
+        { value: "dark", label: t("menu.theme.dark") },
+      ],
+      onChange: (value) => prefs.setTheme(value as ThemeChoice),
     },
     { kind: "separator" },
     { kind: "item", id: "about", label: t("menu.about"), onSelect: () => setAboutOpen(true) },

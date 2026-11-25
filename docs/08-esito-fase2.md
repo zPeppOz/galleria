@@ -175,3 +175,24 @@ un riquadro di 60×60). La prova S8 fotografa la finestra e legge il pixel in me
   `styles.css`. Con i valori della proposta: 107 prove Vitest verdi.
 - I dodici valori `oklch()` della tabella del piano coincidono con la conversione scritta in `color.ts` a ±1 per canale.
 - `scripts/gui.sh smoke`: 7 prove su 7 (le cinque di B1 e le due nuove), `S8: 20 colori … differenza massima 1,3`.
+
+### Cataloghi e lingua (T3)
+
+I testi stanno solo in `ui/src/i18n/{en,it}.json` (74 chiavi ciascuno); `messages.ts` e `i18n.tsx` non esistono più. `i18n/index.tsx`
+dà `useT`, `detectLang`, `hasKey` e `errorText` (D22: il testo del catalogo per il codice, il messaggio inglese del demone per un
+codice che il catalogo non conosce). `prefs.tsx` tiene lingua e tema **solo in memoria** (Q25), scrive `lang` e `data-theme`
+sulla radice e rende il fornitore della lingua: cambiando lingua dal menu si ridisegna tutto senza smontare `App`. `AppMenu` ha
+il gruppo «Tema» (Sistema · Chiaro · Scuro) accanto a «Lingua».
+
+- G8: `crates/galleria-gui/tests/catalogs.rs` legge i due cataloghi e chiede `error.<codice>` per le 11 varianti di `ErrorCode`,
+  le 8 di `SessionErrorCode` e le voci di `GUI_CODES` (oggi vuoto), `state.<s>` per i 7 stati e `bar.<l>` per i 5 stati del
+  collegamento. Ogni enum ha un elenco e, generato dalla stessa macro, un `match` senza ramo di ripiego: una variante nuova non
+  compila finché non è nell'elenco, e nell'elenco senza testo la prova diventa rossa. Un'altra prova cerca nei sorgenti di
+  `galleria-gui/src` i letterali `gui_…` e `import_…` e pretende che stiano in `GUI_CODES`; una terza scarta le chiavi `error.*`
+  senza codice. Le frasi partono dalla tabella della CLI (`galleria-cli/src/messages.rs`): «demone» → «servizio» come nel resto
+  dell'interfaccia, e `already_active` senza `--replace` (la GUI non ha quel parametro).
+- Provato a mano: tolta `error.auth_failed` da `it.json`, `every_session_error_code_has_text_in_both_catalogues` diventa rossa
+  («missing in it»); rimessa, torna verde.
+- Fumo: `language_switches_without_a_restart` (dal menu «Italiano» compare «Avvia il servizio», «English» → «Start the
+  service», stessa sessione WebDriver). `scripts/gui.sh smoke`: 8 prove su 8.
+- `overlays.a11y.ts` (T1) aggiornata: il menu ha due gruppi a scelta singola, i radio sono sei e i segnati due. `a11y`: 11 su 11.

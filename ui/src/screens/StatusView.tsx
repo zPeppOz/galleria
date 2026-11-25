@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import type { DaemonView } from "../daemon/types";
-import { useT } from "../i18n";
-import { hasKey } from "../messages";
+import { errorText, hasKey, useT } from "../i18n";
 
 const PROTOCOL_NAME = { wireguard: "WireGuard", openvpn: "OpenVPN" } as const;
 
@@ -36,7 +35,7 @@ export function StatusView({ view }: { view: DaemonView }) {
       </dl>
       {status.error && (
         <p role="alert" className="error">
-          {t("status.error", { code: status.error.code, message: status.error.message })}
+          {t("status.error", { code: status.error.code, message: errorText(t, status.error.code, status.error.message) })}
         </p>
       )}
       {warnings.length > 0 && (

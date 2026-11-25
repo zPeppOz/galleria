@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseColour, tintOver, toHex, type Rgb } from "../src/design/color";
-import { closeApp, daemon, openApp, TEN_SECONDS, waitForBody, type Browser } from "./support";
+import { bodyText, closeApp, daemon, openApp, TEN_SECONDS, waitForBody, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 const DISCONNECTED = /Disconnected|Disconnesso/;
@@ -43,6 +43,32 @@ describe("galleria-gui against the real daemon", () => {
     const b = await openApp();
     await waitForBody(b, START_THE_SERVICE, "the «Start the service» panel never appeared");
     await waitForBody(b, SYSTEMCTL, "the panel does not show the command");
+  });
+
+  // G8: the language changes from the menu, in the same window and the same WebDriver session, with no restart.
+  it("language_switches_without_a_restart", async () => {
+    daemon("stop");
+    const b = await openApp();
+    await waitForBody(b, START_THE_SERVICE, "the «Start the service» panel never appeared");
+    const session = b.sessionId;
+    const choose = async (label: string) => {
+      await b.$("button=Menu").click();
+      const option = await b.waitUntil(
+        async () => {
+          for (const item of await b.$$('[role="menuitemradio"]')) if ((await item.getText()) === label) return item;
+          return false;
+        },
+        { timeout: TEN_SECONDS, interval: 250, timeoutMsg: `the menu never offered «${label}»` },
+      );
+      await option.click();
+    };
+    await choose("Italiano");
+    await waitForBody(b, "Avvia il servizio", "the window did not switch to Italian");
+    expect(await bodyText(b)).not.toContain("Start the service");
+    await choose("English");
+    await waitForBody(b, "Start the service", "the window did not switch back to English");
+    expect(await bodyText(b)).not.toContain("Avvia il servizio");
+    expect(b.sessionId).toBe(session);
   });
 
   it("window_has_no_remote_content", async () => {

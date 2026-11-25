@@ -83,8 +83,9 @@ describe("menu and dialog under a screen reader", () => {
     await key("Home");
     let tree = await waitForTree((t) => focusedName(t) === "System", "System focused");
     const radios = tree.filter((n) => n.role === "radio menu item");
-    expect(radios.map((n) => n.name)).toEqual(["System", "English", "Italiano"]);
-    expect(radios.filter((n) => n.states.has("checked")).map((n) => n.name)).toEqual(["System"]);
+    // Two groups since T3: the language, then the theme.
+    expect(radios.map((n) => n.name)).toEqual(["System", "English", "Italiano", "System", "Light", "Dark"]);
+    expect(radios.filter((n) => n.states.has("checked")).map((n) => n.name)).toEqual(["System", "System"]);
     await key("ArrowDown");
     await waitForTree((t) => focusedName(t) === "English", "English focused");
     const mark = speechMark();
@@ -95,7 +96,7 @@ describe("menu and dialog under a screen reader", () => {
     const reopened = speechMark();
     await key("Enter");
     tree = await waitForTree((t) => focusedName(t) === "System", "the menu reopened on its first entry");
-    expect(tree.filter((n) => n.role === "radio menu item" && n.states.has("checked")).map((n) => n.name)).toEqual(["English"]);
+    expect(tree.filter((n) => n.role === "radio menu item" && n.states.has("checked")).map((n) => n.name)).toEqual(["English", "System"]);
     record("M4 reopened, checked entry", await waitForSpeech(reopened, "System"), tree);
   });
 

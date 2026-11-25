@@ -1,7 +1,7 @@
 # Roadmap — Galleria
 
 Client desktop open source per OpenVPN e WireGuard: rubrica di connessioni in stile VirtualBox, una connessione
-attiva alla volta, Linux e Windows. Fonti: `docs/01-analisi.md` (§4, §4.1, §10), esiti in `docs/04`–`06`,
+attiva alla volta, Linux e Windows. Fonti: `docs/01-analisi.md` (§4, §4.1, §10), esiti in `docs/04`–`06`, decisioni della fase 2 in `docs/07`,
 spec e piano in `docs/superpowers/`, handoff in `.claude/handoffs/`.
 
 ## Fase 0 · Analisi, validazione e spike
@@ -74,40 +74,59 @@ Decidere cosa costruire e provare su Linux e Windows i punti tecnici più rischi
   - [ ] `nmcli device` mostra `glr-wg0` e `glr-ovpn0` non gestite; DNS interni applicati prima di connected e ripristinati dopo
   - [ ] catture IPv6 e ripiego IPv4 di T9 e T14 ripetute; nessun residuo dopo `kill -9` e riavvio
   - [ ] DCO aperto davvero, connected e bytecount con traffico (un test saltato non conta)
-- [ ] Risposte alle questioni aperte della spec di fase 1
-  - [ ] Q5: script del profilo mai eseguiti, con il mockup allineato, oppure un design a parte per la conferma
-  - [ ] Q8, Q10, Q11: file di log per la GUI, proprietario della sessione, traduzioni nei client
-  - [ ] Q1, Q2, Q4, Q9: testo di `docs/01-analisi.md` precisato; per Q1 questa roadmap propone di chiamare Fase 2 solo la GUI
+- [x] Risposte alle questioni aperte della spec di fase 1 <!-- branch: galleria/t_e8440dfb-galleria-applica-d19-d32-spec-della-fase · task: t_e8440dfb · by: nello -->
+  - [x] D19–D32 proposte in `docs/07-proposte-fase2.md`, approvate da Aitano su delega di Peppe il 2026-11-25
+  - [x] Q5: script del profilo mai eseguiti, nemmeno con conferma (D19), con il mockup allineato
+  - [x] Q8, Q10, Q11: nessun file di log (D20), nessun proprietario della sessione (D21), traduzioni nel frontend per codice (D22)
+  - [x] Q1, Q2, Q4, Q9: testo di `docs/01-analisi.md` precisato (D23, D24); «fase 2» è solo la GUI
 
 ## Fase 2 · GUI Linux
-La rubrica in Tauri 2 + React sopra il demone della fase 1: import, connetti e disconnetti, stato, tray (analisi §4 MVP e §10).
+La rubrica in Tauri 2 + React sopra il demone della fase 1, in sei blocchi B1–B6 che finiscono ognuno con qualcosa che si avvia: criteri G1–G13 della spec.
 
-- [ ] Completa la validazione dei concorrenti (A7)
-  - [ ] difetti di Eddie e prova pratica di Pritunl scritti in `docs/00-mercato-e-concorrenti.md`
-  - [ ] elenco dei punti di UX in cui la GUI deve essere nettamente migliore (analisi §3)
-- [ ] Spec e piano della fase 2
-  - [ ] in `docs/superpowers/` con criteri di uscita verificabili, come per la fase 1
+- ~~Completa la validazione dei concorrenti (A7)~~ — tolto per decisione di Peppe del 2026-11-25: Galleria è uno strumento per Peppe e i colleghi, non un prodotto da validare sul mercato
+
+- [ ] Spec della fase 2 e piano del blocco B1
+  - [ ] spec `docs/superpowers/specs/2026-11-25-fase2-gui-design.md` con i criteri G1–G13, sopra le decisioni D19–D32
+  - [ ] piano di B1 in `docs/superpowers/plans/`; gli altri blocchi hanno un piano ciascuno, scritto prima di partire
   - [ ] l'IPC della fase 1 resta senza modifiche e la webview passa dai comandi Tauri (D12)
-  - [ ] parte dalle risposte a Q5, Q8, Q10 e Q11
-- [ ] Design system di Galleria (A8)
-  - [ ] nuovo e nel repo, con la licenza del progetto; il design system di XR1 non si usa
-  - [ ] componenti della rubrica e del dettaglio a schede ricavati da `design/mockup/Rubrica.html`
-- [ ] Rubrica e dettaglio a schede
-  - [ ] lista con gruppi, tag, ricerca, preferiti, ordinamento e icona di stato
-  - [ ] schede Generale, Autenticazione, Rete, Avanzate (editor raw con validazione) e Log
-  - [ ] duplica, esporta ed elimina profilo
-- [ ] Import grafico
-  - [ ] `.ovpn` con blocchi inline o file separati e `.conf` WireGuard, da file, drag & drop o testo incollato
-  - [ ] associazione delle estensioni nel file manager
-  - [ ] QR WireGuard solo se la verifica lo conferma (oggi [S])
-- [ ] Connessione, stato e credenziali
-  - [ ] connetti e disconnetti con sostituzione della connessione attiva (D5); stato, IP, byte e ultimo handshake dal vivo
-  - [ ] credenziali e OTP chiesti al connect, "ricorda" nel portachiavi con Secret Service al posto del file `0600` (Q6)
-  - [ ] riconnessione automatica su caduta di rete
-- [ ] Tray
-  - [ ] stato, lista rapida, connetti e disconnetti; su Linux tutte le azioni nel menu, perché Tauri non emette i click sull'icona
-- [ ] Avviso di nuova versione su Linux (D16)
-  - [ ] una sola richiesta dalla GUI all'endpoint delle release di GitHub, senza identificativi, disattivabile e scritta nel README
+  - [ ] questioni aperte nuove della spec decise prima di costruire
+- [ ] B1 · Fondamenta
+  - [ ] parte dalla fase 1 integrata in `main`
+  - [ ] crate `galleria-gui` e `ui/` nel workspace, job CI della GUI, permessi minimi della webview (D29)
+  - [ ] connessione al demone con ricollegamento ed eventi inoltrati al frontend (G1)
+  - [ ] quattro stati del primo avvio, senza chiedere privilegi (D27, G2)
+  - [ ] fumo WebDriver nel laboratorio provato, oppure sostituito per scritto da una lista di controllo manuale (oggi [S])
+  - [ ] ci si può fermare qui: finestra che mostra lo stato vero del demone, in sola lettura
+- [ ] B2 · Design system e guscio
+  - [ ] design system nuovo e nel repo, con la licenza del progetto; quello di XR1 non si usa (A8)
+  - [ ] token dal mockup, componenti di base su primitive «headless», tema chiaro e scuro (D30)
+  - [ ] disposizione lista + dettaglio e navigazione da tastiera (G12)
+  - [ ] cataloghi `en` e `it` con il test dei codici del demone (D22, G8)
+  - [ ] ci si può fermare qui: guscio navigabile con dati finti, nelle due lingue
+- [ ] B3 · Rubrica e profili
+  - [ ] lista con gruppi, ricerca, preferiti, ordinamento e icona di stato; gruppi in `galleria.toml`
+  - [ ] schede Generale, Autenticazione e Rete: campi veri per WireGuard, sola lettura più interruttori per OpenVPN (D26)
+  - [ ] editor raw con la validazione delle direttive della fase 1
+  - [ ] duplica, esporta ed elimina profilo; «ultimo uso» in `state.toml` (D32)
+  - [ ] ci si può fermare qui: rubrica completa sui profili importati dalla CLI, senza connettere
+- [ ] B4 · Import
+  - [ ] `.ovpn` con blocchi inline o file separati e `.conf` WireGuard, da file, trascinamento o testo incollato
+  - [ ] anteprima con gli avvisi e il testo di D19, salvataggio solo dopo «Importa» (G3)
+  - [ ] associazione di `.ovpn` e istanza unica; QR WireGuard fuori dalla fase 2 (D31)
+  - [ ] ci si può fermare qui: si importa dalla GUI e si connette ancora dalla CLI
+- [ ] B5 · Connessione
+  - [ ] archivio dei segreti con Secret Service e ripiego sul file `0600`, lettura da entrambi anche nella CLI (D25, G6; crate oggi [S])
+  - [ ] connetti, disconnetti e sostituisci senza conferma tra profili propri (D5, D28, G4); sette stati, `detail` e statistiche dal vivo
+  - [ ] credenziali, OTP e passphrase chiesti solo su `needs_input`; «Ricorda» mai per l'OTP (G5)
+  - [ ] errori tradotti, scheda Log con «Esporta log…» e nessun segreto (D20, G7)
+  - [ ] sessione estranea mostrata e chiusa solo con conferma (D21, G9)
+  - [ ] ci si può fermare qui: uso quotidiano possibile al posto della CLI
+- [ ] B6 · Tray, versione, chiusura
+  - [ ] tray con stato, preferiti, connetti e disconnetti; su Linux tutte le azioni nel menu, perché Tauri non emette i click sull'icona (G10)
+  - [ ] chiudere la finestra lascia la connessione attiva; uscita esplicita dal menu
+  - [ ] avviso di nuova versione: una sola richiesta dalla GUI all'endpoint delle release di GitHub, senza identificativi, disattivabile e scritta nel README (D16, G11)
+  - [ ] fumo end-to-end completo, prova manuale su Ubuntu e Fedora desktop, avvio a freddo misurato (G13)
+  - [ ] esito in `docs/08-esito-fase2.md`
 
 ## Fase 3 · Porting Windows
 Demone come servizio Windows con WireGuardNT e OpenVPN installato come prerequisito, MSI con updater (analisi §10).

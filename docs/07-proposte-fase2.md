@@ -1,7 +1,8 @@
 # 07 — Proposte per la fase 2 (GUI Linux)
 
-Versione 0.1 — 2026-11-25 — stato: **proposta di Nello, da approvare da Peppe**. Nessun codice e nessun altro
-documento è stato modificato: i diff del §4 si applicano dopo l'ok.
+Versione 0.2 — 2026-11-25 — stato: **D19–D32 approvate da Aitano su delega di Peppe il 25/11/2026**, tutte come
+raccomandate. I diff del §4 sono applicati a `01-analisi.md`, `02-modello-minacce.md` e `ROADMAP.md`; la spec
+della fase 2 è `superpowers/specs/2026-11-25-fase2-gui-design.md`.
 
 Base letta: ramo `galleria/t_17a7470c-galleria-correggi-gli-importanti-della-r` a `e4a2d71`.
 
@@ -13,9 +14,13 @@ Linux e Windows, con le VPN aziendali e dei clienti (OpenVPN, WireGuard, più av
 dei concorrenti (A7) è tolta: qui non c'è e la fase 2 non la prevede. Le decisioni D5–D18, Q3, Q6, Q7, A6, A8,
 A11 e l'IPC della fase 1 non sono riaperti.
 
-## 1. Decisioni da approvare in blocco
+## 1. Decisioni approvate in blocco
 
-| ID | Tema | Raccomandazione | Dettagli |
+**D19–D32: approvate da Aitano su delega di Peppe il 25/11/2026**, tutte come raccomandate qui sotto, senza
+modifiche. Non si riaprono. Nel resto del documento «raccomandazione» e «da approvare» restano come traccia
+della proposta.
+
+| ID | Tema | Decisione (era: raccomandazione) | Dettagli |
 |---|---|---|---|
 | D19 | Q5, script dei profili | **Mai eseguiti in v0.1**, nemmeno con conferma. L'import li toglie e lo dice | §2.1 |
 | D20 | Q8, log | **Nessun file di log.** La GUI mostra il buffer del demone e offre «Esporta log…»; «Apri cartella log» sparisce | §2.2 |

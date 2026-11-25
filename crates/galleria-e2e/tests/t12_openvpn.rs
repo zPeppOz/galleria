@@ -293,20 +293,23 @@ async fn ovpn_dco_state_and_bytecount() {
     connect(&mut c, "base").await;
     checked("ping -c 3 -W 2 10.8.0.1");
     assert!(stats(&mut c).await.rx_bytes > 0);
-    let logs: LogsResult = c
-        .call(
-            "logs",
-            &LogsParams {
-                after: None,
-                limit: 2000,
-            },
-        )
-        .await
-        .unwrap();
-    assert!(
-        logs.entries
+    // The daemon serves at most 1000 lines per call, oldest first: page with `after`.
+    let mut after = None;
+    let mut opened = false;
+    loop {
+        let logs: LogsResult = c
+            .call("logs", &LogsParams { after, limit: 1000 })
+            .await
+            .unwrap();
+        opened |= logs
+            .entries
             .iter()
-            .any(|l| l.message.contains("DCO device") && l.message.contains("opened"))
-    );
+            .any(|l| l.message.contains("DCO device") && l.message.contains("opened"));
+        if opened || logs.entries.len() < 1000 {
+            break;
+        }
+        after = Some(logs.last);
+    }
+    assert!(opened, "no 'DCO device ... opened' line in the daemon logs");
     disconnect(&mut c).await;
 }

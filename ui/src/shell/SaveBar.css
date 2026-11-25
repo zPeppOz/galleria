@@ -1,0 +1,7 @@
+/* The bar of the unsaved changes: only variables of tokens.css. It stays at the bottom of the detail while the form scrolls. */
+.savebar {
+  position: sticky; bottom: calc(var(--sp-8) * -1); display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-6); border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  background: var(--panel); box-shadow: var(--shadow-md);
+}
+.savebar-text { flex: 1; margin: 0; color: var(--muted); }

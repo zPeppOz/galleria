@@ -6,11 +6,12 @@
 //   GALLERIA_SMOKE_DRIVER_PORT  the port tauri-driver listens on
 // Nothing here asks the daemon to connect: no route, DNS or interface is touched.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseColour, tintOver, toHex, type Rgb } from "../src/design/color";
-import { bodyText, closeApp, daemon, openApp, readState, TEN_SECONDS, waitForBody, type Browser } from "./support";
+import { bodyText, closeApp, daemon, env, openApp, readState, TEN_SECONDS, waitForBody, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 const DISCONNECTED = /Disconnected|Disconnesso/;
@@ -326,6 +327,36 @@ describe("the shell in the real window", () => {
     expect(checked, "the sort order «Most recent» is the one chosen when the window opens again").toBe(true);
   });
 
+  // T5 (R1): a profile is edited in the real window and saved to the disk. The name is typed in, «Save» writes the file of
+  // the phase 1 (read back here from the folder of the run), the list and the title follow, and the notice says it.
+  it("a_profile_is_renamed_and_the_list_follows", async () => {
+    const b = await openShell();
+    const rows = async () => (await b.execute(() => [...document.querySelectorAll('[role="listbox"] [role="option"] span.profile-name')].map((el) => (el.textContent ?? "").trim()))) as string[];
+    await waitFor(b, async () => (await rows()).length === 5, "the list never showed the five profiles");
+    const field = await b.$('input[name="name"]');
+    await field.click();
+    await press(b, "Control", "a"); // select the name; the next keys replace it (the driver's clearValue does not fire `input`)
+    await press(b, ...Array.from("Sede Napoli"));
+    await waitForBody(b, "You have changes that are not saved.", "the save bar never appeared");
+    expect((await rows())[0], "nothing is written before «Save»").toBe("Ufficio Napoli");
+    await b.$("button=Save").click();
+    await waitFor(b, async () => (await rows()).includes("Sede Napoli"), "the list did not follow the new name");
+    expect(await title(b)).toBe("Sede Napoli");
+    await waitForBody(b, "Profile saved.", "the notice of the save never showed");
+    expect(await bodyText(b)).not.toContain("You have changes that are not saved.");
+    // the file on the disk has it, and it is still a private file of the phase 1
+    const dir = join(env("XDG_CONFIG_HOME"), "galleria", "profiles");
+    const saved = readdirSync(dir).map((name) => readFileSync(join(dir, name), "utf8")).filter((text) => text.includes('name = "Sede Napoli"'));
+    expect(saved, "one profile file holds the new name").toHaveLength(1);
+    expect(saved[0]).toContain("schema_version = 1");
+    // a switch writes at once, with no bar and no notice
+    await (await byText(b, "[role=tab]", "Network")).click();
+    await (await b.$$('button[role="switch"]'))[0].click(); // «Ignore the routes the server pushes», the first of the two
+    await waitFor(b, async () => readdirSync(dir).map((name) => readFileSync(join(dir, name), "utf8")).some((text) => text.includes('name = "Sede Napoli"') && text.includes("ignore_pushed_routes = true")), "the switch did not write the profile");
+    expect(await bodyText(b)).not.toContain("You have changes that are not saved.");
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
   it("shell_is_navigable_with_the_seeded_rubrica", async () => {
     const b = await openShell();
     expect(await bodyText(b)).not.toContain("Sample data");
@@ -345,7 +376,8 @@ describe("the shell in the real window", () => {
     await press(b, "Home");
     await waitFor(b, async () => (await title(b)) === "Ufficio Napoli", "Home in the list did not choose the first profile");
 
-    // «More actions», then the tab strip: the arrows open the tabs, down to «Log»
+    // the star, «More actions», then the tab strip: the arrows open the tabs, down to «Log»
+    await press(b, "Tab");
     await press(b, "Tab");
     await press(b, "Tab");
     expect(await activeRole(b)).toBe("tab");

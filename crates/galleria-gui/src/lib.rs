@@ -6,6 +6,7 @@ pub mod announce;
 #[cfg(target_os = "linux")]
 pub mod announce_atk;
 pub mod commands;
+pub mod edit;
 pub mod error;
 pub mod events;
 pub mod link;
@@ -54,7 +55,8 @@ pub fn configure_with<R: Runtime>(
             commands::ui_state::ui_state_set,
             commands::announce::announce,
             commands::profiles::profiles_list,
-            commands::profiles::profile_get
+            commands::profiles::profile_get,
+            commands::profiles::profile_update
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.

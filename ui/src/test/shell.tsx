@@ -6,9 +6,9 @@ import type { Announce } from "../design/Toast";
 import { Preferences } from "../prefs";
 import { arrange } from "../rubrica/arrange";
 import type { Rubrica } from "../rubrica/store";
-import type { CmdError, RubricaView } from "../rubrica/types";
+import type { CmdError, ProfileDetail, ProfilePatch, RubricaView } from "../rubrica/types";
 import { Shell } from "../shell/Shell";
-import { makeDetail, makeInfo, makeRubricaView, makeView } from "./fixtures";
+import { applyPatch, makeDetail, makeInfo, makeRubricaView, makeView } from "./fixtures";
 
 interface Options {
   lang?: "en" | "it";
@@ -19,6 +19,8 @@ interface Options {
   error?: CmdError | null;
   /** The saved sort order the window starts with. */
   sort?: SortOrder;
+  /** The answer to a write of the window; by default the detail with the patch on it. A test makes it reject to see a refusal. */
+  update?: (id: string, patch: ProfilePatch, expectedModified: string) => Promise<ProfileDetail>;
 }
 
 /** The shell with a rubrica that answers at once and keeps its own selection and sort order: no app behind it, nothing to wait for. */
@@ -37,6 +39,7 @@ function Harness({ view, options }: { view: DaemonView | null; options: Options 
     detail: selected ? makeDetail(selected) : null,
     detailError: null,
     reload: async () => undefined,
+    update: options.update ?? (async (id, patch) => applyPatch(makeDetail(list?.profiles.find((p) => p.id === id) ?? selected!), patch)),
   };
   return (
     <Shell view={view} info={view ? makeInfo() : null} onRetry={options.onRetry ?? (() => undefined)} announce={options.announce} rubrica={rubrica} sort={sort} onSortChange={setSort} />

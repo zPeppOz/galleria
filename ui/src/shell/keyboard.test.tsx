@@ -81,11 +81,11 @@ describe("keyboard on the whole shell", () => {
     const stops = await tabStops(user);
     const seen = stops.map((el) => `${roleOf(el)}:${nameOf(el)}`);
     // The menu button, the search field, the sort order (one stop: the chosen radio), the list (one stop: the chosen row), the
-    // first-run panel («Copy», «Try again»), «More actions», the tab strip (one stop: the chosen tab) and then the panel
-    // itself and its first control.
-    expect(seen.slice(0, 7)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Copy", "button:Try again", "button:More actions"]);
-    expect(seen[7]).toBe("tab:General");
-    const rest = seen.slice(8);
+    // first-run panel («Copy», «Try again»), the star, «More actions», the tab strip (one stop: the chosen tab) and then the
+    // panel itself and its first control.
+    expect(seen.slice(0, 8)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Copy", "button:Try again", "button:Favourite", "button:More actions"]);
+    expect(seen[8]).toBe("tab:General");
+    const rest = seen.slice(9);
     // After the strip comes the panel of the chosen tab (Base UI makes it a stop) or straight its first control; the
     // first control is the name field either way.
     expect(rest.some((s) => s === "input:Name")).toBe(true);
@@ -96,7 +96,7 @@ describe("keyboard on the whole shell", () => {
     const user = userEvent.setup();
     show();
     const seen = (await tabStops(user)).map((el) => `${roleOf(el)}:${nameOf(el)}`);
-    expect(seen.slice(0, 6)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:More actions", "tab:General"]);
+    expect(seen.slice(0, 7)).toEqual(["button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Favourite", "button:More actions", "tab:General"]);
     expect(seen).not.toContain("button:Copy");
   });
 
@@ -249,6 +249,7 @@ describe("keyboard on the whole shell", () => {
     expect(title()).toBe("Ufficio Napoli");
 
     // a tab: to the strip, the arrows choose; the panel shows
+    await user.tab(); // the star
     await user.tab(); // More actions
     await user.tab(); // the tab strip
     expect(roleOf(active())).toBe("tab");
@@ -259,12 +260,20 @@ describe("keyboard on the whole shell", () => {
     await user.keyboard("{Home}");
     expect(screen.getByRole("tab", { name: "General" }).getAttribute("aria-selected")).toBe("true");
 
-    // the read-only fields are stops of the panel, and none of them is a switch yet: C makes the switch come back
+    // the fields are stops of the panel; the name can be typed in, and then «Save» and «Cancel» are two more stops
     for (let step = 0; step < 12 && !(active() instanceof HTMLInputElement); step++) await user.tab();
     expect(nameOf(active())).toBe("Name");
-    expect((active() as HTMLInputElement).readOnly).toBe(true);
+    expect((active() as HTMLInputElement).readOnly).toBe(false);
     await user.keyboard("x");
-    expect((active() as HTMLInputElement).value).toBe("Ufficio Napoli");
+    // a field that gets the focus with Tab has its text selected: the key replaces it
+    expect((active() as HTMLInputElement).value).toBe("x");
+    const bar = screen.getByRole("group", { name: "Unsaved changes" });
+    screen.getByRole("button", { name: "Cancel" }).focus();
+    await user.keyboard("{Enter}");
+    expect(screen.queryByRole("group", { name: "Unsaved changes" })).toBeNull();
+    expect(bar.isConnected).toBe(false);
+    expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("Ufficio Napoli");
+    expect(active(), "the focus after Cancel").toBe(screen.getByRole("tab", { name: "General" }));
 
     // «Delete» says that it arrives later, and nothing changes
     screen.getByRole("button", { name: "More actions" }).focus();

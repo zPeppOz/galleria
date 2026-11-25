@@ -15,10 +15,13 @@ export function ConfirmDialog(props: {
   confirmLabel: string;
   cancelLabel: string;
   danger?: boolean;
+  /** A third choice between the two (Cancel, «Discard», Confirm): a button of the default look. */
+  alternateLabel?: string;
+  onAlternate?: () => void;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const { open, title, body, confirmLabel, cancelLabel, danger, onConfirm, onCancel } = props;
+  const { open, title, body, confirmLabel, cancelLabel, danger, alternateLabel, onAlternate, onConfirm, onCancel } = props;
   const cancel = useRef<HTMLButtonElement | null>(null);
   const confirm = useRef<HTMLButtonElement | null>(null);
   return (
@@ -30,6 +33,7 @@ export function ConfirmDialog(props: {
           <AlertDialog.Description className="gx-dialog-description">{body}</AlertDialog.Description>
           <div className="gx-dialog-footer">
             <button ref={cancel} type="button" className="gx-button gx-button-default gx-button-md" onClick={onCancel}>{cancelLabel}</button>
+            {alternateLabel ? <button type="button" className="gx-button gx-button-default gx-button-md" onClick={onAlternate}>{alternateLabel}</button> : null}
             <button ref={confirm} type="button" className={`gx-button gx-button-${danger ? "danger" : "primary"} gx-button-md`} onClick={onConfirm}>{confirmLabel}</button>
           </div>
         </AlertDialog.Popup>

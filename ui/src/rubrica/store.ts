@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { arrange, type SortKey } from "./arrange";
-import type { CmdError, ProfileDetail, RubricaView } from "./types";
+import type { CmdError, ProfileDetail, ProfilePatch, RubricaView } from "./types";
 
 export interface Rubrica {
   /** The first answer (a list or an error) has arrived. */
@@ -17,6 +17,12 @@ export interface Rubrica {
   detailError: CmdError | null;
   /** Reads the list again. The window does it by itself on focus; a write of the window calls it when it is done. */
   reload: () => Promise<void>;
+  /**
+   * Writes a patch to one profile (the id is explicit, so a write that is still going when the selection moves does
+   * not land on the wrong profile) and answers with the new detail. It does not read the list: the writer calls
+   * `reload` when it has put the answer where it belongs. A refusal is thrown as the error of the command.
+   */
+  update: (id: string, patch: ProfilePatch, expectedModified: string) => Promise<ProfileDetail>;
 }
 
 /** The ids in the order the list shows them: what «the next one» means when the selected profile disappears. */
@@ -58,6 +64,14 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
       setError(asError(failure));
     }
     setLoaded(true);
+  }, []);
+
+  const update = useCallback(async (id: string, patch: ProfilePatch, expectedModified: string): Promise<ProfileDetail> => {
+    try {
+      return await invoke<ProfileDetail>("profile_update", { id, expectedModified, patch });
+    } catch (failure) {
+      throw asError(failure);
+    }
   }, []);
 
   useEffect(() => {
@@ -125,5 +139,6 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
     detail: detail && detail.id === selectedId ? detail : null,
     detailError,
     reload,
+    update,
   };
 }

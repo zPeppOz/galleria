@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "announce",
     "profiles_list",
     "profile_get",
+    "profile_update",
 ];
 
 fn main() {

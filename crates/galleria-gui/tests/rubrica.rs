@@ -437,3 +437,494 @@ fn the_store_of_a_test_is_the_one_in_the_tempdir_and_never_the_home() {
     ProfileStore::open(&root.path().join("galleria")).unwrap();
     assert!(rubrica.list().unwrap().profiles.is_empty());
 }
+
+// ---- editing (plan B3, T5) -------------------------------------------------------------------------------------------
+
+use galleria_gui::rubrica::{FieldIssue, ProfilePatch, RubricaError, check_wireguard};
+use galleria_profile::{SecretStore, to_connect_params};
+use uuid::Uuid;
+
+fn patch(value: Value) -> ProfilePatch {
+    serde_json::from_value(value).unwrap()
+}
+
+fn id_of(seeded: &seed::Seeded, name: &str) -> Uuid {
+    seeded.profiles.iter().find(|(n, _)| n == name).unwrap().1
+}
+
+fn file_of(root: &Path, id: Uuid) -> std::path::PathBuf {
+    root.join(format!("galleria/profiles/{id}.toml"))
+}
+
+fn fields(error: RubricaError) -> Vec<(String, &'static str)> {
+    match error {
+        RubricaError::Invalid(issues) => issues.into_iter().map(|i| (i.field, i.code)).collect(),
+        other => panic!("expected invalid fields, got {other:?}"),
+    }
+}
+
+#[test]
+fn update_changes_only_the_patched_fields_and_bumps_modified() {
+    let root = tempfile::tempdir().unwrap();
+    let seeded = seed(&root.path().join("galleria"), false);
+    let (rubrica, _) = rubrica_in(root.path());
+    let id = id_of(&seeded, "Homelab");
+    let before = rubrica.get(id).unwrap();
+
+    let after = rubrica
+        .update(
+            id,
+            &before.summary.modified,
+            patch(json!({ "name": "  Casa  ", "group": null, "favorite": false, "notes": "dietro il router" })),
+        )
+        .unwrap();
+    assert_eq!(after.summary.name, "Casa", "the name is trimmed");
+    assert_eq!(after.summary.group, None);
+    assert!(!after.summary.favorite);
+    assert_eq!(after.notes, "dietro il router");
+    assert_ne!(after.summary.modified, before.summary.modified);
+    // what the patch did not name is as it was
+    assert_eq!(after.created, before.created);
+    assert_eq!(after.tags, before.tags);
+    assert_eq!(after.secret_refs, before.secret_refs);
+    assert_eq!(
+        after.settings.auto_reconnect,
+        before.settings.auto_reconnect
+    );
+    assert_eq!(
+        serde_json::to_value(&after.wireguard).unwrap(),
+        serde_json::to_value(&before.wireguard).unwrap()
+    );
+    // and it is on the disk
+    assert_eq!(rubrica.get(id).unwrap().summary.name, "Casa");
+
+    // a group goes on with Some(Some(name)), and a patch with only the settings leaves the rest alone
+    let again = rubrica
+        .update(
+            id,
+            &after.summary.modified,
+            patch(json!({ "group": "Clienti", "settings": { "ipv6_block": false, "auto_reconnect": false, "ignore_pushed_routes": true } })),
+        )
+        .unwrap();
+    assert_eq!(again.summary.group.as_deref(), Some("Clienti"));
+    assert_eq!(again.summary.name, "Casa");
+    assert!(
+        !again.settings.ipv6_block
+            && !again.settings.auto_reconnect
+            && again.settings.ignore_pushed_routes
+    );
+}
+
+#[test]
+fn a_stale_expected_modified_is_refused_and_nothing_is_written() {
+    let root = tempfile::tempdir().unwrap();
+    let seeded = seed(&root.path().join("galleria"), false);
+    let (rubrica, _) = rubrica_in(root.path());
+    let id = id_of(&seeded, "Homelab");
+    let file = file_of(root.path(), id);
+    let bytes = fs::read(&file).unwrap();
+
+    let error = rubrica
+        .update(
+            id,
+            "2000-01-01T00:00:00Z",
+            patch(json!({ "name": "Altro" })),
+        )
+        .unwrap_err();
+    assert!(matches!(error, RubricaError::Changed), "{error:?}");
+    assert_eq!(fs::read(&file).unwrap(), bytes);
+}
+
+#[test]
+fn openvpn_profile_refuses_a_wireguard_patch_and_the_other_way_round() {
+    let root = tempfile::tempdir().unwrap();
+    let seeded = seed(&root.path().join("galleria"), false);
+    let (rubrica, _) = rubrica_in(root.path());
+    let office = rubrica.get(id_of(&seeded, "Ufficio Napoli")).unwrap();
+    let homelab = rubrica.get(id_of(&seeded, "Homelab")).unwrap();
+
+    let wireguard = serde_json::to_value(homelab.wireguard.as_ref().unwrap()).unwrap();
+    let error = rubrica
+        .update(
+            office.summary.id,
+            &office.summary.modified,
+            patch(json!({ "wireguard": wireguard })),
+        )
+        .unwrap_err();
+    assert_eq!(fields(error), [("wireguard".to_owned(), "wrong_protocol")]);
+
+    let error = rubrica
+        .update(
+            homelab.summary.id,
+            &homelab.summary.modified,
+            patch(json!({ "openvpn_config": "client\n" })),
+        )
+        .unwrap_err();
+    assert_eq!(
+        fields(error),
+        [("openvpn_config".to_owned(), "wrong_protocol")]
+    );
+
+    // the text of an OpenVPN profile is edited in the editor of T7, not by this command
+    let error = rubrica
+        .update(
+            office.summary.id,
+            &office.summary.modified,
+            patch(json!({ "openvpn_config": "client\n" })),
+        )
+        .unwrap_err();
+    assert_eq!(
+        fields(error),
+        [("openvpn_config".to_owned(), "not_editable")]
+    );
+}
+
+#[test]
+fn peer_count_cannot_change() {
+    let root = tempfile::tempdir().unwrap();
+    let seeded = seed(&root.path().join("galleria"), false);
+    let (rubrica, _) = rubrica_in(root.path());
+    let homelab = rubrica.get(id_of(&seeded, "Homelab")).unwrap();
+    let mut wireguard = serde_json::to_value(homelab.wireguard.as_ref().unwrap()).unwrap();
+    let peer = wireguard["peers"][0].clone();
+    wireguard["peers"] = json!([peer.clone(), peer]);
+    let error = rubrica
+        .update(
+            homelab.summary.id,
+            &homelab.summary.modified,
+            patch(json!({ "wireguard": wireguard })),
+        )
+        .unwrap_err();
+    assert_eq!(fields(error), [("peers".to_owned(), "count_changed")]);
+}
+
+/// A WireGuard profile the daemon accepts: 32 bytes of base64 for the key, everything else in the usual forms.
+const KEY: &str = "c2VlZC1wdWJsaWMta2V5LWZvci10aGUtdGVzdHMtMDA=";
+
+fn good_wireguard() -> WireGuardProfile {
+    WireGuardProfile {
+        addresses: vec!["10.8.0.2/32".into(), "fd00::2/128".into()],
+        dns: vec!["10.8.0.1".into(), "fd00::1".into()],
+        search_domains: vec!["corp.example".into(), "~lab.example".into()],
+        mtu: Some(1380),
+        peers: vec![WireGuardPeer {
+            public_key: KEY.into(),
+            endpoint: Some("vpn.example:51820".into()),
+            allowed_ips: vec!["0.0.0.0/0".into(), "::/0".into()],
+            persistent_keepalive: Some(25),
+        }],
+    }
+}
+
+/// The secrets of a test profile: the private key only, valid.
+struct OnlyAKey;
+impl SecretStore for OnlyAKey {
+    fn get(
+        &self,
+        _: &Uuid,
+        key: &str,
+    ) -> Result<Option<galleria_ipc::Secret>, galleria_profile::StoreError> {
+        Ok((key == "wireguard.private_key").then(|| galleria_ipc::Secret::new(KEY)))
+    }
+    fn set(
+        &self,
+        _: &Uuid,
+        _: &str,
+        _: &galleria_ipc::Secret,
+    ) -> Result<(), galleria_profile::StoreError> {
+        Ok(())
+    }
+    fn delete_all(&self, _: &Uuid) -> Result<(), galleria_profile::StoreError> {
+        Ok(())
+    }
+}
+
+/// What the daemon says about a profile with these WireGuard settings: `None` if it accepts it, else the field it names.
+fn daemon_verdict(wireguard: &WireGuardProfile) -> Option<String> {
+    let mut profile = Profile::new("Prova", ProtocolConfig::Wireguard(wireguard.clone()));
+    profile.secret_refs = vec!["wireguard.private_key".into()];
+    let params = to_connect_params(&profile, &OnlyAKey, false).unwrap();
+    let galleria_ipc::BackendParams::Wireguard(params) = params.backend else {
+        panic!("not a WireGuard profile")
+    };
+    match galleria_backend_wireguard::validate(&params) {
+        Ok(_) => None,
+        Err(e) => Some(e.data.unwrap()["field"].as_str().unwrap().to_owned()),
+    }
+}
+
+fn with(change: impl FnOnce(&mut WireGuardProfile)) -> WireGuardProfile {
+    let mut p = good_wireguard();
+    change(&mut p);
+    p
+}
+
+#[rstest]
+#[case::as_it_is(good_wireguard())]
+#[case::no_endpoint(with(|p| p.peers[0].endpoint = None))]
+#[case::ip_endpoint(with(|p| p.peers[0].endpoint = Some("203.0.113.24:51820".into())))]
+#[case::ipv6_endpoint(with(|p| p.peers[0].endpoint = Some("[2001:db8::1]:51820".into())))]
+#[case::no_dns_no_domains_no_mtu(with(|p| { p.dns.clear(); p.search_domains.clear(); p.mtu = None; }))]
+#[case::mtu_at_the_edges(with(|p| p.mtu = Some(576)))]
+#[case::mtu_at_the_top(with(|p| p.mtu = Some(9000)))]
+#[case::no_keepalive(with(|p| p.peers[0].persistent_keepalive = None))]
+#[case::route_all_domain(with(|p| p.search_domains = vec!["~.".into()]))]
+fn what_the_gui_accepts_the_daemon_accepts(#[case] wireguard: WireGuardProfile) {
+    assert_eq!(check_wireguard(&wireguard), vec![]);
+    assert_eq!(daemon_verdict(&wireguard), None);
+}
+
+#[rstest]
+#[case::address_without_prefix(with(|p| p.addresses = vec!["10.8.0.2".into()]), "addresses")]
+#[case::address_nonsense(with(|p| p.addresses = vec!["not an address".into()]), "addresses")]
+#[case::dns_is_a_name(with(|p| p.dns = vec!["dns.example".into()]), "dns")]
+#[case::domain_with_a_space(with(|p| p.search_domains = vec!["bad domain".into()]), "search_domains")]
+#[case::domain_with_an_empty_label(with(|p| p.search_domains = vec!["a..b".into()]), "search_domains")]
+#[case::mtu_too_low(with(|p| p.mtu = Some(575)), "mtu")]
+#[case::mtu_too_high(with(|p| p.mtu = Some(9001)), "mtu")]
+#[case::no_peer(with(|p| p.peers.clear()), "peers")]
+#[case::key_too_short(with(|p| p.peers[0].public_key = "c2hvcnQ=".into()), "peers.0.public_key")]
+#[case::key_not_base64(with(|p| p.peers[0].public_key = "!!!".into()), "peers.0.public_key")]
+#[case::key_without_padding(with(|p| p.peers[0].public_key = KEY.trim_end_matches('=').into()), "peers.0.public_key")]
+#[case::endpoint_without_port(with(|p| p.peers[0].endpoint = Some("vpn.example".into())), "peers.0.endpoint")]
+#[case::endpoint_port_zero(with(|p| p.peers[0].endpoint = Some("vpn.example:0".into())), "peers.0.endpoint")]
+#[case::endpoint_port_too_big(with(|p| p.peers[0].endpoint = Some("vpn.example:70000".into())), "peers.0.endpoint")]
+#[case::endpoint_with_a_bad_label(with(|p| p.peers[0].endpoint = Some("-a.example:51820".into())), "peers.0.endpoint")]
+#[case::route_not_a_network(with(|p| p.peers[0].allowed_ips = vec!["0.0.0.0".into()]), "peers.0.allowed_ips")]
+#[case::keepalive_too_big(with(|p| p.peers[0].persistent_keepalive = Some(65536)), "peers.0.persistent_keepalive")]
+fn what_the_daemon_refuses_the_gui_refuses(
+    #[case] wireguard: WireGuardProfile,
+    #[case] field: &str,
+) {
+    assert_eq!(
+        daemon_verdict(&wireguard).as_deref(),
+        Some(field),
+        "the daemon"
+    );
+    let issues = check_wireguard(&wireguard);
+    assert!(
+        issues.iter().any(|i| i.field == field),
+        "the window accepted what the daemon refuses ({field}): {issues:?}"
+    );
+}
+
+#[test]
+fn the_window_is_stricter_where_the_daemon_is_not() {
+    // The daemon takes a tunnel with no address and a peer that routes nothing; the window asks for one of each (D26).
+    assert!(daemon_verdict(&with(|p| p.addresses.clear())).is_none());
+    assert!(daemon_verdict(&with(|p| p.peers[0].allowed_ips.clear())).is_none());
+    assert_eq!(
+        check_wireguard(&with(|p| p.addresses.clear())),
+        [FieldIssue {
+            field: "addresses".into(),
+            code: "required"
+        }]
+    );
+    assert_eq!(
+        check_wireguard(&with(|p| p.peers[0].allowed_ips.clear())),
+        [FieldIssue {
+            field: "peers.0.allowed_ips".into(),
+            code: "required"
+        }]
+    );
+}
+
+#[test]
+fn invalid_fields_are_all_reported_with_their_path() {
+    let root = tempfile::tempdir().unwrap();
+    let seeded = seed(&root.path().join("galleria"), false);
+    let (rubrica, _) = rubrica_in(root.path());
+    let homelab = rubrica.get(id_of(&seeded, "Homelab")).unwrap();
+    let mut wireguard = serde_json::to_value(homelab.wireguard.as_ref().unwrap()).unwrap();
+    wireguard["mtu"] = json!(100);
+    wireguard["peers"][0]["endpoint"] = json!("no-port");
+    wireguard["peers"][0]["public_key"] = json!("short");
+    let error = rubrica
+        .update(
+            homelab.summary.id,
+            &homelab.summary.modified,
+            patch(json!({ "name": "", "wireguard": wireguard })),
+        )
+        .unwrap_err();
+    assert_eq!(
+        fields(error),
+        [
+            ("name".to_owned(), "required"),
+            ("mtu".to_owned(), "out_of_range"),
+            ("peers.0.public_key".to_owned(), "invalid_key"),
+            ("peers.0.endpoint".to_owned(), "invalid_endpoint"),
+        ]
+    );
+}
+
+#[rstest]
+#[case::empty("", "required")]
+#[case::only_spaces("   ", "required")]
+#[case::too_long(&"a".repeat(65), "too_long")]
+#[case::a_newline("one\ntwo", "invalid_chars")]
+#[case::a_control_character("tab\u{7}bell", "invalid_chars")]
+fn empty_name_and_overlong_name_are_refused(#[case] name: &str, #[case] code: &'static str) {
+    let root = tempfile::tempdir().unwrap();
+    let seeded = seed(&root.path().join("galleria"), false);
+    let (rubrica, _) = rubrica_in(root.path());
+    let id = id_of(&seeded, "Homelab");
+    let modified = rubrica.get(id).unwrap().summary.modified;
+    let error = rubrica
+        .update(id, &modified, patch(json!({ "name": name })))
+        .unwrap_err();
+    assert_eq!(fields(error), [("name".to_owned(), code)]);
+    // the longest name there is room for, and a group of 48
+    let long = "a".repeat(64);
+    let ok = rubrica
+        .update(
+            id,
+            &modified,
+            patch(json!({ "name": long, "group": "g".repeat(48) })),
+        )
+        .unwrap();
+    assert_eq!(ok.summary.name.len(), 64);
+    let error = rubrica
+        .update(
+            id,
+            &ok.summary.modified,
+            patch(json!({ "group": "g".repeat(49) })),
+        )
+        .unwrap_err();
+    assert_eq!(fields(error), [("group".to_owned(), "too_long")]);
+}
+
+#[test]
+fn update_never_touches_the_secrets() {
+    let root = tempfile::tempdir().unwrap();
+    let galleria = root.path().join("galleria");
+    let seeded = seed(&galleria, false);
+    let (rubrica, _) = rubrica_in(root.path());
+    let secrets = |id: Uuid| galleria.join(format!("secrets/{id}.toml"));
+    let ids = [id_of(&seeded, "Homelab"), id_of(&seeded, "Ufficio Napoli")];
+    let before: Vec<_> = ids
+        .iter()
+        .map(|id| fs::read(secrets(*id)).unwrap())
+        .collect();
+
+    for id in ids {
+        let modified = rubrica.get(id).unwrap().summary.modified;
+        rubrica
+            .update(
+                id,
+                &modified,
+                patch(json!({ "name": "Nuovo", "favorite": true })),
+            )
+            .unwrap();
+    }
+    let after: Vec<_> = ids
+        .iter()
+        .map(|id| fs::read(secrets(*id)).unwrap())
+        .collect();
+    assert_eq!(before, after);
+    // and no file of secrets was added or taken away: the five that the seed wrote
+    assert_eq!(fs::read_dir(galleria.join("secrets")).unwrap().count(), 5);
+}
+
+#[test]
+fn a_profile_saved_by_the_gui_keeps_the_phase_1_format() {
+    let root = tempfile::tempdir().unwrap();
+    let seeded = seed(&root.path().join("galleria"), false);
+    let (rubrica, _) = rubrica_in(root.path());
+    let id = id_of(&seeded, "Homelab");
+    let file = file_of(root.path(), id);
+    let original = Profile::from_toml(&fs::read_to_string(&file).unwrap()).unwrap();
+
+    let mut wireguard = serde_json::to_value(original.wireguard.as_ref().unwrap()).unwrap();
+    wireguard["dns"] = json!(["10.0.0.53"]);
+    let saved = rubrica
+        .update(
+            id,
+            &original.modified,
+            patch(json!({ "name": "Casa", "notes": "n", "wireguard": wireguard })),
+        )
+        .unwrap();
+
+    // the CLI reads it with the code of the phase 1, and what the patch did not name is equal to the letter
+    let text = fs::read_to_string(&file).unwrap();
+    let read = Profile::from_toml(&text).unwrap();
+    assert_eq!(read.modified, saved.summary.modified);
+    let mut expected = original.clone();
+    expected.name = "Casa".into();
+    expected.notes = "n".into();
+    expected.modified = read.modified.clone();
+    expected.wireguard.as_mut().unwrap().dns = vec!["10.0.0.53".into()];
+    assert_eq!(read.to_toml().unwrap(), expected.to_toml().unwrap());
+    assert_eq!(
+        fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+}
+
+#[test]
+fn profile_update_is_a_command_and_says_why_it_refuses() {
+    let root = tempfile::tempdir().unwrap();
+    let seeded = seed(&root.path().join("galleria"), false);
+    let (rubrica, state) = rubrica_in(root.path());
+    let (_app, window) = app(rubrica, state);
+    let id = id_of(&seeded, "Homelab").to_string();
+    let list = invoke(&window, "profiles_list", json!({})).unwrap();
+    let modified = list["profiles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == id.as_str())
+        .unwrap()["modified"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    // a refusal for the fields names them
+    let error = invoke(
+        &window,
+        "profile_update",
+        json!({ "id": id, "expectedModified": modified, "patch": { "name": "" } }),
+    )
+    .unwrap_err();
+    assert_eq!(error["code"], "gui_invalid_field");
+    assert_eq!(
+        error["data"]["fields"],
+        json!([{ "field": "name", "code": "required" }])
+    );
+
+    // a patch with a key it does not know is refused whole
+    assert!(
+        invoke(
+            &window,
+            "profile_update",
+            json!({ "id": id, "expectedModified": modified, "patch": { "path": "/etc/passwd" } }),
+        )
+        .is_err()
+    );
+
+    // it works, answers with the detail and no secret in it
+    let detail = invoke(
+        &window,
+        "profile_update",
+        json!({ "id": id, "expectedModified": modified, "patch": { "name": "Casa", "favorite": false } }),
+    )
+    .unwrap();
+    assert_eq!(detail["name"], "Casa");
+    assert_eq!(detail["favorite"], false);
+    assert!(!detail.to_string().contains(SECRET_MARK));
+
+    // the same version again is stale now
+    let error = invoke(
+        &window,
+        "profile_update",
+        json!({ "id": id, "expectedModified": modified, "patch": { "name": "Altro" } }),
+    )
+    .unwrap_err();
+    assert_eq!(error["code"], "gui_profile_changed");
+    let error = invoke(
+        &window,
+        "profile_update",
+        json!({ "id": "3f0c2a9e-6f0b-4c0e-9a57-1d2e8a4b7c11", "expectedModified": modified, "patch": {} }),
+    )
+    .unwrap_err();
+    assert_eq!(error["code"], "gui_profile_not_found");
+}

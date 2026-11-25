@@ -82,4 +82,9 @@ describe("Field", () => {
     expect(container.textContent).not.toContain("s3cret!");
     expect(container.innerHTML).not.toContain('type="text"');
   });
+
+  it("the_name_is_on_the_control_so_a_form_can_find_it", () => {
+    render(<Harness name="peers.0.endpoint" />);
+    expect(screen.getByLabelText("Name").getAttribute("name")).toBe("peers.0.endpoint");
+  });
 });

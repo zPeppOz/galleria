@@ -13,6 +13,7 @@
     "allow-ui-state-set",
     "allow-announce",
     "allow-profiles-list",
-    "allow-profile-get"
+    "allow-profile-get",
+    "allow-profile-update"
   ]
 }

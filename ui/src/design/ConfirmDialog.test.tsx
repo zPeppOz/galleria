@@ -75,4 +75,16 @@ describe("ConfirmDialog", () => {
     const dialog = await screen.findByRole("alertdialog");
     await expectNoAccessibilityViolations(dialog.parentElement ?? dialog, { landmarks: false });
   });
+
+  it("a_third_choice_sits_between_cancel_and_confirm_and_calls_its_own_function", async () => {
+    const user = userEvent.setup();
+    const onAlternate = vi.fn();
+    const { onConfirm, onCancel } = show({ alternateLabel: "Discard", onAlternate, confirmLabel: "Save", title: "Unsaved changes" });
+    await screen.findByRole("alertdialog", { name: "Unsaved changes" });
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["Cancel", "Discard", "Save"]);
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    expect(onAlternate).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).not.toHaveBeenCalled();
+  });
 });

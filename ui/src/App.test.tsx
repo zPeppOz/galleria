@@ -86,7 +86,8 @@ describe("App", () => {
     await ready();
     // every button of the page, the menu and the dialog it opens included
     for (const button of screen.queryAllByRole("button")) {
-      if (button.getAttribute("aria-haspopup")) continue;
+      // the star writes at once (P7): that is its job, and what it asks for is tried in ProfileDetail.test.tsx
+      if (button.getAttribute("aria-haspopup") || button.hasAttribute("aria-pressed")) continue;
       await user.click(button);
     }
     expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", "profiles_list", "profile_get", ...(calls.includes("daemon_retry") ? ["daemon_retry"] : [])]));

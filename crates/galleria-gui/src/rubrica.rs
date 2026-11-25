@@ -3,6 +3,8 @@
 //! (`secret_refs`), never their values (spec §3.2, rule 1). It reads the same store as the CLI, with the functions of
 //! `galleria-profile`, and never talks to the daemon: the rubrica is usable while the service is stopped.
 
+use crate::edit::apply;
+pub use crate::edit::{FieldIssue, ProfilePatch, check_wireguard};
 use crate::ui_state::UiStateFile;
 use galleria_ipc::Protocol;
 use galleria_ovpn::Item;
@@ -12,6 +14,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use uuid::Uuid;
 
 /// One row of the list: what is needed to draw it and to search and sort it.
@@ -81,13 +84,21 @@ pub struct RubricaView {
     pub skipped: Vec<SkippedView>,
 }
 
-/// A failure of the store, with the folder it happened in (the error of the store does not always carry a path).
+/// Why the rubrica could not do what was asked: the store (with the folder it happened in, because the error of the
+/// store does not always carry a path), a profile that changed on disk since the window read it, or fields that may
+/// not be saved.
 #[derive(Debug, thiserror::Error)]
-#[error("{source}")]
-pub struct RubricaError {
-    pub dir: PathBuf,
-    #[source]
-    pub source: StoreError,
+pub enum RubricaError {
+    #[error("{source}")]
+    Store {
+        dir: PathBuf,
+        #[source]
+        source: StoreError,
+    },
+    #[error("The profile was changed since it was read")]
+    Changed,
+    #[error("Some fields are not valid")]
+    Invalid(Vec<FieldIssue>),
 }
 
 /// The folder of the profiles and the file of the state. The store is opened at every call, so that a fix made in
@@ -108,7 +119,7 @@ impl Rubrica {
     }
 
     fn fail(&self, source: StoreError) -> RubricaError {
-        RubricaError {
+        RubricaError::Store {
             dir: self.dir.clone(),
             source,
         }
@@ -160,6 +171,40 @@ impl Rubrica {
 
     pub fn dir(&self) -> &Path {
         &self.dir
+    }
+
+    /// Changes the fields named by the patch and saves the profile, atomically and with the permissions of the phase 1.
+    /// `expected_modified` is the time of modification the window knows: if the file says another one, the CLI or
+    /// another window wrote it in the meantime, and nothing is written. The secrets are not opened.
+    ///
+    /// # Errors
+    ///
+    /// [`RubricaError::Changed`] for a stale `expected_modified`, [`RubricaError::Invalid`] with every field that is
+    /// not good (nothing is written), the errors of the store otherwise.
+    pub fn update(
+        &self,
+        id: Uuid,
+        expected_modified: &str,
+        patch: ProfilePatch,
+    ) -> Result<ProfileDetail, RubricaError> {
+        let store = ProfileStore::open(&self.dir).map_err(|e| self.fail(e))?;
+        let mut profile = store.find(&id.to_string()).map_err(|e| self.fail(e))?;
+        if profile.modified != expected_modified {
+            return Err(RubricaError::Changed);
+        }
+        let issues = apply(&mut profile, patch);
+        if !issues.is_empty() {
+            return Err(RubricaError::Invalid(issues));
+        }
+        if let Ok(now) = OffsetDateTime::now_utc().format(&Rfc3339) {
+            profile.modified = now;
+        }
+        store.save(&profile).map_err(|e| self.fail(e))?;
+        let state = self.state.load();
+        Ok(detail(
+            &profile,
+            state.last_used.get(&profile.id).map(String::as_str),
+        ))
     }
 }
 

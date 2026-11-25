@@ -1,5 +1,5 @@
 import type { AppInfo, DaemonView, Status } from "../daemon/types";
-import type { ProfileDetail, ProfileSummary, RubricaView } from "../rubrica/types";
+import type { ProfileDetail, ProfilePatch, ProfileSummary, RubricaView } from "../rubrica/types";
 
 export function makeStatus(over: Partial<Status> = {}): Status {
   return {
@@ -101,5 +101,17 @@ export function makeDetail(summary: ProfileSummary): ProfileDetail {
       mtu: null,
       peers: [{ public_key: "PUBLIC", endpoint: summary.server, allowed_ips: ["0.0.0.0/0"], persistent_keepalive: 25 }],
     },
+  };
+}
+
+/** What the backend answers to an update: the detail with the patch on it and a new time of modification. */
+export function applyPatch(detail: ProfileDetail, patch: ProfilePatch): ProfileDetail {
+  const { group, wireguard, ...rest } = patch;
+  return {
+    ...detail,
+    ...rest,
+    group: group === undefined ? detail.group : group,
+    wireguard: wireguard ?? detail.wireguard,
+    modified: `${detail.modified}+`,
   };
 }

@@ -34,3 +34,15 @@
   .detail-strip-cell:nth-child(3) { border-left: 0; }
   .detail-strip-cell:nth-child(n + 3) { border-top: 1px solid var(--line); }
 }
+
+/* The tabs of the form: the same column as «General». */
+.detail-star-button { padding: 0; border: 0; background: transparent; cursor: pointer; border-radius: var(--r-sm); }
+.detail-star-button .gx-icon { fill: none; stroke: var(--muted); }
+.detail-star-button[aria-pressed="true"] .gx-icon { fill: var(--accent); stroke: var(--accent); }
+.detail-fact { margin: 0; }
+.detail-facts { margin: 0; display: grid; gap: var(--sp-2); }
+.detail-facts dt { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--muted); }
+.detail-facts dd { margin: 0; }
+.detail-secrets { margin: 0; padding-left: var(--sp-7); display: grid; gap: var(--sp-2); }
+.detail-peer { display: flex; flex-direction: column; gap: var(--sp-5); }
+.detail-peer-title { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-strong); }

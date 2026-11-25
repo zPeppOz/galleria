@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from "react";
 import type { SortOrder } from "../app/uiState";
 import type { AppInfo, DaemonView } from "../daemon/types";
+import { ConfirmDialog } from "../design/ConfirmDialog";
 import { ToastProvider, type Announce } from "../design/Toast";
 import { useLang, useT } from "../i18n";
 import { arrange } from "../rubrica/arrange";
 import type { Rubrica } from "../rubrica/store";
-import { ProfileDetail } from "./ProfileDetail";
+import { ProfileDetail, type Guard } from "./ProfileDetail";
 import { ProfileList, type ListGroup } from "./ProfileList";
 import { RubricaNotices } from "./RubricaNotices";
 import { SearchBox } from "./SearchBox";
@@ -35,8 +36,29 @@ export function Shell(props: {
   const lang = useLang();
   const [query, setQuery] = useState("");
   const list = useRef<{ focus: () => void }>(null);
+  // The form of the chosen profile says whether it has edits that are not saved; the list asks before it moves away.
+  const guard = useRef<Guard | null>(null);
+  const [leaving, setLeaving] = useState<string | null>(null);
   const profiles = rubrica.view?.profiles;
   const selected = profiles?.find((p) => p.id === rubrica.selectedId) ?? null;
+  const choose = (id: string) => {
+    if (id !== rubrica.selectedId && guard.current?.dirty) setLeaving(id);
+    else rubrica.select(id);
+  };
+  const leave = async (how: "save" | "discard") => {
+    const target = leaving;
+    setLeaving(null);
+    if (target === null) return;
+    if (how === "discard") {
+      guard.current?.discard();
+      rubrica.select(target);
+    } else if (await guard.current?.save()) {
+      rubrica.select(target);
+    } else {
+      // The save was refused: the dialog gave the focus back to the list, and the field with the error takes it again.
+      setTimeout(() => guard.current?.focusError(), 0);
+    }
+  };
 
   // The session of the service shows on the row of its profile, when the profile is in the rubrica: a session that
   // someone else started (a profile that is not here) shows nowhere on the list (D21 is B5).
@@ -75,7 +97,7 @@ export function Shell(props: {
                   <SearchBox value={query} onChange={setQuery} count={arranged.total} onArrowDown={() => list.current?.focus()} />
                   <SortControl value={sort} onChange={onSortChange} />
                 </div>
-                <ProfileList label={t("list.label")} groups={groups} selectedId={selected?.id ?? ""} onSelect={rubrica.select} empty={t("search.no_match")} focusRef={list} />
+                <ProfileList label={t("list.label")} groups={groups} selectedId={selected?.id ?? ""} onSelect={choose} empty={t("search.no_match")} focusRef={list} />
               </>
             ) : (
               <p className="shell-aside-empty">{rubrica.loaded ? t("list.empty") : t("rubrica.loading")}</p>
@@ -84,10 +106,23 @@ export function Shell(props: {
           <main className="shell-main">
             <ServiceArea view={view} info={info} onRetry={onRetry} />
             <RubricaNotices rubrica={rubrica} />
-            {selected ? <ProfileDetail profile={selected} detail={rubrica.detail} detailError={rubrica.detailError} /> : null}
+            {selected ? (
+              <ProfileDetail profile={selected} detail={rubrica.detail} detailError={rubrica.detailError} groups={rubrica.view?.groups ?? []} update={rubrica.update} reload={rubrica.reload} guard={guard} />
+            ) : null}
           </main>
         </div>
         <StatusBar view={view} info={info} />
+        <ConfirmDialog
+          open={leaving !== null}
+          title={t("leave.title")}
+          body={t("leave.body", { name: selected?.name ?? "" })}
+          confirmLabel={t("leave.save")}
+          alternateLabel={t("leave.discard")}
+          cancelLabel={t("leave.cancel")}
+          onConfirm={() => void leave("save")}
+          onAlternate={() => void leave("discard")}
+          onCancel={() => setLeaving(null)}
+        />
       </div>
     </ToastProvider>
   );

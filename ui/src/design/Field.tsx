@@ -13,17 +13,20 @@ export interface FieldProps {
   options?: { value: string; label: string }[];
   type?: "text" | "password";
   inputMode?: "numeric";
+  /** The `name` of the control: how a form finds the field to put the focus on. */
+  name?: string;
 }
 
 /** Label, hint and error are linked to the control (`for`, `aria-describedby`, `aria-invalid`). */
 export function Field(props: FieldProps) {
-  const { label, hint, error, mono, readOnly, value, onChange, as = "input", options = [], type = "text", inputMode } = props;
+  const { label, hint, error, mono, readOnly, value, onChange, as = "input", options = [], type = "text", inputMode, name } = props;
   const id = useId();
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   const common = {
     id,
+    name,
     className: `gx-control${mono ? " gx-mono" : ""}`,
     "aria-describedby": describedBy,
     "aria-invalid": error ? true : undefined,

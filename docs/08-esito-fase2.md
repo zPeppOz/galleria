@@ -749,3 +749,65 @@ molte centinaia di profili (la lettura è sincrona nel comando async, non misura
 
 Non verificato (T4): «Più recenti» con date vere (nessuno scrive `last_used` prima di B5: provato solo con date messe a mano nelle prove); `Ctrl+K` sotto Wayland o con un
 gestore di scorciatoie del desktop che lo prenda prima; il comportamento di Orca sul campo di ricerca (stesso limite del campo di testo nudo nell'immagine, Orca 46.1).
+
+### Schede Generale, Autenticazione e Rete; `profile_update` (T5)
+
+- **`galleria-gui`** (nessuna modifica a `galleria-profile`): `edit.rs` (senza `tauri` e senza segreti) ha `ProfilePatch` (`deny_unknown_fields`;
+  nessun campo per un segreto, un percorso, l'id o le date; `group: null` è «nessun gruppo» e un gruppo assente non chiede niente),
+  `FieldIssue { field, code }`, `check_label` e `check_wireguard`. `Rubrica::update(id, expected_modified, patch)` apre lo store, rilegge il
+  profilo, confronta l'ora di modifica (`gui_profile_changed` se è un'altra: niente viene scritto), applica la patch tutta o per niente,
+  aggiorna `modified` e salva con `ProfileStore::save` (rename atomico, `0600`). **Non apre l'archivio dei segreti.** `RubricaError` è ora
+  un `enum` (`Store { dir, source }`, `Changed`, `Invalid(Vec<FieldIssue>)`). Comando `profile_update(id, expected_modified, patch)` in
+  `COMMANDS`, nella capability e in `tests/config.rs`; codici nuovi `gui_profile_changed` e `gui_invalid_field` (`data.fields`: l'elenco
+  `{ field, code }`) nei due cataloghi.
+- **Regole** (P8): nome 1–64 caratteri senza caratteri di controllo (tolti gli spazi ai lati), gruppo 1–48; per WireGuard indirizzi e reti
+  in forma CIDR, DNS come IP, domini, MTU 576–9000, endpoint `host:porta`, chiave pubblica di 32 byte in base64, keepalive 0–65535, almeno un
+  indirizzo e una rete per peer (**più severa del demone** su queste ultime due, come chiede D26: `the_window_is_stricter_where_the_daemon_is_not`).
+  Il numero dei peer non cambia (`peer_count_cannot_change`: i segreti sono per posizione del peer). Il testo di una configurazione OpenVPN non
+  si cambia da qui (`not_editable`, è di T7).
+- **Prova contro il demone** (P8): `galleria-backend-wireguard` è una dipendenza **di sola prova** di `galleria-gui` (`cargo tree -p galleria-gui -e normal` non
+  contiene né quel crate né `galleriad`). `what_the_gui_accepts_the_daemon_accepts` (9 profili validi: `to_connect_params` + `validate` riescono) e
+  `what_the_daemon_refuses_the_gui_refuses` (17 campi rotti uno alla volta: il demone rifiuta, e il campo che nomina è tra quelli che la finestra segnala).
+  `Cargo.lock`: tre righe (`base64`, `ipnet` e il crate dei test tra le dipendenze di `galleria-gui`), nessun crate nuovo.
+- **Il seme**: `tests/support/seed.rs` scrive ora chiavi pubbliche di 32 byte in base64 (`SEED-PUBLIC-<tag>` riempito di punti): prima erano parole e la finestra,
+  giustamente, le avrebbe rifiutate.
+- **Webview**: `rubrica/validate.ts` (stesse regole, puro: serve a dire l'errore mentre si scrive), `rubrica/draft.ts` (la bozza: ogni campo è testo, `build` dà
+  la patch dei soli campi cambiati o l'elenco dei campi sbagliati; `fieldOrder` e `fieldTab` dicono dove sta ogni campo), `useRubrica().update(id, patch,
+  expectedModified)` (non rilegge la lista: la rilegge chi scrive, quando ha messo la risposta al suo posto), `shell/SaveBar` (appare solo con una differenza;
+  `Ctrl+S`), `shell/tabs/{General,Authentication,Network}`. `ProfileDetail` tiene il profilo com'è sul disco, la bozza, le scritture e gli errori; il guscio
+  tiene la guardia («Salva · Scarta · Annulla») e la apre quando si sceglie un altro profilo con modifiche non salvate. Il `ConfirmDialog` ha una terza scelta
+  opzionale; `Field` ha la proprietà `name` (come il modulo trova il campo a cui dare il fuoco). La stella è un pulsante a due stati nell'intestazione e scrive subito.
+- **Comportamento**: interruttori e stella scrivono subito, mostrano il valore nuovo mentre la scrittura va e tornano com'erano se fallisce (avviso d'errore,
+  *assertive*); una scrittura alla volta. Il testo si scrive con «Salva» (avviso `profile.saved`, *polite*, il fuoco resta dov'è; col pulsante il fuoco passa
+  alla scheda scelta, perché la barra sparisce). Un errore di un campo (della finestra o di `gui_invalid_field`) **non è un avviso**: il fuoco va sul primo campo
+  sbagliato nell'ordine delle schede (la scheda si apre da sola), l'errore è collegato con `aria-describedby`, e scrivendo nel campo l'errore se ne va. Un profilo
+  cambiato sul disco (CLI, altra finestra) senza modifiche in corso viene preso senza chiedere; con modifiche in corso queste restano e compare l'avviso in linea con
+  «Ricarica». Un salvataggio che trova `gui_profile_changed` lascia la bozza, mostra lo stesso avviso e dice l'errore come avviso *assertive*.
+- **Prove**: Rust, `tests/rubrica.rs` passa da 31 a 71 prove (contando i casi delle tabelle); JS (440 in tutto): `validate` (57), `draft` (6), `SaveBar` (6), `tabs/*` (22), `ProfileDetail`
+  (34: la parte di lettura e la parte di modifica), `store.update` (2), `ConfirmDialog` e `Field` (una ciascuno). Fumo: `a_profile_is_renamed_and_the_list_follows`
+  (rinomina, «Salva», la lista e il titolo seguono, il file sul disco ha il nome nuovo; poi un interruttore scrive `ignore_pushed_routes`). Orca:
+  `S4` (l'interruttore) torna verde sul modulo vero; `R4a` (il salvataggio è detto **una volta**, urgenza 1 nella riga `object:announcement`), `R4d` (la prova riscrive il file come
+  farebbe la CLI, poi un interruttore: Orca dice «This profile was changed somewhere else since you opened it.» una volta, urgenza **2**), `R5a`.
+
+| # | Supposizione | Esito | Dove | Ripiego applicato |
+|---|---|---|---|---|
+| S24 | Un errore *assertive* detto da Orca arriva dall'app vera | **Vero.** `R4d`: riga `EVENT MANAGER: Dequeued object:announcement … (2, 0, This profile was changed somewhere else since you opened it.)`; Orca la dice una volta. Chiude il «non verificato» di T2 sull'urgenza 2 | `ui/e2e/rubrica.a11y.ts` | nessuno |
+| S25 | Con il fuoco che torna da solo su un campo sbagliato Orca legge l'errore con il campo | **Non confermato nell'immagine.** L'albero è giusto (il campo è `invalid`, con `described-by` verso l'errore) e `R5a` lo asserisce; ma Orca 46.1 dice solo «Text unselected.»: né il nome né la descrizione. È lo stesso limite del campo di testo (`S4b`), quindi `R5a` ha l'attesa del parlato **capovolta** (diventa positiva quando l'immagine avrà un Orca che dice i campi). Su GNOME vero la descrizione di un campo non è stata provata | `ui/e2e/rubrica.a11y.ts` | registrato, non asserito |
+| S26 | L'urgenza arriva a Orca come `(1, 0, testo)` per il *polite* e `(2, 0, testo)` per l'*assertive* | **Vero** (due prove: `R4a` e `R4d`) | `ui/e2e/rubrica.a11y.ts` | nessuno |
+
+Scostamenti dal piano, da sapere:
+
+- La logica sta in `edit.rs` (nuovo) e non tutta in `rubrica.rs`: `rubrica.rs` resta di sola lettura più `update`, che chiama `edit::apply`.
+- `profile_update` risponde con `data: { fields: [...] }` (un oggetto) e non con la sola lista: lascia posto ad altro senza cambiare forma.
+- La stella è un pulsante con `aria-pressed` e il nome «Favourite»/«Preferito» (uno stato, non un'immagine): Tab ha una sosta in più tra la lista e «More actions»
+  (`keyboard.test.tsx`, fumo e Orca aggiornati).
+- Se non c'è niente in modifica, un profilo cambiato altrove viene preso in silenzio anche quando a scoprirlo è un interruttore che fallisce con
+  `gui_profile_changed`: l'avviso d'errore c'è (e Orca lo dice), l'avviso in linea con «Ricarica» no, perché non c'è niente da proteggere.
+- Il testo di `error.gui_profile_changed` (avviso a scomparsa) e quello dell'avviso in linea sono **frasi diverse**: la stessa frase due volte sarebbe letta due volte dai
+  lettori di schermo che dicono le regioni vive.
+- «Chiudere con modifiche non salvate» (la chiusura della **finestra**) non è coperta: la guardia c'è per il cambio di profilo. Intercettare la chiusura vuole l'evento di
+  chiusura della finestra (un permesso in più alla webview o un gestore in Rust) e non è nel piano di T5; da decidere.
+
+Non verificato (T5): la finestra «Salva · Scarta · Annulla» con il lettore di schermo (nessuna prova di Orca; la conferma di «Elimina» di T8 ha la sua `S5`); il fuoco
+che torna sul campo sbagliato dopo la chiusura della finestra di conferma è affidato a un `setTimeout(0)` (provato in jsdom, non nella finestra vera); un profilo
+WireGuard con più peer nella finestra vera (provato in jsdom e con le prove Rust); la lettura dell'errore di un campo con Orca su un desktop vero (S25).

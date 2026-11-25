@@ -22,4 +22,6 @@ pub const GUI_CODES: &[&str] = &[
     "gui_profile_not_found",
     "gui_profile_newer",
     "gui_profile_invalid",
+    "gui_profile_changed",
+    "gui_invalid_field",
 ];

@@ -1,6 +1,6 @@
 // Plan B2 T7, the shell under a screen reader (Q22 (a): Orca and the AT-SPI tree in the real window, run locally by
 // lab/tests/gui-a11y.sh, i.e. `scripts/gui.sh a11y`). One session of the app, in order: the list, the tabs, a text field,
-// a notice that goes away by itself (the switch and the confirmation of «Delete» come back with T5 and T8). Assertions are on our own names and on the states
+// a switch, a notice that goes away by itself (the confirmation of «Delete» comes back with T8). Assertions are on our own names and on the states
 // AT-SPI reports; the words Orca uses for the role and the state are recorded in target/gui-a11y/transcript.txt and
 // copied into docs/08-esito-fase2.md, because they are Orca's, not ours.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -73,6 +73,10 @@ describe("the shell under a screen reader", () => {
   });
 
   it("S3_tabs_are_a_page_tab_list_and_the_chosen_tab_is_spoken", async () => {
+    // the star (a toggle button: «pressed» when the profile is a favourite), then «More actions»
+    await key("Tab");
+    const star = await waitForTree(focusedIs("Favourite"), "the star focused");
+    expect((focusedNode(star) as AtNode).role, "the star is a toggle button").toBe("toggle button");
     await key("Tab");
     await waitForTree(focusedIs("More actions"), "«More actions» focused");
     const mark = speechMark();
@@ -110,9 +114,10 @@ describe("the shell under a screen reader", () => {
     record("S4b text field reached (Orca 46.1 in the image does not say the name)", speechSince(mark), tree);
   });
 
-  // T3 (P10): no switch in the shell until C makes the tab «General» write, so S4 waits for T5; the check of the switch
-  // under Orca came out of B2 with the demo form and comes back with the real one.
-  it.skip("S4_switch_state_is_exposed_and_spoken", async () => {
+  // T5: the switch of «General» is real now and writes at once (P7); the check of the switch under Orca that came out of
+  // B2 with the demo form is back, on the real one. It turns «Reconnect automatically» off and on again, so the profile
+  // of the seed ends as it began.
+  it("S4_switch_state_is_exposed_and_spoken", async () => {
     const reached = speechMark();
     const tree = await reach(/Reconnect automatically/, ["Tab"]);
     const control = focusedNode(tree) as AtNode;

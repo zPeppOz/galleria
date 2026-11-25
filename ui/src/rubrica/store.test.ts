@@ -135,4 +135,44 @@ describe("useRubrica", () => {
     });
     expect(result.current.view?.profiles.map((p) => p.name)).toEqual(["New"]);
   });
+
+  it("update_sends_the_id_the_time_it_expects_and_the_patch_and_does_not_read_the_list_by_itself", async () => {
+    const sent: unknown[] = [];
+    const state = backend(makeRubricaView());
+    mockIPC((cmd, args) => {
+      state.calls.push(cmd);
+      if (cmd === "profiles_list") return state.view;
+      if (cmd === "profile_get") return makeDetail(state.view.profiles[0]);
+      if (cmd === "profile_update") {
+        sent.push(args);
+        return { ...makeDetail(state.view.profiles[0]), name: "Nuovo" };
+      }
+      return undefined;
+    });
+    const { result } = renderHook(() => useRubrica());
+    await waitFor(() => expect(result.current.detail).not.toBeNull());
+    const lists = count(state, "profiles_list");
+    let detail: { name: string } | undefined;
+    await act(async () => {
+      detail = await result.current.update("office", { name: "Nuovo" }, "2026-11-25T10:00:00Z");
+    });
+    expect(detail?.name).toBe("Nuovo");
+    expect(sent).toEqual([{ id: "office", expectedModified: "2026-11-25T10:00:00Z", patch: { name: "Nuovo" } }]);
+    // the one who writes decides when to read again (the form keeps its draft until then)
+    expect(count(state, "profiles_list")).toBe(lists);
+  });
+
+  it("update_throws_the_error_of_the_command_as_it_is", async () => {
+    backend(makeRubricaView());
+    const failure = { code: "gui_invalid_field", message: "Some fields are not valid", data: { fields: [{ field: "name", code: "required" }] } };
+    mockIPC((cmd) => {
+      if (cmd === "profiles_list") return makeRubricaView();
+      if (cmd === "profile_get") return makeDetail(SAMPLE_PROFILES[0]);
+      if (cmd === "profile_update") return Promise.reject(failure);
+      return undefined;
+    });
+    const { result } = renderHook(() => useRubrica());
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    await expect(result.current.update("office", { name: "" }, "x")).rejects.toEqual(failure);
+  });
 });

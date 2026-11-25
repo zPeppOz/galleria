@@ -26,14 +26,23 @@ fn openvpn_text(host: &str, port: u16, proto: &str, tag: &str, extra: &str) -> S
     )
 }
 
+/// 32 bytes of base64, like a real public key (the window checks them): the text is `SEED-PUBLIC-<tag>` padded with dots.
+fn public_key(tag: &str) -> &'static str {
+    match tag {
+        "homelab" => "U0VFRC1QVUJMSUMtaG9tZWxhYi4uLi4uLi4uLi4uLi4=",
+        _ => "U0VFRC1QVUJMSUMtdnBzLi4uLi4uLi4uLi4uLi4uLi4=",
+    }
+}
+
 fn wireguard_text(tag: &str, endpoint: &str, address: &str, preshared: bool) -> String {
+    let key = public_key(tag);
     let psk = if preshared {
         format!("PresharedKey = {SECRET_MARK}{tag}-psk\n")
     } else {
         String::new()
     };
     format!(
-        "[Interface]\nPrivateKey = {SECRET_MARK}{tag}-private\nAddress = {address}\nDNS = 10.0.0.1\n\n[Peer]\nPublicKey = SEED-PUBLIC-{tag}\n{psk}Endpoint = {endpoint}\nAllowedIPs = 0.0.0.0/0\nPersistentKeepalive = 25\n"
+        "[Interface]\nPrivateKey = {SECRET_MARK}{tag}-private\nAddress = {address}\nDNS = 10.0.0.1\n\n[Peer]\nPublicKey = {key}\n{psk}Endpoint = {endpoint}\nAllowedIPs = 0.0.0.0/0\nPersistentKeepalive = 25\n"
     )
 }
 

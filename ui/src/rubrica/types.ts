@@ -39,4 +39,20 @@ export interface SkippedProfile { file_name: string; code: "gui_profile_newer" |
 export interface RubricaView { profiles: ProfileSummary[]; groups: string[]; skipped: SkippedProfile[] }
 
 /** The error every command returns (spec §4): a stable code, the English message, and sometimes data for the text. */
-export interface CmdError { code: string; message: string; data?: { path?: string; mode?: string; fix?: string } }
+export interface CmdError { code: string; message: string; data?: { path?: string; mode?: string; fix?: string; fields?: FieldIssue[] } }
+
+/** A field that may not be saved, by its path (`name`, `mtu`, `peers.0.endpoint`), with the reason: `gui_invalid_field` carries a list of them. */
+export interface FieldIssue { field: string; code: string }
+
+/**
+ * What the window asks to change in a profile (`ProfilePatch` in `crates/galleria-gui/src/edit.rs`): only the keys that
+ * change. `group: null` is «no group». There is no key for a secret, a path or the text of an OpenVPN profile.
+ */
+export interface ProfilePatch {
+  name?: string;
+  group?: string | null;
+  favorite?: boolean;
+  notes?: string;
+  settings?: ProfileSettings;
+  wireguard?: WireGuardView;
+}

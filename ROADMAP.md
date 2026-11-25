@@ -60,11 +60,11 @@ Decidere cosa costruire e provare su Linux e Windows i punti tecnici più rischi
   - [x] minore 3: un dominio con `~` spinto dal server viene scartato con una riga di log, senza far cadere la connessione (`09e3cdb`)
   - [x] gate locali 6/6 verdi: 529 test passati e 0 falliti
   - [ ] laboratorio T13 e T16 verdi sui tre client: verde su Ubuntu 24.04; su 26.04 e Fedora OpenVPN 2.7 usa il DCO del kernel 7.3 e Docker rootless lo nega (EPERM), da rifare sulla CI
-- [ ] CI remota verde sulla fase 1 (S2) <!-- branch: aitano/galleria-fase1-t13-16 -->
+- [x] CI remota verde sulla fase 1 (S2) <!-- branch: aitano/galleria-fase1-t13-16 · commit: b38215a · by: genny -->
   - [x] `check` e `coverage` verdi su GitHub Actions (run 43707067359, ramo `t_17a7470c`; già verdi sul primo push, run 43661067765)
   - [x] `lab` verde su Ubuntu 24.04, Ubuntu 26.04 e Fedora (stesso run: job 26, 27 e 79)
-  - [ ] `lab-dco` riparato o tolto per scritto: causa provata (il modulo `openvpn-dco-dkms` non compila sul kernel 7.0.0-1019-azure); riparato nel workflow con il modulo `ovpn` del kernel sui client 27 e 79, da provare dopo il push
-  - [ ] S2 in `docs/06-esito-fase1.md` §4 aggiornato con il link al run: link al run 43707067359 scritto, manca il run di `lab-dco` riparato
+  - [x] `lab-dco` riparato con il modulo `ovpn` del kernel sui client 27 e 79 (il modulo `openvpn-dco-dkms` non compila sul kernel 7.0.0-1019-azure): verde sul run 45625594806 (`b38215a`), job ora bloccante
+  - [x] S2 in `docs/06-esito-fase1.md` §4 aggiornato con il link al run 45625594806
 - [x] Integra la fase 1 in `main` <!-- branch: main · commit: e4a2d71 · by: aitano -->
   - [x] con l'ok di Peppe: `spike/windows` e la catena `aitano/galleria-fase1-*` sono entrati in `main` con un fast-forward a `e4a2d71`
   - [x] `docs/06-esito-fase1.md` §7 corretto: la parte Linux di D15 è già allineata da `556b89e`

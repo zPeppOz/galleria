@@ -69,7 +69,6 @@ jobs:
   # Il vecchio modulo fuori albero openvpn-dco-dkms non compila su kernel 7.0 (vedi docs/06-esito-fase1.md §4, S2).
   lab-dco:
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:

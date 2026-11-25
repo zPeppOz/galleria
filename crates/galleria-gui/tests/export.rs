@@ -772,6 +772,96 @@ fn delete_works_with_no_daemon_at_all() {
 
 // ---- no path from the webview ----------------------------------------------------------------------------------------
 
+/// The text between the parentheses of `pub fn <name>(`, up to the `)` that closes the list (not up to the first `) ->`:
+/// a command with no return type has none). `None` when the text has no such function, or the list never closes.
+fn params_of<'a>(source: &'a str, name: &str) -> Option<&'a str> {
+    let head = format!("pub fn {name}(");
+    let start = source.find(&head)? + head.len();
+    let mut depth = 1;
+    for (at, c) in source[start..].char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(&source[start..start + at]);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The parameters of a list, split at the commas that are not inside `<>`, `()` or `[]` (`HashMap<String, PathBuf>` is one).
+fn split_params(params: &str) -> Vec<&str> {
+    let (mut parts, mut depth, mut from) = (vec![], 0_i32, 0);
+    let mut previous = ' ';
+    for (at, c) in params.char_indices() {
+        match c {
+            '<' | '(' | '[' => depth += 1,
+            '>' if previous == '-' => {} // the arrow of a `Fn(u8) -> u8`
+            '>' | ')' | ']' => depth -= 1,
+            ',' if depth == 0 => {
+                parts.push(&params[from..at]);
+                from = at + 1;
+            }
+            _ => {}
+        }
+        previous = c;
+    }
+    parts.push(&params[from..]);
+    parts.retain(|p| !p.trim().is_empty());
+    parts
+}
+
+/// A hand-made source: a command with no return type, followed by a line that is not a parameter of it.
+const NO_RETURN_TYPE: &str = "\
+#[tauri::command]
+pub fn daemon_retry(state: State<'_, SupervisorHandle>) {
+    state.retry_now();
+}
+
+use std::path::Path;
+
+#[tauri::command]
+pub fn other(id: String) -> Result<(), Error> {
+    Ok(())
+}
+";
+
+#[test]
+fn params_end_at_the_parenthesis_that_closes_the_list() {
+    assert_eq!(
+        params_of(NO_RETURN_TYPE, "daemon_retry"),
+        Some("state: State<'_, SupervisorHandle>")
+    );
+    assert_eq!(params_of(NO_RETURN_TYPE, "other"), Some("id: String"));
+    assert_eq!(params_of(NO_RETURN_TYPE, "missing"), None);
+    // a parameter that has parentheses of its own, a list that spans lines, and one with a trailing comma
+    let source = "pub fn a(f: Box<dyn Fn(u8) -> u8>, g: (u8, u8),\n    h: Vec<Path>,\n) -> () {}\npub fn b() {}";
+    assert_eq!(
+        params_of(source, "a"),
+        Some("f: Box<dyn Fn(u8) -> u8>, g: (u8, u8),\n    h: Vec<Path>,\n")
+    );
+    assert_eq!(params_of(source, "b"), Some(""));
+    // a list that never closes is not guessed
+    assert_eq!(params_of("pub fn c(a: u8", "c"), None);
+}
+
+#[test]
+fn params_are_split_at_the_commas_of_the_list_only() {
+    assert_eq!(
+        split_params("a: HashMap<String, PathBuf>, f: Box<dyn Fn(u8, u8) -> u8>, g: (u8, u8),\n"),
+        [
+            "a: HashMap<String, PathBuf>",
+            " f: Box<dyn Fn(u8, u8) -> u8>",
+            " g: (u8, u8)"
+        ]
+    );
+    assert!(split_params("").is_empty());
+}
+
 /// The parameters of every command of `COMMANDS`, read from the sources: no command takes a path (spec §3.2, rule 3).
 #[test]
 fn no_command_takes_a_path() {
@@ -789,18 +879,33 @@ fn no_command_takes_a_path() {
         .map(|c| c.trim().trim_matches('"'))
         .filter(|c| !c.is_empty())
         .collect();
-    let mut sources = String::new();
-    for entry in fs::read_dir(crate_dir.join("src/commands")).unwrap() {
-        sources.push_str(&fs::read_to_string(entry.unwrap().path()).unwrap());
-    }
+    // each file on its own, in a fixed order: a command is looked for, and read, inside the file that has it
+    let mut files: Vec<PathBuf> = fs::read_dir(crate_dir.join("src/commands"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    files.sort();
+    let sources: Vec<(String, String)> = files
+        .iter()
+        .map(|path| {
+            (
+                path.file_name().unwrap().to_string_lossy().into_owned(),
+                fs::read_to_string(path).unwrap(),
+            )
+        })
+        .collect();
     let mut checked = 0;
     for command in &commands {
-        let head = format!("pub fn {command}(");
-        let at = sources
-            .find(&head)
-            .unwrap_or_else(|| panic!("no `{head}` in src/commands"));
-        let params = sources[at + head.len()..].split(") ->").next().unwrap();
-        for param in params.split(',') {
+        let found: Vec<(&str, &str)> = sources
+            .iter()
+            .filter_map(|(file, source)| Some((file.as_str(), params_of(source, command)?)))
+            .collect();
+        assert_eq!(
+            found.len(),
+            1,
+            "`pub fn {command}(` must be in exactly one file of src/commands: {found:?}"
+        );
+        for param in split_params(found[0].1) {
             let Some((name, ty)) = param.split_once(':') else {
                 continue;
             };

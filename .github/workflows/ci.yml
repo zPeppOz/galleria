@@ -119,13 +119,12 @@ jobs:
       - run: cargo deny check
 
   # Level 3 (spec §14, Q13): the real app in a WebKitGTK window under Xvfb, driven by tauri-driver and
-  # WebKitWebDriver, against a fake daemon. Not blocking until it has been green on a runner (B1 plan, task 6).
+  # WebKitWebDriver, against a fake daemon.
   # It runs in the same image as locally (`scripts/gui.sh smoke`, lab/images/gui.Dockerfile, Ubuntu 24.04), not on
   # the runner's own packages: `ubuntu-latest` moves to a new release and renames them (26.04 has no
   # `webkit2gtk-driver`, run 45638906906). The image gets the host Rust toolchain mounted, so it is installed here.
   gui-smoke:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:

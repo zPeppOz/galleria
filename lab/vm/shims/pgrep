@@ -1,0 +1,35 @@
+#!/bin/bash
+# Test-harness shim for pgrep/pkill, used only by lab/vm/vm-lab.sh run (PATH prefix).
+# In the Docker client the OpenVPN *servers* live in other containers, so `pgrep -x openvpn` only
+# ever sees the client's own processes. In a VM the servers run as containers of the same kernel
+# and the same /proc: this shim hides every `openvpn` whose cgroup is a docker one, so the
+# assertions keep meaning "the CLIENT has no openvpn left". Any other pgrep/pkill use is passed
+# through untouched.
+real=/usr/bin/$(basename "$0")
+[[ ${!#} == openvpn ]] || exec "$real" "$@"
+mode=$(basename "$0")
+oldest=0 sig=TERM
+for a in "${@:1:$#-1}"; do
+  case $a in
+    -[A-Z]*|-[0-9]*) sig=${a#-} ;;
+    -[a-z]*)
+      flags=${a#-}
+      for ((i=0; i<${#flags}; i++)); do
+        case ${flags:i:1} in
+          x) ;;
+          o) oldest=1 ;;
+          *) exec "$real" "$@" ;;
+        esac
+      done ;;
+    *) exec "$real" "$@" ;;
+  esac
+done
+pids=()
+for p in $(/usr/bin/pgrep -x openvpn); do
+  grep -q docker "/proc/$p/cgroup" 2>/dev/null || pids+=("$p")
+done
+((${#pids[@]})) || exit 1
+if ((oldest)); then
+  pids=("$(ps -o pid= --sort=start_time -p "$(IFS=,; echo "${pids[*]}")" | awk 'NR==1 {print $1}')")
+fi
+if [[ $mode == pgrep ]]; then printf '%s\n' "${pids[@]}"; else kill -"$sig" "${pids[@]}"; fi

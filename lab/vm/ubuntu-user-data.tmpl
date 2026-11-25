@@ -1,0 +1,56 @@
+#cloud-config
+hostname: galleria-ubuntu
+manage_etc_hosts: true
+users:
+  - name: lab
+    gecos: Galleria lab
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - @SSH_PUBKEY@
+ssh_pwauth: false
+package_update: true
+package_upgrade: false
+packages:
+  - ubuntu-desktop-minimal
+  - gnome-shell-extension-appindicator
+  - network-manager
+  - openvpn
+  - wireguard-tools
+  - tcpdump
+  - oathtool
+  - curl
+  - python3
+  - iputils-ping
+  - iproute2
+  - rsync
+  - docker.io
+  - systemd-resolved
+write_files:
+  - path: /etc/netplan/01-network-manager-all.yaml
+    permissions: '0600'
+    content: |
+      network:
+        version: 2
+        renderer: NetworkManager
+  - path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    content: |
+      network: {config: disabled}
+  - path: /usr/local/sbin/galleria-gdm-autologin
+    permissions: '0755'
+    content: |
+      #!/bin/sh
+      mkdir -p /etc/gdm3
+      printf '[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin=lab\n' > /etc/gdm3/custom.conf
+runcmd:
+  - [ /usr/local/sbin/galleria-gdm-autologin ]
+  - [ rm, -f, /etc/netplan/50-cloud-init.yaml ]
+  - [ systemctl, set-default, graphical.target ]
+  - [ sh, -c, "echo PROVISION_DONE > /var/lib/galleria-provision" ]
+power_state:
+  mode: reboot
+  message: provisioning done, rebooting onto NetworkManager
+  timeout: 30
+  condition: true

@@ -1,0 +1,38 @@
+#cloud-config
+hostname: galleria-fedora
+manage_etc_hosts: true
+users:
+  - name: lab
+    gecos: Galleria lab
+    groups: [wheel]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - @SSH_PUBKEY@
+ssh_pwauth: false
+write_files:
+  - path: /etc/gdm/custom.conf
+    content: |
+      [daemon]
+      AutomaticLoginEnable=true
+      AutomaticLogin=lab
+  - path: /etc/dconf/profile/user
+    content: |
+      user-db:user
+      system-db:local
+  - path: /etc/dconf/db/local.d/00-appindicator
+    content: |
+      [org/gnome/shell]
+      enabled-extensions=['appindicatorsupport@rgcjonas.gmail.com']
+runcmd:
+  - [ sh, -c, "dnf -y --setopt=install_weak_deps=True group install workstation-product-environment > /var/log/galleria-dnf-group.log 2>&1" ]
+  - [ sh, -c, "dnf -y install gnome-shell-extension-appindicator NetworkManager-openvpn openvpn wireguard-tools tcpdump oathtool curl python3 rsync moby-engine systemd-resolved iproute iputils util-linux-script >> /var/log/galleria-dnf-group.log 2>&1" ]
+  - [ dconf, update ]
+  - [ systemctl, set-default, graphical.target ]
+  - [ sh, -c, "echo PROVISION_DONE > /var/lib/galleria-provision" ]
+power_state:
+  mode: reboot
+  message: provisioning done, rebooting into the desktop
+  timeout: 30
+  condition: true

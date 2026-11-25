@@ -87,8 +87,8 @@ La rubrica in Tauri 2 + React sopra il demone della fase 1, in sei blocchi B1–
 
 - [ ] Spec della fase 2 e piano del blocco B1
   - [x] spec `docs/superpowers/specs/2026-11-25-fase2-gui-design.md` con i criteri G1–G13, sopra le decisioni D19–D32
-  - [ ] piano di B1 in `docs/superpowers/plans/`; gli altri blocchi hanno un piano ciascuno, scritto prima di partire
-  - [ ] l'IPC della fase 1 resta senza modifiche e la webview passa dai comandi Tauri (D12)
+  - [x] piano di B1 in `docs/superpowers/plans/2026-11-25-fase2-b1-fondamenta.md` (6 task); gli altri blocchi hanno un piano ciascuno, scritto prima di partire
+  - [x] l'IPC della fase 1 resta senza modifiche e la webview passa dai comandi Tauri (D12)
   - [ ] questioni aperte nuove della spec (Q12–Q21) decise prima di costruire
 - [ ] B1 · Fondamenta
   - [ ] parte dalla fase 1 integrata in `main`

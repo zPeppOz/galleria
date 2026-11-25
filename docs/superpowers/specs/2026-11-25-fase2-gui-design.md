@@ -405,6 +405,7 @@ Il mockup resta il riferimento visivo. Dove dice altro, vale questa spec:
 | S10 | `.ovpn` ha un tipo MIME registrato sulle tre distribuzioni | B4 | il pacchetto installa una definizione MIME propria |
 | S11 | Comportamento del plugin di istanza unica senza bus di sessione | B4 | l'app parte comunque e lo scrive nel log |
 | S12 | Crate per Secret Service e comportamento con GNOME Keyring e KWallet | B5, primo task | ripiego sul file (D25) |
+| S13 | `cargo deny check` passa con l'albero di Tauri: mi aspetto avvisi «non più mantenuto» sulle librerie GTK3 per Rust e forse licenze non ancora in elenco (previsione, non eseguito) | B1-T1 | avvisi ignorati uno per uno con il motivo scritto; licenze aggiunte solo se compatibili con GPL-3.0-or-later; una incompatibile ferma il blocco |
 
 ## 18. Questioni aperte nuove
 

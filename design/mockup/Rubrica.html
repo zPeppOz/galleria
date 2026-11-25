@@ -169,7 +169,7 @@ section.detail{display:flex;flex-direction:column;min-height:0;min-width:0}
       <div style="color:var(--ink);font-weight:600;margin-top:14px">Anteprima: <span style="font-family:var(--mono)">cliente-bianchi.ovpn</span> <span class="proto ovpn">OVPN</span></div>
       <div class="check"><span class="g">✓</span><span>CA, certificato e chiave inline trovati — la chiave andrà nel portachiavi di sistema</span></div>
       <div class="check"><span class="g">✓</span><span>tls-crypt trovato</span></div>
-      <div class="check"><span class="w">!</span><span>Direttiva <code>up /etc/openvpn/update-dns</code> bloccata: gli script non vengono eseguiti senza conferma esplicita</span></div>
+      <div class="check"><span class="w">!</span><span>Direttiva <code>up /etc/openvpn/update-resolv-conf</code> <b>rimossa</b>: Galleria non esegue gli script dei profili. I DNS del server li applica Galleria.</span></div>
       <div class="check"><span class="w">!</span><span><code>auth-user-pass</code>: le credenziali saranno chieste alla prima connessione</span></div>
       <div class="form" style="grid-template-columns:110px 1fr;margin-top:14px">
         <label>Nome</label><input class="field" value="Cliente Bianchi">
@@ -321,18 +321,18 @@ ${p.auth!=="cert"?"auth-user-pass\n":""}verb 3
 <key>  <portachiavi:${p.id}/key>  </key>`)}</textarea>`;
   if(tab==="log"){
     const me=p.id===active&&state==="on";
-    return `<div class="rawbar"><span>Ultima sessione</span><span style="margin-left:auto"></span><button class="btn">Copia</button><button class="btn">Apri cartella log</button></div>
+    return `<div class="rawbar"><span>${p.id===active&&state!=="off"?"Sessione corrente":"Ultima sessione"}</span><span style="margin-left:auto"></span><button class="btn">Copia</button><button class="btn">Esporta log…</button></div>
     <div class="log">${me?(p.proto==="wg"?
-`<span class="t">10:42:01</span> <span class="i">Creazione interfaccia galleria0</span>
-<span class="t">10:42:01</span> <span class="i">Configurazione peer ${esc(p.server)}</span>
-<span class="t">10:42:02</span> <span class="i">DNS impostato: ${esc(p.dns)}</span>
-<span class="t">10:42:02</span> <span class="g">Handshake completato</span>`:
-`<span class="t">10:42:01</span> <span class="i">OpenVPN 2.6 avviato (management 127.0.0.1)</span>
-<span class="t">10:42:01</span> <span class="i">TCP/UDP: connessione a ${esc(p.server)}</span>
-<span class="t">10:42:02</span> <span class="i">Verifica certificato server: OK</span>
-<span class="t">10:42:02</span> <span class="w">WARNING: direttiva 'up' ignorata (script disabilitati)</span>
-<span class="t">10:42:03</span> <span class="i">PUSH: route ${esc(p.routes)}</span>
-<span class="t">10:42:03</span> <span class="g">Initialization Sequence Completed</span>`):`<span class="t">Nessun log per la sessione corrente. Connetti per vedere l'output in tempo reale.</span>`}</div>`;
+`<span class="t">10:42:01</span> <span class="i">interface glr-wg0 created</span>
+<span class="t">10:42:01</span> <span class="i">peer ${esc(p.server)} configured</span>
+<span class="t">10:42:02</span> <span class="i">DNS applied: ${esc(p.dns)}</span>
+<span class="t">10:42:02</span> <span class="g">handshake completed</span>`:
+`<span class="t">10:42:01</span> <span class="i">OpenVPN 2.6.19 x86_64-pc-linux-gnu</span>
+<span class="t">10:42:01</span> <span class="i">UDPv4 link remote: [AF_INET]${esc(p.server)}</span>
+<span class="t">10:42:02</span> <span class="i">VERIFY OK: depth=0, CN=vpn-server</span>
+<span class="t">10:42:03</span> <span class="i">PUSH: Received control message: 'PUSH_REPLY,route ${esc(p.routes)}'</span>
+<span class="t">10:42:03</span> <span class="i">TUN/TAP device glr-ovpn0 opened</span>
+<span class="t">10:42:03</span> <span class="g">Initialization Sequence Completed</span>`):`<span class="t">Nessun log. Connetti per vedere l'output in tempo reale.</span>`}</div>`;
   }
 }
 
@@ -386,7 +386,7 @@ document.addEventListener("click",e=>{
 });
 $("#q").oninput=renderList;
 $("#bImport").onclick=$("#bImport2").onclick=()=>open("#mImport");
-$("#doImport").onclick=()=>{if(!P("bianchi"))profiles.push({id:"bianchi",name:"Cliente Bianchi",proto:"ovpn",group:"Clienti",server:"vpn.bianchi.example:1194",transport:"UDP",auth:"cert+user",dns:"Sistema",routes:"10.50.0.0/24",full:false,used:"mai"});sel="bianchi";tab="gen";close();render();toast("Importato: Cliente Bianchi — 1 direttiva bloccata")};
+$("#doImport").onclick=()=>{if(!P("bianchi"))profiles.push({id:"bianchi",name:"Cliente Bianchi",proto:"ovpn",group:"Clienti",server:"vpn.bianchi.example:1194",transport:"UDP",auth:"cert+user",dns:"Sistema",routes:"10.50.0.0/24",full:false,used:"mai"});sel="bianchi";tab="gen";close();render();toast("Importato: Cliente Bianchi — 1 direttiva rimossa")};
 $("#bTray").onclick=()=>$("#tray").classList.toggle("show");
 $("#bTheme").onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==="light"?"":"light"};
 document.addEventListener("keydown",e=>{

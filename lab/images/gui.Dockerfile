@@ -7,7 +7,7 @@ ARG NODE_VERSION
 ARG PNPM_VERSION
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential pkg-config ca-certificates curl wget file git xz-utils xvfb xauth xclip dbus fonts-dejavu-core webkit2gtk-driver iproute2 \
+        build-essential pkg-config ca-certificates curl wget file git xz-utils xvfb xauth xclip dbus fonts-dejavu-core webkit2gtk-driver \
         libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN set -eux; \

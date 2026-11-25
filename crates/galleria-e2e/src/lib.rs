@@ -65,7 +65,10 @@ pub async fn wait_state(c: &mut Client, wanted: State, timeout: Duration) -> Sta
     .unwrap_or_else(|_| panic!("did not reach {wanted:?}"))
 }
 pub fn residue() -> String {
-    checked("ip -br link; ip route; ip -6 route; ip rule; ip -6 rule; resolvectl dns")
+    // RA routes on a real desktop link carry a ticking "expires Nsec": strip it, it is not state.
+    checked(
+        "set -o pipefail; { ip -br link; ip route; ip -6 route; ip rule; ip -6 rule; resolvectl dns; } | sed -E 's/ expires [0-9]+sec//'",
+    )
 }
 pub fn lab_file(name: &str) -> String {
     assert_lab();

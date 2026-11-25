@@ -12,6 +12,9 @@ gui_prepare_outer() {
   : "${GALLERIA_SMOKE_DAEMON:?path of the fake-daemon binary}"
   repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
   tmp=$(mktemp -d)
+  # The app reads and writes `state.toml` (D32) and, from B3, the profiles: both inside the temporary directory, never
+  # in the home of whoever runs the test.
+  export XDG_CONFIG_HOME=$tmp/config XDG_STATE_HOME=$tmp/state
   bin=$tmp/bin
   mkdir -p "$bin"
 

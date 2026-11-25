@@ -590,3 +590,41 @@ versione di Ubuntu 24.04 LTS, e il campo 2 non è stato provato lì: se interess
 - Orca 46 su desktop vero (Ubuntu 24.04), GNOME su X11, KDE/Plasma e Orca su altre distro.
 - Il comportamento della coda di Orca se gli annunci sono molti e ravvicinati (urgenza, interruzioni).
 - Le due VM sono «Cloud» con il desktop aggiunto sopra (come in `t_4a5ce3ed`): non sono installazioni da ISO.
+
+## B3 · Rubrica e profili
+
+Piano: `docs/superpowers/plans/2026-11-25-fase2-b3-rubrica.md`. Q28–Q34 approvate da Aitano il 2026-11-25 su delega di Peppe,
+tutte come raccomandate (segnate nella spec, §18). Ambiente: quello di B2. Il gruppo A (T1, T2) parte da `main` con il piano e
+lo spike di Orca (`b5f3240`).
+
+### `state.toml`, lingua e tema salvati (T1)
+
+Il file è `$XDG_STATE_HOME/galleria/state.toml` (altrimenti `~/.local/state/galleria/`), cartella `0700` e file `0600`,
+scritto con rename atomico. `ui_state.rs` non importa Tauri; `window.rs` salva la dimensione; i comandi sono `ui_state_get` e
+`ui_state_set` (il `patch` ha solo `lang`, `theme`, `sort` e rifiuta ogni altra chiave: `window` e `last_used` li scrive solo
+Rust).
+
+| # | Supposizione | Esito | Dove | Ripiego applicato |
+|---|---|---|---|---|
+| S21 | L'attributo del tema è sulla radice prima del primo disegno, anche con il tema salvato | **Vero.** `main.tsx` mette il tema del sistema subito e quello salvato appena `ui_state_get` risponde, prima di montare React; la prova `language_and_theme_survive_a_restart` sceglie il tema **opposto** a quello del sistema (WebKitGTK nell'immagine dichiara «chiaro»: sceglie «Scuro») e al secondo avvio trova quello salvato. `theme_attribute_is_set_before_first_paint` resta verde | `ui/e2e/smoke.e2e.ts` | nessuno |
+| S23 | La dimensione salvata viene applicata all'avvio sotto Xvfb | **Vero.** `window_size_survives_a_restart`: `setWindowSize(900, 620)`, la app scrive `[window]` entro mezzo secondo, riaperta la finestra è 900×620 (uscita: «S23: saved 900×620, the window opens at 900×620»). Su Wayland resta **non verificato** (nessuna sessione Wayland qui) | `ui/e2e/smoke.e2e.ts` | nessuno |
+
+Scelte da sapere:
+
+- `tauri.conf.json` crea la finestra **nascosta** (`"visible": false`); `window::restore` applica la dimensione salvata e poi
+  la mostra: la finestra si apre una volta, già della misura giusta. Se il setup fallisce la finestra non compare.
+- La dimensione si salva alla chiusura e 500 ms dopo l'ultimo ridimensionamento (la sessione di WebDriver uccide l'app senza
+  evento di chiusura). Una finestra massimizzata tiene larghezza e altezza di prima (`WindowSize::after`): quelle dello
+  schermo non sono la misura a cui tornare. Una misura fuori da 400–16000 px non si applica.
+- `configure_with` ha ora un quarto parametro, il file di stato: le prove di livello 2 lo mettono nella cartella
+  temporanea e nessuna scrive nella casa di chi le lancia. `lab/tests/gui-lib.sh` esporta `XDG_CONFIG_HOME` e
+  `XDG_STATE_HOME` dentro la cartella temporanea del giro, e `openApp()` parte da uno `state.toml` vuoto (`openApp(true)` per
+  la prova che riavvia di proposito): senza, la lingua scelta da una prova finiva nella successiva.
+- `Preferences.setLang/setTheme` applicano la scelta subito e restituiscono la promessa della scrittura; `AppMenu`, che sta
+  sotto il `ToastProvider`, mostra l'errore `gui_state_not_saved` come avviso assertivo.
+- `main.tsx` aspetta `ui_state_get` al più 300 ms (`READ_LIMIT_MS`); oltre, o in caso di errore, parte con «Sistema».
+- `localStorage` non è mai stato usato in `ui/src` (la ricerca non trova nulla).
+
+Non verificato (T1): il cancellare `state.toml` a finestra aperta e la scelta successiva che lo ricrea («Fatto quando»), a
+mano: `update` rilegge e riscrive a ogni scelta e la prova `broken_toml_gives_the_defaults_and_the_next_write_replaces_it`
+copre il caso del file rotto, ma non l'ho fatto nella finestra vera.

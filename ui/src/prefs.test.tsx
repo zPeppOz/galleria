@@ -7,6 +7,7 @@ import type { DaemonView } from "./daemon/types";
 import en from "./i18n/en.json";
 import it_ from "./i18n/it.json";
 import { detectLang } from "./i18n";
+import { loadUiPrefs, READ_LIMIT_MS, SYSTEM_PREFS } from "./app/uiState";
 import { makeInfo, makeView } from "./test/fixtures";
 
 const stopped: DaemonView = makeView({ link: "daemon_not_running", status: null });
@@ -95,5 +96,87 @@ describe("preferences", () => {
     await screen.findByText("Start the service");
     expect(document.documentElement.dataset.theme).toBe("light");
     vi.unstubAllGlobals();
+  });
+});
+
+// D32, Q25: language and theme are kept by the Rust side in `state.toml` and read before the first render.
+describe("saved preferences", () => {
+  type Call = { cmd: string; args: unknown };
+
+  function savedBackend(opts: { saved?: unknown; failWrite?: boolean } = {}) {
+    const calls: Call[] = [];
+    mockIPC(
+      (cmd, args) => {
+        calls.push({ cmd, args });
+        if (cmd === "daemon_view") return stopped;
+        if (cmd === "app_info") return makeInfo();
+        if (cmd === "ui_state_get") return opts.saved ?? { schema_version: 1, lang: "system", theme: "system", sort: "name" };
+        if (cmd === "ui_state_set") {
+          if (opts.failWrite) throw { code: "gui_state_not_saved", message: "cannot write" };
+          return undefined;
+        }
+        return undefined;
+      },
+      { shouldMockEvents: true },
+    );
+    return calls;
+  }
+
+  it("saved_language_and_theme_are_applied_at_start", async () => {
+    savedBackend({ saved: { schema_version: 1, lang: "it", theme: "light", sort: "recent" } });
+    const prefs = await loadUiPrefs();
+    expect(prefs).toEqual({ lang: "it", theme: "light", sort: "recent" });
+    render(<App lang={prefs.lang} theme={prefs.theme} />);
+    expect(await screen.findByText("Avvia il servizio")).toBeTruthy();
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("light"));
+    expect(document.documentElement.lang).toBe("it");
+  });
+
+  it("values_the_saved_state_cannot_have_fall_back_to_the_system", async () => {
+    savedBackend({ saved: { lang: "klingon", theme: 7, sort: null } });
+    expect(await loadUiPrefs()).toEqual(SYSTEM_PREFS);
+  });
+
+  it("a_choice_is_written_through_ui_state_set", async () => {
+    const calls = savedBackend();
+    const user = userEvent.setup();
+    render(<App lang="en" />);
+    await screen.findByText("Start the service");
+    await choose(user, "Italiano");
+    // the menu is in Italian now: «Chiaro» is the light theme
+    await choose(user, "Chiaro");
+    await waitFor(() => expect(calls.filter((c) => c.cmd === "ui_state_set").map((c) => c.args)).toEqual([{ patch: { lang: "it" } }, { patch: { theme: "light" } }]));
+  });
+
+  it("a_failed_write_keeps_the_choice_and_shows_an_error", async () => {
+    savedBackend({ failWrite: true });
+    const user = userEvent.setup();
+    render(<App lang="en" />);
+    await screen.findByText("Start the service");
+    await choose(user, "Light");
+    // the choice stands for the session...
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("light"));
+    // ...and the user is told, with the text of the code, in an assertive region
+    const alert = await screen.findByRole("alert");
+    await waitFor(() => expect(alert.textContent).toContain(en["error.gui_state_not_saved"]));
+  });
+
+  it("a_slow_or_failing_read_starts_with_the_system_values", async () => {
+    vi.useFakeTimers();
+    try {
+      mockIPC((cmd) => (cmd === "ui_state_get" ? new Promise(() => {}) : undefined));
+      const slow = loadUiPrefs();
+      await vi.advanceTimersByTimeAsync(READ_LIMIT_MS);
+      expect(await slow).toEqual(SYSTEM_PREFS);
+      expect(READ_LIMIT_MS).toBe(300);
+
+      mockIPC((cmd) => {
+        if (cmd === "ui_state_get") throw new Error("no backend");
+        return undefined;
+      });
+      expect(await loadUiPrefs()).toEqual(SYSTEM_PREFS);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

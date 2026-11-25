@@ -1,6 +1,12 @@
 /// The commands the webview may call. Declaring them here makes Tauri generate an `allow-<name>` permission for
 /// each, to be listed in `capabilities/main.json`; `tests/config.rs` keeps the two lists equal.
-const COMMANDS: &[&str] = &["daemon_view", "daemon_retry", "app_info"];
+const COMMANDS: &[&str] = &[
+    "daemon_view",
+    "daemon_retry",
+    "app_info",
+    "ui_state_get",
+    "ui_state_set",
+];
 
 fn main() {
     let app = tauri_build::AppManifest::new().commands(COMMANDS);

@@ -39,7 +39,9 @@ fn gui(socket: &Path, policy: RelinkPolicy) -> Gui {
         .enable_all()
         .build()
         .unwrap();
-    let mut app = configure_with(mock_builder(), socket.to_path_buf(), policy)
+    // `state.toml` goes next to the socket, in the temporary directory of the test: never in the home of whoever runs it.
+    let state = galleria_gui::ui_state::UiStateFile::new(socket.with_file_name("state/state.toml"));
+    let mut app = configure_with(mock_builder(), socket.to_path_buf(), policy, state)
         .build(mock_context(noop_assets()))
         .unwrap();
     // `build` does not run the setup hook on the mock runtime; one iteration does (S4: found in B1-T4).

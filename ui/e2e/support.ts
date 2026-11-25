@@ -1,7 +1,8 @@
 // Helpers shared by the level 3 tests: the WebDriver smoke test (`*.e2e.ts`, lab/tests/gui-smoke.sh) and the screen
 // reader checks (`*.a11y.ts`, lab/tests/gui-a11y.sh). Nothing here asks the daemon to connect.
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { remote } from "webdriverio";
 
 export type Browser = Awaited<ReturnType<typeof remote>>;
@@ -19,7 +20,18 @@ export const TEN_SECONDS = 10_000;
 
 let current: Browser | undefined;
 
-export async function openApp(): Promise<Browser> {
+/** `state.toml` of the app under test: gui-lib.sh points XDG_STATE_HOME into the temporary directory of the run. */
+export const stateFile = (): string => join(env("XDG_STATE_HOME"), "galleria", "state.toml");
+
+/** What the app wrote in `state.toml`, or an empty string while it has written nothing. */
+export const readState = (): string => (existsSync(stateFile()) ? readFileSync(stateFile(), "utf8") : "");
+
+/**
+ * Starts the app. Every test starts from an empty `state.toml`, so what one test chose (Italian, a theme) does not
+ * leak into the next; `keepState` is for the test that restarts the app on purpose.
+ */
+export async function openApp(keepState = false): Promise<Browser> {
+  if (!keepState) rmSync(stateFile(), { force: true });
   current = await remote({
     hostname: "127.0.0.1",
     port: Number(env("GALLERIA_SMOKE_DRIVER_PORT")),

@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseColour, tintOver, toHex, type Rgb } from "../src/design/color";
-import { bodyText, closeApp, daemon, openApp, TEN_SECONDS, waitForBody, type Browser } from "./support";
+import { bodyText, closeApp, daemon, openApp, readState, TEN_SECONDS, waitForBody, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 const DISCONNECTED = /Disconnected|Disconnesso/;
@@ -69,6 +69,63 @@ describe("galleria-gui against the real daemon", () => {
     await waitForBody(b, "Start the service", "the window did not switch back to English");
     expect(await bodyText(b)).not.toContain("Avvia il servizio");
     expect(b.sessionId).toBe(session);
+  });
+
+  // D32, Q25, S21: what the menu chose is in `state.toml` and the next run starts with it. A second app on the same
+  // state file stands for the restart: the window is closed with its session, and a new one opened.
+  it("language_and_theme_survive_a_restart", async () => {
+    daemon("stop");
+    const first = await openApp();
+    await waitForBody(first, START_THE_SERVICE, "the «Start the service» panel never appeared");
+    const choose = async (label: string) => {
+      await first.$("button=Menu").click();
+      const option = await first.waitUntil(
+        async () => {
+          for (const item of await first.$$('[role="menuitemradio"]')) if ((await item.getText()) === label) return item;
+          return false;
+        },
+        { timeout: TEN_SECONDS, interval: 250, timeoutMsg: `the menu never offered «${label}»` },
+      );
+      await option.click();
+    };
+    // The opposite of what the system gives, so that «saved» cannot be mistaken for «followed the system».
+    const before = await first.execute(() => document.documentElement.dataset.theme);
+    const [label, theme, tomlTheme] = before === "light" ? ["Scuro", "dark", 'theme = "dark"'] : ["Chiaro", "light", 'theme = "light"'];
+    await choose("Italiano");
+    await choose(label);
+    await first.waitUntil(async () => readState().includes('lang = "it"') && readState().includes(tomlTheme), {
+      timeout: TEN_SECONDS,
+      interval: 250,
+      timeoutMsg: `the app did not write the choices to state.toml; it holds: ${readState()}`,
+    });
+    await closeApp();
+
+    const second = await openApp(true);
+    await waitForBody(second, "Avvia il servizio", "the new window did not start in Italian");
+    expect(await second.execute(() => document.documentElement.dataset.theme)).toBe(theme);
+    expect(await second.execute(() => document.documentElement.lang)).toBe("it");
+  });
+
+  // Q34, S23: the size of the window comes back. WebKitWebDriver sets the rectangle; the app writes it half a second
+  // after the last resize (it may be killed with the session, without a close event).
+  it("window_size_survives_a_restart", async () => {
+    daemon("stop");
+    const first = await openApp();
+    await waitForBody(first, START_THE_SERVICE, "the «Start the service» panel never appeared");
+    await first.setWindowSize(900, 620);
+    await first.waitUntil(async () => /\[window\]/.test(readState()) && /width = 9\d\d/.test(readState()), {
+      timeout: TEN_SECONDS,
+      interval: 250,
+      timeoutMsg: `the app did not write the size of the window; state.toml holds: ${readState()}`,
+    });
+    await closeApp();
+
+    const second = await openApp(true);
+    await waitForBody(second, START_THE_SERVICE, "the new window never rendered");
+    const size = await second.getWindowSize();
+    console.log(`S23: saved 900×620, the window opens at ${size.width}×${size.height}`);
+    expect(Math.abs(size.width - 900)).toBeLessThanOrEqual(40);
+    expect(Math.abs(size.height - 620)).toBeLessThanOrEqual(40);
   });
 
   it("window_has_no_remote_content", async () => {

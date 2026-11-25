@@ -12,6 +12,8 @@ const ALLOWED: &[&str] = &[
     "allow-daemon-view",
     "allow-daemon-retry",
     "allow-app-info",
+    "allow-ui-state-get",
+    "allow-ui-state-set",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

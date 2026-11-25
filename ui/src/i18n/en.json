@@ -55,6 +55,7 @@
   "error.dns_unavailable": "systemd-resolved is unavailable",
   "error.unsupported_challenge": "This authentication challenge is unsupported",
   "error.backend_exited": "The VPN backend exited unexpectedly",
+  "error.gui_state_not_saved": "Could not save the setting; it applies until you close Galleria",
   "dialog.close": "Close",
   "menu.label": "Menu",
   "menu.language": "Language",

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { AppInfo } from "../daemon/types";
 import { Menu, type MenuEntry } from "../design/Menu";
+import { useToast } from "../design/Toast";
 import type { ThemeChoice } from "../design/theme";
-import { useT } from "../i18n";
+import { errorText, useT } from "../i18n";
 import { usePrefs, type LangChoice } from "../prefs";
 import { AboutDialog } from "./AboutDialog";
 
@@ -10,7 +11,15 @@ import { AboutDialog } from "./AboutDialog";
 export function AppMenu(props: { info: AppInfo | null; daemonVersion: string | null }) {
   const t = useT();
   const prefs = usePrefs();
+  const toast = useToast();
   const [aboutOpen, setAboutOpen] = useState(false);
+  // The choice applies at once; if it cannot be written the user is told it lasts only until the window closes.
+  const saved = (write: Promise<void>) => {
+    write.catch((error: unknown) => {
+      const { code, message } = (error ?? {}) as { code?: string; message?: string };
+      toast(errorText(t, code ?? "gui_state_not_saved", message ?? ""), { tone: "error" });
+    });
+  };
   const entries: MenuEntry[] = [
     {
       kind: "radio",
@@ -22,7 +31,7 @@ export function AppMenu(props: { info: AppInfo | null; daemonVersion: string | n
         { value: "en", label: t("menu.language.en") },
         { value: "it", label: t("menu.language.it") },
       ],
-      onChange: (value) => prefs.setLang(value as LangChoice),
+      onChange: (value) => saved(prefs.setLang(value as LangChoice)),
     },
     {
       kind: "radio",
@@ -34,7 +43,7 @@ export function AppMenu(props: { info: AppInfo | null; daemonVersion: string | n
         { value: "light", label: t("menu.theme.light") },
         { value: "dark", label: t("menu.theme.dark") },
       ],
-      onChange: (value) => prefs.setTheme(value as ThemeChoice),
+      onChange: (value) => saved(prefs.setTheme(value as ThemeChoice)),
     },
     { kind: "separator" },
     { kind: "item", id: "about", label: t("menu.about"), onSelect: () => setAboutOpen(true) },

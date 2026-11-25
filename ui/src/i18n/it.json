@@ -55,6 +55,7 @@
   "error.dns_unavailable": "systemd-resolved non è disponibile",
   "error.unsupported_challenge": "Questo tipo di autenticazione non è supportato",
   "error.backend_exited": "Il backend VPN si è chiuso inaspettatamente",
+  "error.gui_state_not_saved": "Impossibile salvare l'impostazione; vale finché non chiudi Galleria",
   "dialog.close": "Chiudi",
   "menu.label": "Menu",
   "menu.language": "Lingua",

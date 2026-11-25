@@ -206,7 +206,7 @@ modificabile senza demone (da B3).
   con la classificazione delle direttive della fase 1.
 - Stato nella testata: i sette stati di `State` più `detail` mappato su etichette tradotte, con il valore grezzo
   come ripiego (D22).
-- `state.toml` in `$XDG_STATE_HOME/galleria/` (D32): ultimo uso per profilo, dimensione e posizione della finestra,
+- `state.toml` in `$XDG_STATE_HOME/galleria/` (D32): ultimo uso per profilo, dimensione e «massimizzata» della finestra (Q34: la posizione non si salva),
   ordinamento scelto. Scritto dalla GUI, `0600`; se manca o non si legge si riparte dai valori predefiniti senza errore.
 
 ## 7. Import (D19, D31)
@@ -458,6 +458,16 @@ Numerazione che continua Q1–Q11 della spec della fase 1. Ognuna ha la mia racc
 | Q27 | Come arrivano a Orca gli esiti e i cambi di stato, visto che le regioni vive di WebKitGTK restano mute (spike `t_b81c3909`) | (1) segnale ATK `announcement`/`notification` dal lato Rust · (2) notifiche del desktop · (3) spostare il fuoco · (4) limite dichiarato · (5) altro `aria-live` | **Approvata** da Aitano il 2026-11-25 su delega di Peppe, come raccomanda lo spike: **(1)** per esiti non bloccanti e cambi di stato, *polite* di norma e *assertive* per gli errori; **(3)** per conferme ed errori che chiedono una risposta; **(4)** per tutto il resto; niente `aria-live` come unico canale, niente notifiche del desktop (§12.1) | B3-T2 |
 
 Le questioni da Q28 in poi stanno nel piano del blocco che le apre (B3: `docs/superpowers/plans/2026-11-25-fase2-b3-rubrica.md`).
+
+| # | Questione | Decisione | Serve entro |
+|---|---|---|---|
+| Q28 | Orca 46 su Ubuntu 24.04 desktop vero per il nome dei campi di testo | **Approvata (b)** da Aitano il 2026-11-25 su delega di Peppe: nella passata di B6, non una card ora | B6 |
+| Q29 | Dove sta il codice nuovo che legge e scrive i file della fase 1 | **Approvata (a)**: solo aggiunte in `galleria-profile`, nessuna firma esistente cambia | B3-T3 |
+| Q30 | Formato dei gruppi in `galleria.toml` | **Approvata (a)**: `groups = [...]`, appartenenza in `Profile.group` | B3-T3 |
+| Q31 | Contenuto del file di «Esporta» | **Approvata (a)**: file nativo con le chiavi, dopo una conferma, `0600`, scritto da Rust | B3-T8 |
+| Q32 | Severità dell'editor raw | **Approvata (a)**: OpenVPN si salva solo senza problemi, WireGuard in sola lettura | B3-T7 |
+| Q33 | Quando si scrive sul disco | **Approvata (a)**: «Salva/Annulla» per i campi di testo, subito per interruttori e stella | B3-T5 |
+| Q34 | Posizione della finestra in `state.toml` (§6) | **Approvata (a)**: si salvano solo dimensione e «massimizzata»; riduzione rispetto al §6 | B3-T1 |
 
 ## 19. Cosa non ho verificato
 

@@ -952,6 +952,9 @@ Non verificato:
 
 ## Questioni aperte nuove
 
+**Q28–Q34 approvate da Aitano il 2026-11-25 su delega di Peppe, tutte come raccomandate** (segnate nella spec, §18).
+Le righe sotto restano come motivazione.
+
 La numerazione continua Q12–Q27. Ognuna ha la mia raccomandazione, che vale come **predefinito per chi implementa**
 se nessuno decide prima del task indicato.
 

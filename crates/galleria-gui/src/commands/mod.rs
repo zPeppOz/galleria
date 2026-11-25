@@ -2,3 +2,4 @@
 
 pub mod app;
 pub mod daemon;
+pub mod ui_state;

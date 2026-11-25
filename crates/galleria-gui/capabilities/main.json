@@ -8,6 +8,8 @@
     "core:event:allow-unlisten",
     "allow-daemon-view",
     "allow-daemon-retry",
-    "allow-app-info"
+    "allow-app-info",
+    "allow-ui-state-get",
+    "allow-ui-state-set"
   ]
 }

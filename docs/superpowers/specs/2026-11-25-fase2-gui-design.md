@@ -396,7 +396,7 @@ Il numero dei task di B2–B6 resta la stima di `docs/07` §5; quello definitivo
 | B2 · Design system e guscio | 6 | token, componenti di base, disposizione lista + dettaglio, temi, cataloghi con la prova dei codici (D22), tastiera | B1 | G8, G12 | guscio navigabile con dati finti, nelle due lingue |
 | B3 · Rubrica e profili | 9 (piano scritto, in quattro gruppi) | lista, gruppi, ricerca, preferiti, ordinamento; schede secondo D26; editor raw; duplica, esporta, elimina; `state.toml` (D32) con lingua e tema (Q25); comando `announce` e primo uso di Q27 | B2 | G12 per la parte degli annunci | rubrica completa sui profili importati dalla CLI |
 | B4 · Import | 7 (piano scritto, in tre gruppi) | file, trascinamento, testo; anteprima con il testo di D19; associazione di `.ovpn` e istanza unica (D31) | B3 | G3 | si importa dalla GUI e si connette dalla CLI |
-| B5 · Connessione | 8 | archivio dei segreti (D25); connetti, disconnetti, sostituisci (D28); stati e statistiche; credenziali su `needs_input`; errori tradotti; Log con «Esporta log…» (D20); sessione estranea (D21) | B3 (B4 per il giro completo) | G4, G5, G6, G7, G9 | **uso quotidiano possibile** |
+| B5 · Connessione | 11 (piano scritto, in quattro gruppi) | archivio dei segreti (D25); connetti, disconnetti, sostituisci (D28); stati e statistiche; credenziali su `needs_input`; errori tradotti; Log con «Esporta log…» (D20); sessione estranea (D21) | B3 (B4 per il giro completo) | G4, G5, G6, G7, G9 | **uso quotidiano possibile** |
 | B6 · Tray, versione, chiusura | 6 | tray, chiusura nella tray, avviso di versione (D16), fumo completo, prove manuali, `docs/08-esito-fase2.md` | B5 | G10, G11, G13 | fase 2 chiusa |
 
 «Fase 1 in `main`»: oggi `main` e `origin/main` sono a `e4a2d71` e contengono i crate della fase 1 **[V: `git log
@@ -485,6 +485,10 @@ associazione dei `.ovpn`): testo e raccomandazione nel piano di B4,
 | Q39 | Riconoscimento del formato | **Approvata (a)**: `.ovpn` vale come OpenVPN; per `.conf` e per il testo incollato il formato si ricava dal contenuto |
 | Q40 | Più file insieme | **Approvata (a)**: un solo file per gesto |
 | Q41 | Associazione dei `.ovpn` | **Approvata (a)**: `bundle.fileAssociations` più un file `.desktop` nostro in `packaging/linux/`, tenuti uguali da una prova |
+
+Q42–Q47 (laboratorio di B5, annunci di stato dal lato Rust, crate per Secret Service, credenziali ricordate nella CLI e
+in `secret_refs`, password ricordata rifiutata): testo e raccomandazione nel piano di B5,
+`docs/superpowers/plans/2026-11-26-fase2-b5-connessione.md`. **Da decidere**: finché non lo sono vale la raccomandazione.
 
 ## 19. Cosa non ho verificato
 

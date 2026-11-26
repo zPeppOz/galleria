@@ -7,3 +7,4 @@ lab/pki/
 lab/out/
 crates/galleria-gui/gen/
 crates/galleria-gui/permissions/
+__pycache__/

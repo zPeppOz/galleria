@@ -50,8 +50,13 @@ PY
 }
 
 case ${1:-} in
-  run)
-    for unit in spike-app spike-daemon spike-orca; do stop_unit "$unit.service"; done
+  run|prep|open)
+    # prep: Orca, rubrica, demone finto, finestra (si ferma qui, così chi guida può rendere attivo il frame);
+    # open: stampa se il frame è `active`, poi apre le credenziali e stampa il parlato (Q49: apertura da frame già attivo);
+    # run: i due di fila, come prima.
+    if [[ $1 != open ]]; then
+    for unit in spike-app spike-daemon spike-orca daily-app; do stop_unit "$unit.service"; done
+    pkill -x galleria-gui 2>/dev/null
     pkill -x orca 2>/dev/null; sleep 1
     gsettings set org.gnome.desktop.interface toolkit-accessibility true
     rm -rf "$CFG" "$S/run"; mkdir -p "$CFG" "$S/run"
@@ -70,6 +75,9 @@ case ${1:-} in
     fi
     run --unit=spike-app -E GALLERIA_SOCKET="$S/run/galleriad.sock" -E XDG_CONFIG_HOME="$CFG" "${nokeyring[@]}" "$N/release/galleria-gui"
     sleep 6
+    fi
+    [[ $1 == prep ]] && exit 0
+    echo "frame active before opening: $(python3 "$S/atspi-dump.py" | awk -F'\t' '$2 == "frame" {print ($4 ~ /active/) ? "yes" : "NO"; exit}')"
     for round in 1; do
       before=$(grep -c 'SPEECH OUTPUT' "$LOG")
       # the profile that asks for credentials is «Datacenter Milano»: the row is selected first

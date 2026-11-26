@@ -37,7 +37,7 @@ install)
   rsync -a -e "ssh ${SSHO[*]} -p $port" "$labout/bin/galleria" "$labout/bin/galleriad" lab@127.0.0.1:spike/bin/
   rsync -a -e "ssh ${SSHO[*]} -p $port" "$repo/packaging/linux/" lab@127.0.0.1:spike/packaging-linux/
   rsync -a -e "ssh ${SSHO[*]} -p $port" "$repo/crates/galleria-gui/icons/128x128.png" lab@127.0.0.1:.local/share/icons/hicolor/128x128/apps/io.github.zpeppoz.galleria.png
-  for f in orca-line-buffered.py orca-spike-vm.sh orca-credentials-vm.sh atspi-announce.py gtk-announce.py gui-vm.sh; do
+  for f in orca-line-buffered.py orca-spike-vm.sh orca-credentials-vm.sh atspi-announce.py gtk-announce.py gui-vm.sh daily-vm.sh wg-peer-vm.sh keyring-create.py tray-icon-probe.sh; do
     [[ -f $here/$f ]] && rsync -a -e "ssh ${SSHO[*]} -p $port" "$here/$f" lab@127.0.0.1:spike/
   done
   rsync -a -e "ssh ${SSHO[*]} -p $port" "$repo/lab/tests/atspi-dump.py" lab@127.0.0.1:spike/

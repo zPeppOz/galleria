@@ -1,6 +1,8 @@
 
 ## Gruppo D — desktop veri (B6, T8–T10), giro parziale
 
+> **Completamento (card `t_a16d68aa`):** giro quotidiano, Q49 e S56 in [08-b6-giro-quotidiano.md](08-b6-giro-quotidiano.md). Solo Ubuntu 24.04 ha il giro intero; le altre due sono «non verificato».
+
 **Non è la chiusura di G10/G12 né della fase 2.** La card permette la consegna parziale a budget finito.
 T8 è stato eseguito; di T9/T10 sono scritte qui sia le prove sia le parti non fatte. I limiti del banco
 non diventano automaticamente limiti ammessi del prodotto. In particolare il menu Fedora è obbligatorio:

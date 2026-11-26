@@ -19,7 +19,7 @@ Solo i `.ovpn` sono associati all'app (`packaging/linux/io.github.zpeppoz.galler
 sono stati letti nel giro dal file di debug; l'apertura del dialogo credenziali e il primo campo User name
 sono invece rimasti muti in quel giro (apertura inizialmente inattiva su Wayland), pur avendo nome, ruolo
 e fuoco nell'albero AT-SPI. Con Tab è stato letto Password (non il valore). La causa del silenzio non è
-isolata dal fuoco del compositore: **la prova Q49 con apertura già attiva va ripetuta**; non è l'assenza
+isolata dal fuoco del compositore: **la prova Q49 con frame già attivo è stata ripetuta su 24.04 e il silenzio resta** (Orca 46.1 non sposta il fuoco logico sul campo): non è il fuoco del compositore, né l'assenza
 delle etichette. Nessun ascolto
 umano è stato eseguito. KWallet, portali in sandbox, doppio click/trascinamento Nautilus, sblocco del
 portachiavi in VM e l'intera passata della tray non sono verificati da questa consegna. Su Wayland il

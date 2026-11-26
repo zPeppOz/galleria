@@ -184,6 +184,9 @@ describe("closing the window and quitting (plan B6, T3)", () => {
     // no watcher: nobody shows a tray, so a window that is hidden could not come back (Q53)
     const b = await openApp();
     await waitForBody(b, CONNECTED, "the bar never showed the active link");
+    // the form of the chosen profile is mounted again about 25 ms after the bar says the link (the cause of the stale clicks of the screen reader checks of
+    // B5, docs/08, group B): a click on «Connect» in that window finds a button that is gone («stale element reference», 1 round of 3 in group C)
+    await new Promise((resolve) => setTimeout(resolve, 600));
     await b.$("button=Connect").click();
     await waitFor(b, async () => cli("status") === "connected", "the session never came up");
     requestClose();

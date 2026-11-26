@@ -6,8 +6,12 @@
 //! without the bus cannot come out green (and `scripts/check-gates.py` wants every name with `ok` in the log).
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 use galleria_ipc::Secret;
-use galleria_profile::{KeyringSecretStore, SecretStore, StoreError, keyring_present};
+use galleria_profile::{
+    FileSecretStore, KeyringSecretStore, LayeredSecretStore, SecretStore, StoreError, StoreKind,
+    Writes, keyring_present,
+};
 use std::{
+    os::unix::fs::PermissionsExt,
     process::Command,
     time::{Duration, Instant},
 };
@@ -269,6 +273,42 @@ fn keyring_absent_opens_as_none() {
         started.elapsed() < Duration::from_secs(5),
         "a bus without the service must answer quickly, took {:?}",
         started.elapsed()
+    );
+}
+
+#[test]
+#[ignore = "needs GNOME Keyring without a default collection: scripts/gui.sh keyring"]
+fn keyring_without_a_default_collection_is_no_keyring() {
+    must_be("nodefault");
+    // Ubuntu 26.04 with an automatic login: the Secret Service answers on the bus, but nothing was ever made to keep a secret in.
+    // The app must treat it as it treats a bus without the service (D25): the secrets go to the file, with the warning of the
+    // window, and the import is not stopped by «The keyring did not answer».
+    assert!(
+        !keyring_present(),
+        "a service with no default collection is not a keyring"
+    );
+    assert!(KeyringSecretStore::open().is_none());
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let layered = LayeredSecretStore::new(
+        KeyringSecretStore::open().map(|k| Box::new(k) as Box<dyn SecretStore>),
+        Box::new(FileSecretStore::open(dir.path()).unwrap()),
+        Writes::Keyring,
+    );
+    assert_eq!(
+        layered.kind(),
+        StoreKind::File,
+        "the warning is shown for this"
+    );
+    let id = Uuid::new_v4();
+    layered.set(&id, "k", &Secret::new("in the file")).unwrap();
+    assert_eq!(text(&layered, &id, "k").as_deref(), Some("in the file"));
+    assert!(
+        dir.path()
+            .join("secrets")
+            .join(format!("{id}.toml"))
+            .is_file(),
+        "the secret is in the file"
     );
 }
 

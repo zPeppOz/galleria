@@ -196,7 +196,7 @@ jobs:
       # The owner check of the single-instance socket against two real users (lab/tests/gui-socket-owner.sh). It counts its checks
       # and ends with an error if one was skipped, so it cannot be green without running.
       - run: scripts/gui.sh socket-owner
-      # GNOME Keyring unlocked, locked and absent: the keyring store and the CLI on it (lab/tests/gui-keyring.sh, plan B5, T2).
+      # GNOME Keyring unlocked, locked, absent and without a default collection: the keyring store and the CLI on it (lab/tests/gui-keyring.sh, plan B5, T2).
       # The tests are `#[ignore]` for `cargo test`, fail under the wrong case, and the check at the end wants each of them with
       # `ok` in the log: a round that ran nothing is red.
       - run: scripts/gui.sh keyring
@@ -204,4 +204,4 @@ jobs:
       # The cargo ones are the keyring (G5, G6, the three logs above); the vitest ones are the smoke test of this very job, which kept its results in
       # target/gates/smoke-vitest.json (plan B6, T6): G10a–G10f, the tray and the closing of the window, and G11a, the version check of the app built
       # as for a release. No `--kind`: until B6 this step looked at the cargo ones only, and the proofs of the smoke test could be skipped unseen.
-      - run: scripts/check-gates.py --job gui-smoke --vitest-json target/gates/smoke-vitest.json --cargo-log target/gates/keyring-unlocked.log --cargo-log target/gates/keyring-locked.log --cargo-log target/gates/keyring-absent.log
+      - run: scripts/check-gates.py --job gui-smoke --vitest-json target/gates/smoke-vitest.json --cargo-log target/gates/keyring-unlocked.log --cargo-log target/gates/keyring-locked.log --cargo-log target/gates/keyring-absent.log --cargo-log target/gates/keyring-nodefault.log

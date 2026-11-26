@@ -36,7 +36,7 @@ Prove in **`/mnt/b/vm/evidence/b6/daily/`** (`ubuntu24/`, più gli script `h.sh`
 | 6 | Credenziali nel portachiavi | **verificato per la chiave privata WG**; **limite** per utente/password | `11-keyring.txt`: elemento «Galleria: daily-office (wireguard.private_key)» nel portachiavi; nessuna chiave in `~/.config/galleria` (`secrets/` vuota, grep senza risultati). Un profilo WG non ha utente/password: il «Ricorda» di OpenVPN **non verificato** nel giro. Il portachiavi è stato creato **non cifrato** (password vuota) |
 | 7 | Riapertura | **verificato** | «Open Galleria» dalla tray (`13-reopened-tray.png`); uscita completa del processo e nuovo avvio dal menu applicazioni: profilo presente, Connect senza richieste, di nuovo connected (`15-relaunched.png`, `16-reconnected-state.txt`) |
 
-Ubuntu 26.04: **non verificato** (giro non eseguito per budget). Fedora 45: **non verificato** (giro non eseguito per budget; S56 sotto).
+Ubuntu 26.04 e Fedora 45: eseguiti nella card `t_6670f193`, vedi [08-b6-desktop-pass.md](08-b6-desktop-pass.md), «Giro quotidiano sulle tre VM» (qui sotto restano le celle di quella consegna).
 
 ### Trovato nel giro
 

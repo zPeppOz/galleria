@@ -1,7 +1,7 @@
 
 ## Gruppo D — desktop veri (B6, T8–T10), giro parziale
 
-> **Completamento (card `t_a16d68aa`):** giro quotidiano, Q49 e S56 in [08-b6-giro-quotidiano.md](08-b6-giro-quotidiano.md). Solo Ubuntu 24.04 ha il giro intero; le altre due sono «non verificato».
+> **Completamento (card `t_a16d68aa`):** giro quotidiano, Q49 e S56 in [08-b6-giro-quotidiano.md](08-b6-giro-quotidiano.md). Solo Ubuntu 24.04 aveva il giro intero. **Card `t_6670f193`: giro quotidiano fatto anche su Ubuntu 26.04 e Fedora 45** (tabella e S56 in fondo, «Giro quotidiano sulle tre VM»); T10 su 26.04 e Fedora resta «non verificato».
 
 **Non è la chiusura di G10/G12 né della fase 2.** La card permette la consegna parziale a budget finito.
 T8 è stato eseguito; di T9/T10 sono scritte qui sia le prove sia le parti non fatte. I limiti del banco
@@ -192,3 +192,60 @@ comando IPC: si marca la prima chiamata che la pagina fa già.
 - `cargo fmt --all --check` e `scripts/check-boundaries.sh`: verdi. Crate vietati, Cargo.lock, design e docs/00–07 non toccati.
 - Nessun nuovo `smoke`, `a11y` di container o CI in questo gruppo: non riciclare i numeri del C come eseguiti sul nuovo trace.
 - Fine banco: `final-vm-status.txt`, **ubuntu24/ubuntu/fedora stopped**. Dischi lasciati in `/mnt/b/vm/disks/`, nessuna immagine nel repo.
+
+## Giro quotidiano sulle tre VM (card `t_6670f193`): Fedora 45 e Ubuntu 26.04
+
+Stessa prova di `t_a16d68aa` (`lab/vm/daily-vm.sh`, server WireGuard vero in un namespace con `wg-peer-vm.sh`), sugli stessi binari del gruppo C
+(`bcb3f39`, hash in `/mnt/b/vm/evidence/b6/binaries-bcb3f39.sha256`; dopo `bcb3f39` il codice di prodotto cambia solo per la traccia di avvio
+opzionale `GALLERIA_STARTUP_TRACE`). Prove in **`/mnt/b/vm/evidence/b6/daily2/`** (`fedora/`, `ubuntu/` = 26.04; per 24.04 resta `daily/ubuntu24/`).
+Come prima: i pulsanti della finestra con l'azione AT-SPI `press` (su queste due il ruolo si chiama `button`, non `push button`), file chooser e menu della
+tray con la tastiera vera (`sendkey`), il puntatore VNC non consegna clic.
+
+| Passo | Ubuntu 24.04 | Ubuntu 26.04 (GNOME 50.1) | Fedora 45 (GNOME 51.1) |
+|---|---|---|---|
+| 1 Import | verificato | **limite** (F1): senza portachiavi predefinito «The keyring did not answer» (`ubuntu/06-F1-keyring-did-not-answer.png`); dopo aver creato il portachiavi (`keyring-create.py`, `06b`–`06e`) verificato (`06f-after-import2.png`) | **verificato** (`05c-preview.png`, `06b-unlock-empty.png`): qui il «Login» esiste ma è **bloccato**, GNOME chiede lo sblocco (`06-after-import.png`), con password vuota Import finisce e mostra «Imported “daily-office”» |
+| 2 Connetti dalla finestra | verificato | **verificato** (`ubuntu/07-connected-state.txt`: connected, handshake, ping 10.99.0.1 ok, `glr-wg0`) | **verificato** (`fedora/07-connected-state.txt`, stesso esito) |
+| 3 Chiudi nella tray | verificato | **verificato** (`08-closed.png`: finestra chiusa, pallino verde in barra; `08-closed-state.txt`) | **verificato**, ma con **F2** (`fedora/08-closed.png`: «…» al posto dell’anello) |
+| 4 Il tunnel resta su | verificato | **verificato** (`08-closed-state.txt`: connected, ping ok) | **verificato** (`08-closed-state.txt`) |
+| 5 Disconnetti dal menu della tray | verificato | **verificato** (`09-tray-menu.png`, `09b-sel.png`, `10-disconnected-state.txt`: disconnected, nessuna interfaccia, ping FAIL), con **F2** | **verificato** (`09-tray-menu.png`, `09b-sel.png`, `10-disconnected-state.txt`) |
+| 6 Credenziali nel portachiavi | verificato (chiave WG); **limite** utente/password | **verificato per la chiave WG** (`07-connected-state.txt`, elemento «Galleria: daily-office (wireguard.private_key)»); **limite**: password Ricorda di OpenVPN non verificata; portachiavi creato **non cifrato** | **verificato per la chiave WG** (stesso elemento nel «Login»); **limite**: Ricorda di OpenVPN non verificato |
+| 7 Riapertura | verificato | **verificato** il riavvio completo dal menu delle applicazioni (profilo presente, riconnessione ok: `16-relaunched.png`, `17-reconnected-state.txt`); «Open Galleria» dal menu della tray: **non verificato** (la sequenza di tasti è finita nella Panoramica) | **verificato** («Open Galleria» dalla tray `15-reopened-tray.png`; riavvio dal menu applicazioni e riconnessione `16-relaunched.png`, `17-reconnected-state.txt`) |
+| T10 (screen reader) | parziale (24.04) | **non verificato** (non si fa per VM, deciso) | **non verificato** (idem) |
+| Q49 | verificato come esito | **non verificato** | **non verificato** |
+
+Cautele: ogni passo è **un solo giro** per VM. Le VM erano rimaste con file a zero byte dopo lo spegnimento brusco dell’altra card (`keyring-create.py`,
+`galleria-gui` in `/usr/local/bin` sulla 26.04); ricopiati e controllati con l’hash prima del giro.
+
+### S56, menu della tray su Fedora: esito
+
+- **Il menu della tray funziona su Fedora 45**: si apre (`fedora/09-tray-menu.png`), con «Connected to «daily-office»», «Disconnect», «Open Galleria», «Quit (the VPN stays on)»,
+  si naviga con la tastiera e «Disconnect» e «Open Galleria» fanno ciò che dicono (passi 5 e 7). La libreria caricata è `libappindicator3.so.1` (`fedora/versions.txt`).
+- **Il timeout «Unable to connect to the Notification Watcher: Timeout was reached» non si è riprodotto** in nessuno dei 17 avvii di questo giro (3 dal menu, 14 con
+  `s56-repeat.sh`, alcuni con `SIGKILL` e pausa di 3 s: sempre registrato e con icona). Il tentativo di causarlo:
+  sessione bloccata (`s56-locked.txt`: nessun watcher, l’app parte **senza** icona, compaiono i due `Gtk-CRITICAL` identici a quelli di T9, e **l’icona si registra da sola allo sblocco**),
+  VT in secondo piano (`s56-vt.txt`: nessun effetto), `gnome-shell` fermato con `SIGSTOP` per 55 s (`s56-freeze.txt`: nessun avviso; l’icona si registra alla ripresa).
+- **Conclusione onesta: la causa del timeout non è stata trovata, ma nulla indica il nostro codice.** I due `Gtk-CRITICAL` compaiono quando l’estensione non c’è al momento dell’avvio
+  (sessione bloccata, greeter davanti, shell sotto carico come durante il provisioning di T9); in tutti i casi provati l’app si riprende da sola quando l’estensione torna. **Limite scritto
+  (ambiente)**: se all’avvio l’estensione AppIndicator non risponde (schermata bloccata, GNOME ancora in avvio) l’icona compare più tardi, non subito. Per riprovare:
+  `lab/vm/daily-vm.sh launch` e `journalctl -b | grep -i 'Notification Watcher'`; `s56-locked.sh`, `s56-freeze.sh`, `s56-repeat.sh` (in `daily2/`).
+
+### F2 — l’icona della tray resta «…»: causa trovata, è un corto circuito tra noi e l’estensione (riprodotto su 24.04, 26.04 e Fedora 45)
+
+Prova (`fedora/icon-watch.log`, `fedora/tray-icon-journal.txt`, `ubuntu/tray-icon-watch-and-journal.txt`; `icon-watch.py` annota i file dell’icona al millisecondo):
+a ogni cambio di stato l’app passa da `On` a `Busy` e subito allo stato finale (30–40 ms dopo: `tray-icon-galleria-4.png` esiste 37 ms, poi è
+cancellato e scritto `-5`). Il crate `tray-icon` cancella il PNG precedente prima di scrivere il successivo. L’estensione AppIndicator legge `-4` quando ormai
+non c’è più e registra «Impossible to read image info … Failed to recognize image format / unable to update icon» (stesso messaggio, stessi tempi, su
+`ubuntu-appindicators` e su `appindicatorsupport@rgcjonas`), **e non si riprende con l’icona `-5` che segue**: la barra resta con «…» finché non si riavvia l’app
+(riavviata: anello giusto, `16-relaunched.png`). Il file su disco e `IconName` erano già quelli giusti. È **nostro nel senso che lo provochiamo** (due cambi in ~40 ms); il difetto
+è anche dell’estensione, che non si riprende. **Non corretto in questa card** (fuori dai quattro punti): la correzione minima è non applicare l’icona `Busy`
+se lo stato finale arriva entro ~200–300 ms (raccogliere i cambi in `TauriSurface::show`, `crates/galleria-gui/src/tray_tauri.rs`) e rifare la prova con `icon-watch.py` + `journalctl`. Su 26.04
+il pallino verde compare ma dopo la disconnessione si vede «…» (`ubuntu/12-menu-disconnected.png`).
+
+### F1 anche su 26.04, F3 non confermata
+
+F1 (nessun portachiavi predefinito con accesso automatico senza password → «The keyring did not answer») si riproduce su **26.04**; su **Fedora** il «Login» esiste ma è bloccato e il
+prodotto aspetta lo sblocco (corretto). F3 (due separatori di fila): visto su Fedora a menu «disconnesso» in una fotografia (`13c-menu.png`), un solo separatore in un’altra (`14d.png`): non determinato.
+
+### Non verificato, riepilogo
+
+26.04: «Open Galleria» dalla tray; Ricorda di OpenVPN; Q49; T10. Fedora: Ricorda di OpenVPN; Q49; T10; il timeout S56 (non riprodotto). Matrice M1–M12: invariata (fuori giro quotidiano).

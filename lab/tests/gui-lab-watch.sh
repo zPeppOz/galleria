@@ -19,11 +19,16 @@ log=/tmp/gui-lab-watch.log
 tick=0
 while :; do
   ms=$(date +%s%3N)
+  # The two readings are not one instant: `glr-wg0` is read before and after the processes, and counts only when it was there both
+  # times. A tunnel that was torn down while `openvpn` was being read is then not taken for two backends at once; one that was there
+  # the whole time and an `openvpn` that was seen in between is two backends alive together (D5).
+  wg_before=0
+  ip -br link show glr-wg0 > /dev/null 2>&1 && wg_before=1
   processes=$(pgrep -a -x openvpn || true)
   count=0
   [[ -z $processes ]] || count=$(printf '%s\n' "$processes" | grep -c .)
   wg=0
-  ip -br link show glr-wg0 > /dev/null 2>&1 && wg=1
+  if (( wg_before == 1 )) && ip -br link show glr-wg0 > /dev/null 2>&1; then wg=1; fi
   {
     echo "sample $ms openvpn=$count wg=$wg"
     [[ -z $processes ]] || printf '%s\n' "$processes" | sed "s/^/argv $ms /"

@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { DaemonView } from "../daemon/types";
@@ -293,6 +293,233 @@ describe("keyboard on the whole shell", () => {
     await waitFor(() => expect(calls.filter((c) => c.cmd === "disconnect")).toHaveLength(1));
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
     expect(active()).not.toBe(document.body);
+  });
+
+  // ---- the connection (plan B5, T11) -------------------------------------------------------------------------------
+
+  const OFFICE = { id: "office", name: "Ufficio Napoli" };
+  const OUTSIDE = { id: "outside-id", name: "VPN Cliente" };
+  const sessionOf = (state: "connecting" | "needs_input" | "connected", profile = OFFICE, over: Partial<ReturnType<typeof makeStatus>> = {}) =>
+    makeView({ status: makeStatus({ state, session: 1, profile, protocol: "openvpn", local_addresses: ["10.9.0.2"], ...over }) });
+  const asking = (kind: "credentials" | "otp" | "key_passphrase" = "credentials") =>
+    sessionOf("needs_input", OFFICE, { input_request: { request: 0, kind, prompt: kind === "otp" ? "Enter OTP" : "Username and password", echo: false, expires_in_secs: 120 } });
+  type Sent = { cmd: string; args: Record<string, unknown> };
+  /** The service as the window sees it: `refuse` makes a connection over a session answer `already_active`; the log has one line. */
+  function serving(refuse: { current: "own" | "foreign" | null }, failing: { current: boolean } = { current: false }): Sent[] {
+    const sent: Sent[] = [];
+    mockIPC(
+      (cmd, args) => {
+        const given = (args ?? {}) as Record<string, unknown>;
+        sent.push({ cmd, args: given });
+        if (failing.current && cmd === "connect_profile") throw { code: "gui_daemon_unreachable", message: "The service does not answer", data: null };
+        if (cmd === "connect_profile" && given.replace === false && refuse.current) {
+          throw { code: "already_active", message: "A session is active", data: { foreign: refuse.current === "foreign", profile: refuse.current === "foreign" ? OUTSIDE : OFFICE } };
+        }
+        if (cmd === "logs_get") return { entries: [{ seq: 1, ts: "1795000000000", level: "info", source: "daemon", message: "tunnel is up" }], last: 1 };
+        return undefined;
+      },
+      { shouldMockEvents: true },
+    );
+    return sent;
+  }
+
+  it("a_full_connection_tour_needs_no_pointer", async () => {
+    // connect, the credentials with «Remember», the log and «Copy», disconnect, switch to another profile, and a session of someone else with its two questions
+    const refuse = { current: null as "own" | "foreign" | null };
+    const sent = serving(refuse);
+    const user = userEvent.setup();
+    const active = () => document.activeElement as HTMLElement;
+    const calls = (cmd: string) => sent.filter((c) => c.cmd === cmd);
+    const { show } = renderShell(makeView());
+
+    // Enter on the row connects; the state comes with the events and not with the answer
+    screen.getByRole("option", { name: /Ufficio Napoli/ }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(calls("connect_profile").map((c) => c.args)).toEqual([{ id: "office", replace: false }]));
+
+    // the service asks: the window of the credentials takes the focus on its first field, and the keyboard fills it
+    show(asking());
+    await screen.findByRole("dialog", { name: "Credentials for «Ufficio Napoli»" });
+    await waitFor(() => expect(nameOf(active())).toBe("User name"));
+    await user.keyboard("carla{Tab}secret{Tab}{ }");
+    expect(nameOf(active()), "«Remember» is where the third Tab leads").toBe("Remember in the keyring");
+    expect((active() as HTMLInputElement).checked).toBe(true);
+    await user.tab();
+    expect(nameOf(active())).toBe("Cancel");
+    await user.tab();
+    expect(nameOf(active())).toBe("Connect");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(calls("provide_input")).toHaveLength(1));
+    expect(calls("provide_input")[0].args).toMatchObject({ session: 1, request: 0, remember: true, values: { username: "carla", password: "secret" } });
+    show(sessionOf("connected"));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(active(), "after the window of the credentials").not.toBe(document.body);
+
+    // the tab «Log» with the keyboard, and «Copy»
+    screen.getByRole("tab", { name: "General" }).focus();
+    await user.keyboard("{End}{Enter}");
+    const log = await screen.findByRole("log");
+    await waitFor(() => expect(log.textContent).toContain("tunnel is up"));
+    screen.getByRole("button", { name: "Copy" }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(toastStatus().textContent).toContain("Log copied."));
+    expect(await navigator.clipboard.readText()).toContain("tunnel is up");
+    expect(active()).not.toBe(document.body);
+
+    // Enter on the row of the session that is up ends it
+    screen.getByRole("option", { name: /Ufficio Napoli/ }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(calls("disconnect")).toHaveLength(1));
+
+    // another profile of the rubrica replaces it without a question (D28): one call that is refused, and the second with `replace`
+    refuse.current = "own";
+    screen.getByRole("option", { name: /Homelab/ }).focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Homelab");
+    screen.getByRole("button", { name: "Connect" }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(calls("connect_profile").slice(1).map((c) => c.args)).toEqual([{ id: "homelab", replace: false }, { id: "homelab", replace: true }]));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+
+    // a session of someone else: connecting over it asks, Escape is «Cancel», and the second time «Replace» is the answer
+    show(sessionOf("connected", { id: "homelab", name: "Homelab" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Disconnect" })).toBeTruthy());
+    refuse.current = "foreign";
+    show(sessionOf("connected", OUTSIDE, { session: 7 }));
+    await screen.findByRole("group", { name: "Session started outside this rubrica" });
+    screen.getByRole("button", { name: "Connect" }).focus();
+    await user.keyboard("{Enter}");
+    await screen.findByRole("alertdialog", { name: "Replace «VPN Cliente»?" });
+    await waitFor(() => expect(nameOf(active())).toBe("Cancel"));
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(active(), "after Escape on the question").not.toBe(document.body);
+    const before = calls("connect_profile").length;
+    screen.getByRole("button", { name: "Connect" }).focus();
+    await user.keyboard("{Enter}");
+    await screen.findByRole("alertdialog", { name: "Replace «VPN Cliente»?" });
+    await waitFor(() => expect(nameOf(active())).toBe("Cancel"));
+    await user.tab();
+    expect(nameOf(active())).toBe("Replace");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(calls("connect_profile").slice(before).map((c) => c.args.replace)).toEqual([false, true]));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(active(), "after the replacement").not.toBe(document.body);
+  });
+
+  it("focus_is_never_lost_to_the_body_after_the_credentials_the_confirmations_and_an_error", async () => {
+    // B5: the window of the credentials sent, cancelled and expired; the questions about a session of someone else; an error of a command
+    const refuse = { current: null as "own" | "foreign" | null };
+    const failing = { current: false };
+    const sent = serving(refuse, failing);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const active = () => document.activeElement as HTMLElement;
+      const calls = (cmd: string) => sent.filter((c) => c.cmd === cmd);
+      const { show } = renderShell(makeView());
+      const row = () => screen.getByRole("option", { name: /Ufficio Napoli/ });
+      const placed = () => expect(active(), "where the focus is").not.toBe(document.body);
+
+      // sent
+      row().focus();
+      await user.keyboard("{Enter}");
+      show(asking());
+      await screen.findByRole("dialog");
+      await waitFor(() => expect(nameOf(active())).toBe("User name"));
+      await user.keyboard("carla{Tab}secret{Enter}");
+      await waitFor(() => expect(calls("provide_input")).toHaveLength(1));
+      show(sessionOf("connected"));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      placed();
+
+      // cancelled: «Cancel» is a disconnection and the focus is not lost
+      show(makeView());
+      show(asking("otp"));
+      await screen.findByRole("dialog", { name: "Code for «Ufficio Napoli»" });
+      await user.tab();
+      expect(nameOf(active())).toBe("Cancel");
+      await user.keyboard("{Enter}");
+      await waitFor(() => expect(calls("disconnect")).toHaveLength(1));
+      show(makeView());
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      placed();
+
+      // expired: the countdown reaches zero, the window goes and the state that follows says the rest
+      show(asking("key_passphrase"));
+      await screen.findByRole("dialog", { name: "Passphrase for «Ufficio Napoli»" });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(121_000);
+      });
+      show(sessionOf("connecting"));
+      show(makeView({ status: makeStatus({ state: "error", session: 1, profile: OFFICE, protocol: "openvpn", error: { code: "input_timeout", message: "No answer" } }) }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      placed();
+
+      // the questions about a session of someone else: Escape, and the answer
+      show(sessionOf("connected", OUTSIDE, { session: 7 }));
+      await screen.findByRole("group", { name: "Session started outside this rubrica" });
+      screen.getByRole("button", { name: "Disconnect «VPN Cliente»" }).focus();
+      await user.keyboard("{Enter}");
+      await screen.findByRole("alertdialog");
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      placed();
+      screen.getByRole("button", { name: "Disconnect «VPN Cliente»" }).focus();
+      await user.keyboard("{Enter}");
+      await screen.findByRole("alertdialog");
+      await user.tab();
+      await user.keyboard("{Enter}");
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      placed();
+
+      // an error of a command is in line, takes the focus, and a new attempt leaves it
+      show(makeView());
+      failing.current = true;
+      screen.getByRole("button", { name: "Connect" }).focus();
+      await user.keyboard("{Enter}");
+      const notice = await waitFor(() => {
+        const found = document.querySelector<HTMLElement>('[data-notice="command"]');
+        expect(found).not.toBeNull();
+        return found as HTMLElement;
+      });
+      await waitFor(() => expect(notice.contains(active()) || active() === notice).toBe(true));
+      failing.current = false;
+      screen.getByRole("button", { name: "Connect" }).focus();
+      await user.keyboard("{Enter}");
+      await waitFor(() => expect(document.querySelector('[data-notice="command"]')).toBeNull());
+      placed();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a_notice_of_the_connection_is_said_once_and_shown", async () => {
+    // B5 (Q27): «Log copied.» and the change of profile are notices of the page: said once and shown; an error of a command is not said, it takes the focus
+    const refuse = { current: "own" as "own" | "foreign" | null };
+    serving(refuse);
+    const user = userEvent.setup();
+    const announce = vi.fn();
+    const { show } = renderShell(sessionOf("connected"), { announce });
+    await screen.findByRole("option", { name: /Ufficio Napoli/ });
+    screen.getByRole("tab", { name: "General" }).focus();
+    await user.keyboard("{End}{Enter}");
+    await screen.findByRole("log");
+    screen.getByRole("button", { name: "Copy" }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(announce).toHaveBeenCalledWith("Log copied.", false));
+    expect(toastStatus().textContent).toContain("Log copied.");
+    // another profile over the session: the notice of what was left
+    screen.getByRole("option", { name: /Homelab/ }).focus();
+    await user.keyboard("{Enter}");
+    screen.getByRole("button", { name: "Connect" }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(announce).toHaveBeenCalledWith("Disconnected from «Ufficio Napoli»", false));
+    show(sessionOf("connected", { id: "homelab", name: "Homelab" }));
+    expect(announce.mock.calls.filter(([text]) => text === "Log copied.")).toHaveLength(1);
+    expect(announce.mock.calls.filter(([text]) => text === "Disconnected from «Ufficio Napoli»")).toHaveLength(1);
+    // the same notices are in the page, not only in the live region
+    expect(document.querySelector(".gx-toasts")?.textContent).toContain("Disconnected from «Ufficio Napoli»");
   });
 
   it("a_full_tour_needs_no_pointer", async () => {

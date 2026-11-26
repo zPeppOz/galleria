@@ -502,3 +502,128 @@ fn stderr_never_carries_connect_params() {
     assert!(!text.contains(seed::SECRET_MARK), "{text}");
     let _ = Secret::new("");
 }
+
+/// A window «Save» that always says the same place.
+struct SavesTo(std::path::PathBuf);
+
+impl galleria_gui::export::SavePicker for SavesTo {
+    fn pick(&self, _suggested_name: &str) -> Option<std::path::PathBuf> {
+        Some(self.0.clone())
+    }
+}
+
+#[test]
+fn no_command_returns_a_secret_after_a_full_round() {
+    // G7, the whole of B5: every command of the connection and every event, in a round that types the user, the password, a code and a
+    // passphrase, remembers, forgets, reads the log and exports it, with the keys of the seed in the profiles and repeated by a backend
+    // that cannot keep its mouth shut. Nothing the page can read, and nothing written for it, holds any of them.
+    const TYPED: [&str; 4] = [
+        "carla.v",
+        "PW-5f3a-typed",
+        "OTP-482913-typed",
+        "PASSPHRASE-7c1e-typed",
+    ];
+    let known: Vec<&str> = TYPED.iter().copied().chain([seed::SECRET_MARK]).collect();
+    let out = tempfile::tempdir().unwrap();
+    let mut answers: Vec<(String, String)> = vec![];
+    let mut events: Vec<(String, Value)> = vec![];
+    let mut exported = String::new();
+    // each scenario is a backend that asks (or leaks) differently; the round is the same
+    for (scenario, profile, input) in [
+        (
+            "credentials",
+            "Datacenter Milano",
+            Some(json!({ "username": TYPED[0], "password": TYPED[1] })),
+        ),
+        ("otp", "Datacenter Milano", Some(json!({ "otp": TYPED[2] }))),
+        (
+            "passphrase",
+            "Datacenter Milano",
+            Some(json!({ "key_passphrase": TYPED[3] })),
+        ),
+        ("leaky", "Homelab", None),
+    ] {
+        let target = out.path().join(format!("{scenario}.txt"));
+        let world = start(Options {
+            scenario,
+            picker: Some(Arc::new(SavesTo(target.clone()))),
+            ..Options::default()
+        });
+        let mut note = |what: &str, answer: Result<Value, Value>| {
+            answers.push((
+                format!("{scenario}: {what}"),
+                answer.unwrap_or_else(|e| e).to_string(),
+            ));
+        };
+        world.phrases();
+        note("connect_profile", world.connect(profile, false));
+        if let Some(values) = input {
+            world.until_state("needs_input", None);
+            let (session, request) = {
+                let events = world.events.lock().unwrap();
+                let state = events
+                    .iter()
+                    .rev()
+                    .find(|(name, value)| {
+                        name == "galleria:state" && value["state"] == "needs_input"
+                    })
+                    .map(|(_, value)| value.clone())
+                    .unwrap();
+                (
+                    state["session"].as_u64().unwrap(),
+                    state["input_request"]["request"].as_u64().unwrap(),
+                )
+            };
+            note(
+                "provide_input",
+                world.invoke("provide_input", json!({ "session": session, "request": request, "values": values, "remember": true })),
+            );
+        }
+        world.until_state("connected", None);
+        note(
+            "logs_get",
+            world.invoke("logs_get", json!({ "after": null, "limit": 1000 })),
+        );
+        note("logs_export", world.invoke("logs_export", json!({})));
+        note(
+            "secret_store_status",
+            world.invoke("secret_store_status", json!({})),
+        );
+        note(
+            "profile_get",
+            world.invoke("profile_get", json!({ "id": world.id(profile) })),
+        );
+        note(
+            "forget_credentials",
+            world.invoke("forget_credentials", json!({ "id": world.id(profile) })),
+        );
+        note("daemon_view", world.invoke("daemon_view", json!({})));
+        note("disconnect", world.invoke("disconnect", json!({})));
+        world.until_state("disconnected", None);
+        events.extend(world.events.lock().unwrap().iter().cloned());
+        exported.push_str(&fs::read_to_string(&target).unwrap());
+        world.stop();
+    }
+    // the round happened: the log was read and exported four times, with something in it, and the events include the states
+    assert!(answers.len() >= 30, "{} answers", answers.len());
+    assert!(
+        exported.contains("handshake with key [redatto] done"),
+        "the leaky backend's line is in the export, redacted: {exported}"
+    );
+    assert!(events.iter().any(|(name, _)| name == "galleria:state"));
+    for secret in known {
+        for (what, text) in &answers {
+            assert!(!text.contains(secret), "{what} returned `{secret}`: {text}");
+        }
+        for (name, value) in &events {
+            assert!(
+                !value.to_string().contains(secret),
+                "{name} carried `{secret}`: {value}"
+            );
+        }
+        assert!(
+            !exported.contains(secret),
+            "the exported log holds `{secret}`"
+        );
+    }
+}

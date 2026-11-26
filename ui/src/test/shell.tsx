@@ -110,9 +110,13 @@ function Harness({ view, options }: { view: DaemonView | null; options: Options 
   );
 }
 
-export const renderShell = (view: DaemonView | null = makeView(), options: Options = {}) =>
-  render(
+export const renderShell = (view: DaemonView | null = makeView(), options: Options = {}) => {
+  const tree = (current: DaemonView | null) => (
     <Preferences lang={options.lang ?? "en"}>
-      <Harness view={view} options={options} />
-    </Preferences>,
+      <Harness view={current} options={options} />
+    </Preferences>
   );
+  const result = render(tree(view));
+  // `show` is the service telling the window something new: the same window, another view
+  return { ...result, show: (next: DaemonView | null) => result.rerender(tree(next)) };
+};

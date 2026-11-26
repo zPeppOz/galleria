@@ -117,12 +117,12 @@ La rubrica in Tauri 2 + React sopra il demone della fase 1, in sei blocchi B1–
   - [x] associazione di `.ovpn` e istanza unica; QR WireGuard fuori dalla fase 2 (D31): `an_ovpn_is_opened_by_the_desktop_entry` (con `gio launch`), `a_second_launch_hands_the_file_to_the_first_window`, `tests/instance.rs`; non provati un file manager vero e Wayland
   - [x] ci si può fermare qui: si importa dalla GUI e si connette ancora dalla CLI (I1–I6 e G3 con la loro prova, i buchi sono in `docs/08-esito-fase2.md`, «B4 · chiusura»; il job `gui`, `gui-smoke` e `lab-g3` di CI non sono ancora girati su un runner, niente push)
 - [ ] B5 · Connessione
-  - [ ] archivio dei segreti con Secret Service e ripiego sul file `0600`, lettura da entrambi anche nella CLI (D25, G6; crate oggi [S])
-  - [ ] connetti, disconnetti e sostituisci senza conferma tra profili propri (D5, D28, G4); sette stati, `detail` e statistiche dal vivo
-  - [ ] credenziali, OTP e passphrase chiesti solo su `needs_input`; «Ricorda» mai per l'OTP (G5)
-  - [ ] errori tradotti, scheda Log con «Esporta log…» e nessun segreto (D20, G7)
-  - [ ] sessione estranea mostrata e chiusa solo con conferma (D21, G9)
-  - [ ] ci si può fermare qui: uso quotidiano possibile al posto della CLI
+  - [x] archivio dei segreti con Secret Service e ripiego sul file `0600`, lettura da entrambi anche nella CLI (D25, G6): `dbus-secret-service` 4.2.0 con `vendored` (Q44), provato contro GNOME Keyring vero sbloccato, bloccato e assente (`scripts/gui.sh keyring`, job `gui-smoke`); `G6a` e `G6b` nel laboratorio sul client 26; KWallet **non verificato** (docs/08 «Non verificato»)
+  - [x] connetti, disconnetti e sostituisci senza conferma tra profili propri (D5, D28, G4); sette stati, `detail` e statistiche dal vivo: `G4a`–`G4e` e `t18` sul client 26 contro il demone vero (`scripts/gui.sh lab-connect 26`, 20 prove su 20); su 27 e 79 le prove di OpenVPN aspettano il job `lab-connect` della CI (DCO negato da Docker rootless), mai girato su un runner
+  - [x] credenziali, OTP e passphrase chiesti solo su `needs_input`; «Ricorda» mai per l'OTP (G5): `G5a`–`G5e` sul client 26; «Ricorda» contro un portachiavi **bloccato** che chiede lo sblocco non provato
+  - [x] errori tradotti, scheda Log con «Esporta log…» e nessun segreto (D20, G7): `G7a`, `gui_session_left_no_secret_in_journal_or_argv`, `no_command_returns_a_secret_after_a_full_round`, export dalla finestra «Salva» vera con AT-SPI senza Orca
+  - [x] sessione estranea mostrata e chiusa solo con conferma (D21, G9): `G9a`–`G9c` con due utenti veri del gruppo (`alice` e `carla`, due ponti) sul client 26, e `gui_session_was_driven_by_two_users`
+  - [ ] ci si può fermare qui: uso quotidiano possibile al posto della CLI: in locale fumo 50/50, Orca 47/47 (ma con `K5c` Orca non dice niente all'apertura della finestra delle credenziali), `lab-connect 26` 20 prove su 20 (docs/08, «Tastiera, fumo, screen reader e chiusura del blocco (T11)»); **G4–G9 sui tre client aspettano il run di CI dopo il push**
 - [ ] B6 · Tray, versione, chiusura
   - [ ] tray con stato, preferiti, connetti e disconnetti; su Linux tutte le azioni nel menu, perché Tauri non emette i click sull'icona (G10)
   - [ ] chiudere la finestra lascia la connessione attiva; uscita esplicita dal menu

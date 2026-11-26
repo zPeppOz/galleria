@@ -318,3 +318,68 @@ describe("a session of someone else (plan B5, T8)", () => {
     await waitFor(b, async () => !(await b.$(GROUP).isExisting()), "the row stayed after the session ended");
   });
 });
+
+describe("the connection as a whole (plan B5, T11)", () => {
+  // Every `securitypolicyviolation` event from here on is kept; the test reads them at the end.
+  const watchCsp = (b: Browser) =>
+    b.execute(() => {
+      const w = window as unknown as { __csp: string[] };
+      w.__csp = [];
+      document.addEventListener("securitypolicyviolation", (e) => w.__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
+    });
+  const cspViolations = (b: Browser) => b.execute(() => (window as unknown as { __csp: string[] }).__csp);
+  const cliOf = (...args: string[]) => execFileSync(env("GALLERIA_SMOKE_CLI"), ["--socket", env("GALLERIA_SOCKET"), ...args], { encoding: "utf8", env: { ...process.env, XDG_CONFIG_HOME: env("XDG_CONFIG_HOME") } });
+
+  it("no_csp_violation_during_the_connection_tour", async () => {
+    // the credentials with «Remember», the log and «Copy», a replacement, a disconnection, and a session of someone else with its question
+    const b = await openWith("credentials");
+    await watchCsp(b);
+    await choose(b, "Datacenter Milano");
+    await b.$("button=Connect").click();
+    await waitFor(b, async () => (await b.$$('[role="dialog"]')).length === 1, "the window of the credentials never showed");
+    await b.$("#credentials-username").setValue("carla.v");
+    await b.$("#credentials-password").setValue("PW-smoke-9d41-typed");
+    await b.$('[role="dialog"] input[name="remember"]').click();
+    await b.$('[role="dialog"] button[type="submit"]').click();
+    await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the profile never connected");
+    await b.$("button=Log").click();
+    await waitFor(b, async () => (await b.$$(".log-line")).length > 0, "the tab «Log» never showed a line");
+    await b.$("button=Copy").click();
+    await waitForBody(b, "Log copied.", "the outcome of the copy was never said");
+    await b.$("button=Authentication").click();
+    await waitForBody(b, /credentials saved in the keyring/i, "the tab never said the credentials are saved");
+    await choose(b, "Homelab");
+    await b.$("button=Connect").click();
+    await waitForBody(b, "Disconnected from «Datacenter Milano»", "the notice of the replacement never showed");
+    await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the second profile never connected");
+    await b.$("button=Disconnect").click();
+    await waitFor(b, async () => (await barState(b)) === "Disconnected", "the bar never went back to «Disconnected»");
+    // a session of someone else: the fixed row, its question and the answer
+    const home = mkdtempSync(join(tmpdir(), "galleria-csp-"));
+    const file = join(home, "other.conf");
+    writeFileSync(file, "[Interface]\nPrivateKey = OTHER-RUBRICA-PRIVATE\nAddress = 10.7.0.2/32\n\n[Peer]\nPublicKey = U0VFRC1QVUJMSUMtdnBzLi4uLi4uLi4uLi4uLi4uLi4=\nEndpoint = other.example:51820\nAllowedIPs = 0.0.0.0/0\n");
+    const other = (...args: string[]) => execFileSync(env("GALLERIA_SMOKE_CLI"), ["--socket", env("GALLERIA_SOCKET"), ...args], { encoding: "utf8", env: { ...process.env, XDG_CONFIG_HOME: home } });
+    other("import", file, "--name", "Altra rubrica");
+    other("connect", "Altra rubrica");
+    const group = '[role="group"][aria-label="Session started outside this rubrica"]';
+    await waitFor(b, async () => await b.$(group).isExisting(), "the list never showed the fixed row of the session of someone else");
+    await b.$(`${group} button[aria-label^="Disconnect"]`).click();
+    await waitFor(b, async () => (await b.$$('[role="alertdialog"]')).length === 1, "the confirmation never showed");
+    await b.$('[role="alertdialog"]').$("button=Disconnect").click();
+    await waitFor(b, async () => other("status").trim() === "disconnected", "the session of someone else was never ended");
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
+  it("the_cli_sees_the_session_the_window_started", async () => {
+    const b = await openWith("plain");
+    await b.$("button=Connect").click();
+    await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the profile never connected");
+    // the same daemon, asked by the CLI of the phase 1: it is the session the window started, and the window's own
+    expect(cliOf("status").trim()).toBe("connected");
+    expect((JSON.parse(cliOf("status", "--json")) as { profile: { name: string } }).profile.name).toBe("Ufficio Napoli");
+    // and the other way: what the CLI does, the window follows
+    cliOf("disconnect");
+    await waitFor(b, async () => (await barState(b)) === "Disconnected", "the window never followed the disconnection made by the CLI");
+    expect(cliOf("status").trim()).toBe("disconnected");
+  });
+});

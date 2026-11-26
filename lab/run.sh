@@ -7,6 +7,19 @@ case "$client" in 26|27|79) ;; *) echo 'usage: lab/run.sh <26|27|79> [test-file-
 cleanup() {
   result=$?
   trap - EXIT INT TERM
+  # A red run keeps what the containers say before they are removed (Q48): the register of the watch and the journal of the daemon
+  # of the client, the logs of every `glab-*` container. Best effort: it never changes the result of the run.
+  if ((result != 0)) && [[ ${KEEP:-0} != 1 ]]; then
+    kept="target/lab-failures/$(date -u +%Y%m%dT%H%M%SZ)-$client"
+    if mkdir -p "$kept" 2>/dev/null; then
+      for container in $(docker ps -a --format '{{.Names}}' | awk '/^glab-/'); do
+        docker logs "$container" > "$kept/$container.log" 2>&1 || true
+      done
+      docker exec "glab-client$client" journalctl -u galleriad --no-pager -o short-precise > "$kept/galleriad.journal" 2>&1 || true
+      docker exec "glab-client$client" cat /tmp/gui-lab-watch.log > "$kept/gui-lab-watch.log" 2>&1 || true
+      echo "lab/run.sh: the run failed; the logs of the containers are kept in $kept" >&2
+    fi
+  fi
   if [[ ${KEEP:-0} != 1 ]]; then lab/down.sh || result=1; fi
   lab/check-wsl.sh || result=1
   exit "$result"

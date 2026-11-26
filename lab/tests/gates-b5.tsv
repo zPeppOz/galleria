@@ -26,6 +26,7 @@ G4	lab-connect	vitest	G4c_switching_profile_replaces_without_asking
 G4	lab-connect	vitest	G4d_disconnect_returns_to_disconnected
 G4	lab-connect	vitest	G4e_cancel_while_connecting_is_a_disconnect
 G4	lab-connect	cargo	gui_session_never_had_two_backends
+G4	lab-connect	cargo	the_observer_of_the_backends_leaves_out_only_the_probe_and_the_exiting
 G4	lab-connect	cargo	gui_session_left_no_residue
 G5	lab-connect	vitest	G5a_only_the_asked_field_is_shown
 G5	lab-connect	vitest	G5b_remember_saves_to_the_keyring_and_the_next_connection_does_not_ask

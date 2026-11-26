@@ -88,6 +88,21 @@ SHIM
   printf '#!/usr/bin/env bash\nexport GALLERIA_UPDATE_URL=$(cat "%s/update-url" 2>/dev/null || echo http://127.0.0.1:9/zPeppOz/galleria/releases/latest)\nexec "%s" "$@"\n' "$bin" "${GALLERIA_SMOKE_APP:-/nonexistent}" > "$bin/app-update"
   chmod +x "$bin/app-update"
 
+  # The app of the whole-day test (plan B6, T7): what it says on `stderr` and how it ends are kept in files, to be read when the day is over. The
+  # wrapper is not an `exec`: it waits for the app and writes its exit status, and passes on the signals it gets (the driver ends a session by
+  # killing what it started). A test that fails before the end kills the app by name (`pkill`), as `stopPrivateDriver` does.
+  cat > "$bin/app-day" <<SCRIPT
+#!/usr/bin/env bash
+"${GALLERIA_SMOKE_APP:-/nonexistent}" "\$@" 2>> "$tmp/day.stderr" &
+child=\$!
+trap 'kill -TERM "\$child" 2>/dev/null' TERM INT HUP
+wait "\$child"; status=\$?
+while kill -0 "\$child" 2>/dev/null; do wait "\$child"; status=\$?; done
+echo "\$status" > "$tmp/day.exit"
+exit "\$status"
+SCRIPT
+  chmod +x "$bin/app-day"
+
   # The tests start every run from a rubrica they know: this wipes the profiles and writes the seed again (`--empty`:
   # the store only). It writes inside $XDG_CONFIG_HOME of the run and refuses to run without it.
   cat > "$bin/rubrica-seed" <<SCRIPT
@@ -122,6 +137,7 @@ SCRIPT
   # The tray and the window seen from outside (plan B6): the probe that stands in for the desktop that shows the tray, and the one that
   # reads and closes the window like a window manager (ui/e2e/support.ts).
   export GALLERIA_SMOKE_APP_NO_INDICATOR=$bin/app-no-indicator GALLERIA_SMOKE_NO_INDICATOR_STDERR=$tmp/no-indicator.stderr GALLERIA_TRAY_PROBE=$repo/lab/tests/tray-probe.py GALLERIA_X11_WINDOW=$repo/lab/tests/x11-window.py
+  export GALLERIA_SMOKE_APP_DAY=$bin/app-day GALLERIA_SMOKE_DAY_STDERR=$tmp/day.stderr GALLERIA_SMOKE_DAY_EXIT=$tmp/day.exit
   export GALLERIA_SMOKE_APP_UPDATE=$bin/app-update GALLERIA_SMOKE_UPDATE_URL_FILE=$bin/update-url GALLERIA_UPDATE_SERVER=$repo/lab/tests/update-server.py
 }
 

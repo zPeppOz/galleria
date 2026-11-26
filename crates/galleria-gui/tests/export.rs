@@ -930,4 +930,15 @@ fn no_command_takes_a_path() {
     }
     assert_eq!(checked, commands.len());
     assert!(commands.contains(&"profile_export"), "the list was read");
+    // the six of B6 are in the list that was read, and so were looked at one by one (plan B6, T7): none takes a path, a file or a folder
+    for command in [
+        "tray_labels",
+        "window_show",
+        "unsaved_set",
+        "window_hide",
+        "app_quit",
+        "update_view",
+    ] {
+        assert!(commands.contains(&command), "{command} is not in COMMANDS");
+    }
 }

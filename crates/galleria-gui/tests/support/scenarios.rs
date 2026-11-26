@@ -20,6 +20,7 @@ pub const NAMES: &[&str] = &[
     "stuck",
     "chatty",
     "leaky",
+    "day",
 ];
 
 const TURNS: usize = 12;
@@ -130,6 +131,17 @@ fn leaky() -> Vec<FakeStep> {
     steps
 }
 
+/// The first connection of a day: asks for the user and the password, takes the answer and then gives a tunnel whose counters grow (the
+/// credentials of the first connection and the numbers that move, in the one session of the whole-day smoke test, plan B6, T7).
+fn asking_and_counting() -> Vec<FakeStep> {
+    let mut steps = vec![
+        ask(InputKind::Credentials, "Username and password", false),
+        FakeStep::WaitCommand,
+    ];
+    steps.extend(counting());
+    steps
+}
+
 /// The scripts of a scenario, one for each connection; `None` for a name that is not one.
 pub fn scenario(name: &str) -> Option<Vec<Vec<FakeStep>>> {
     let repeat = |make: &dyn Fn() -> Vec<FakeStep>| (0..TURNS).map(|_| make()).collect();
@@ -154,6 +166,12 @@ pub fn scenario(name: &str) -> Option<Vec<Vec<FakeStep>>> {
         "stuck" => repeat(&stuck),
         "chatty" => repeat(&chatty),
         "leaky" => repeat(&leaky),
+        // a whole day in one window: the first connection asks and counts, the next ones (their profile remembers) just connect
+        "day" => {
+            let mut scripts = vec![asking_and_counting()];
+            scripts.extend((0..TURNS).map(|_| plain()));
+            scripts
+        }
         _ => return None,
     })
 }

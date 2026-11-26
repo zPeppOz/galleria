@@ -25,3 +25,4 @@ G11	gui	cargo	update_disabled_asks_nothing
 G11	gui	cargo	update_asks_at_most_once_a_day
 G11	gui	cargo	update_never_follows_a_redirect
 G11	gui-smoke	vitest	G11a_the_built_app_asks_once_and_never_when_disabled
+G10	gui-smoke	vitest	the_whole_day_in_one_window

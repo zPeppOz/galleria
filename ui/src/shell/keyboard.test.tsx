@@ -6,6 +6,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { mockIPC } from "@tauri-apps/api/mocks";
+import { emit } from "@tauri-apps/api/event";
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -13,6 +14,7 @@ import type { DaemonView } from "../daemon/types";
 import type { ImportActions } from "../import/types";
 import type { CmdError, ProfilePatch, ProfileSummary } from "../rubrica/types";
 import { applyPatch, makeDetail, makePreview, makeStatus, makeSummary, makeView, SAMPLE_PROFILES } from "../test/fixtures";
+import { backend } from "../test/connection";
 import { renderShell } from "../test/shell";
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -1111,5 +1113,81 @@ describe("the notice of a newer version, with the keyboard only (plan B6, T5)", 
     expect(writes).toEqual([{ update_dismissed: "9.9.9" }]);
     await waitFor(() => expect(active()).not.toBe(document.body));
     expect(roleOf(active())).not.toBe("body");
+  });
+});
+
+describe("quit and the guard of a close, with the keyboard only (plan B6, T7)", () => {
+  /** The page as Rust sees it: the window of the test hears `galleria:close-blocked` the way the real one does, and `app_quit` answers `done`. */
+  function setup(answers: boolean[]) {
+    return backend((call) => (call.cmd === "app_quit" ? { done: answers.shift() ?? true } : undefined));
+  }
+  const dialog = () => screen.findByRole("alertdialog", { name: "Save your changes?" });
+
+  it("quit_and_the_guard_need_no_pointer", async () => {
+    // Rust stops the first quit (there are changes that are not saved) and lets the second through, after «Discard»
+    const calls = setup([false, false, true]);
+    const user = userEvent.setup();
+    show();
+    const name = screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement;
+    name.focus();
+    await user.keyboard("{End}x");
+    await waitFor(() => expect(name.value).toBe("Ufficio Napolix"));
+    const active = () => document.activeElement as HTMLElement;
+    const quits = () => calls.filter((c) => c.cmd === "app_quit").length;
+
+    // Ctrl+Q asks Rust, which says why it did not quit; the question opens, with the focus on the choice that does nothing
+    await user.keyboard("{Control>}q{/Control}");
+    await waitFor(() => expect(quits()).toBe(1));
+    await act(async () => emit("galleria:close-blocked", { intent: "quit" }));
+    const first = await dialog();
+    await waitFor(() => expect(active()).toBe(within(first).getByRole("button", { name: "Cancel" })));
+    // Escape gives up: the question goes, the draft is there, and the focus is on a stop of the page, not on the body
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(name.value).toBe("Ufficio Napolix");
+    await waitFor(() => expect(active()).not.toBe(document.body));
+    expect(quits()).toBe(1);
+
+    // again; now Tab goes to «Discard» and Enter does it: the bit goes down, then Rust is asked again, once
+    await user.keyboard("{Control>}q{/Control}");
+    await waitFor(() => expect(quits()).toBe(2));
+    await act(async () => emit("galleria:close-blocked", { intent: "quit" }));
+    const second = await dialog();
+    await waitFor(() => expect(active()).toBe(within(second).getByRole("button", { name: "Cancel" })));
+    await user.tab();
+    expect(nameOf(active())).toBe("Discard");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(quits()).toBe(3));
+    const order = calls.map((c) => (c.cmd === "unsaved_set" ? `unsaved_set:${String(c.args.dirty)}` : c.cmd)).filter((c) => c === "unsaved_set:false" || c === "app_quit");
+    expect(order.slice(-2), "the bit goes down, then Rust is asked to quit again").toEqual(["unsaved_set:false", "app_quit"]);
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  });
+
+  it("focus_is_never_lost_to_the_body_after_the_guard_of_a_close", async () => {
+    // a close of the window (the «X») that Rust stopped: «Cancel» by Escape, then the same again and «Discard» hides
+    const calls = backend((call) => (call.cmd === "window_hide" ? { done: true } : undefined));
+    const user = userEvent.setup();
+    show();
+    const name = screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement;
+    name.focus();
+    await user.keyboard("{End}x");
+    await waitFor(() => expect(name.value).toBe("Ufficio Napolix"));
+    const active = () => document.activeElement as HTMLElement;
+    await act(async () => emit("galleria:close-blocked", { intent: "hide" }));
+    await dialog();
+    await waitFor(() => expect(nameOf(active())).toBe("Cancel"));
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await waitFor(() => expect(active()).not.toBe(document.body));
+    await act(async () => emit("galleria:close-blocked", { intent: "hide" }));
+    const second = await dialog();
+    await waitFor(() => expect(active()).toBe(within(second).getByRole("button", { name: "Cancel" })));
+    await user.tab();
+    expect(nameOf(active())).toBe("Discard");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(calls.some((c) => c.cmd === "window_hide")).toBe(true));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    // the window is hidden in the tray and the page is still there: whatever has the focus, it is not nothing
+    expect(active()).not.toBe(document.body);
   });
 });

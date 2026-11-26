@@ -33,7 +33,7 @@ export const readState = (): string => (existsSync(stateFile()) ? readFileSync(s
  * app on purpose and keeps both. `rubrica: "empty"` starts from a store with no profile. `args` are the arguments of the
  * process, as a file manager gives them: a file to open (S30: `tauri-driver` hands `tauri:options.args` to the app).
  */
-export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "seeded", args: string[] = [], keyring: "system" | "none" | "no-indicator" | "update" = "system"): Promise<Browser> {
+export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "seeded", args: string[] = [], keyring: "system" | "none" | "no-indicator" | "update" | "day" = "system"): Promise<Browser> {
   if (!keepState) {
     rmSync(stateFile(), { force: true });
     seedRubrica(rubrica);
@@ -44,7 +44,7 @@ export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "
       hostname: "127.0.0.1",
       port,
       logLevel: "error",
-      capabilities: { "tauri:options": { application: env(keyring === "none" ? "GALLERIA_SMOKE_APP_NO_KEYRING" : keyring === "no-indicator" ? "GALLERIA_SMOKE_APP_NO_INDICATOR" : keyring === "update" ? "GALLERIA_SMOKE_APP_UPDATE" : "GALLERIA_SMOKE_APP"), ...(args.length > 0 ? { args } : {}) } } as WebdriverIO.Capabilities,
+      capabilities: { "tauri:options": { application: env(keyring === "none" ? "GALLERIA_SMOKE_APP_NO_KEYRING" : keyring === "no-indicator" ? "GALLERIA_SMOKE_APP_NO_INDICATOR" : keyring === "update" ? "GALLERIA_SMOKE_APP_UPDATE" : keyring === "day" ? "GALLERIA_SMOKE_APP_DAY" : "GALLERIA_SMOKE_APP"), ...(args.length > 0 ? { args } : {}) } } as WebdriverIO.Capabilities,
     });
   } catch (failure) {
     await stopPrivateDriver();

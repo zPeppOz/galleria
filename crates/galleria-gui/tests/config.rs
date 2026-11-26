@@ -476,3 +476,68 @@ fn every_vitest_proof_of_the_manifest_is_a_test_that_exists() {
     }
     assert!(seen > 0, "no vitest proof in the manifests");
 }
+
+/// The commands `generate_handler!` registers in `src/lib.rs`: the last name of each path.
+fn commands_in_the_handler() -> Vec<String> {
+    let text = std::fs::read_to_string(crate_file("src/lib.rs")).unwrap();
+    let after = text
+        .split("generate_handler![")
+        .nth(1)
+        .expect("src/lib.rs must register its commands with `generate_handler![...]`");
+    after
+        .split(']')
+        .next()
+        .unwrap()
+        .split(',')
+        .map(|path| {
+            path.trim()
+                .rsplit("::")
+                .next()
+                .unwrap_or_default()
+                .to_owned()
+        })
+        .filter(|name| !name.is_empty())
+        .collect()
+}
+
+#[test]
+fn the_commands_are_the_thirty_six_of_the_capability() {
+    // plan B6, T7: the thirty of B5 and the six of B6 (`tray_labels`, `window_show`, `unsaved_set`, `window_hide`, `app_quit`, `update_view`),
+    // and the three places that name them agree: the handler, the manifest of `build.rs` and the capability of the window
+    let mut handler = commands_in_the_handler();
+    let mut manifest = commands_in_build_rs();
+    let capability: Vec<String> = read_json("capabilities/main.json")["permissions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|p| p.as_str())
+        .filter_map(|p| p.strip_prefix("allow-"))
+        .map(|p| p.replace('-', "_"))
+        .collect();
+    let mut capability = capability;
+    for list in [&mut handler, &mut manifest, &mut capability] {
+        list.sort();
+    }
+    assert_eq!(handler.len(), 36, "the handler registers {handler:?}");
+    assert_eq!(
+        handler, manifest,
+        "`generate_handler!` and `COMMANDS` of build.rs differ"
+    );
+    assert_eq!(
+        manifest, capability,
+        "`COMMANDS` and `capabilities/main.json` differ"
+    );
+    for command in [
+        "tray_labels",
+        "window_show",
+        "unsaved_set",
+        "window_hide",
+        "app_quit",
+        "update_view",
+    ] {
+        assert!(
+            handler.iter().any(|name| name == command),
+            "{command} is not registered"
+        );
+    }
+}

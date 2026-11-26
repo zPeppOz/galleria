@@ -553,6 +553,7 @@ fn no_command_returns_a_secret_after_a_full_round() {
     let mut answers: Vec<(String, String)> = vec![];
     let mut events: Vec<(String, Value)> = vec![];
     let mut exported = String::new();
+    let mut blocked = vec![];
     // each scenario is a backend that asks (or leaks) differently; the round is the same
     for (scenario, profile, input) in [
         (
@@ -569,9 +570,12 @@ fn no_command_returns_a_secret_after_a_full_round() {
         ("leaky", "Homelab", None),
     ] {
         let target = out.path().join(format!("{scenario}.txt"));
+        // a window of the test: the six commands of B6 below hide it and end the app, and must not do it to the test
+        let window = TestWindow::new(false);
         let world = start(Options {
             scenario,
             picker: Some(Arc::new(SavesTo(target.clone()))),
+            window: Some(Arc::clone(&window) as Arc<dyn galleria_gui::window::WindowControl>),
             ..Options::default()
         });
         let mut note = |what: &str, answer: Result<Value, Value>| {
@@ -623,14 +627,59 @@ fn no_command_returns_a_secret_after_a_full_round() {
             world.invoke("forget_credentials", json!({ "id": world.id(profile) })),
         );
         note("daemon_view", world.invoke("daemon_view", json!({})));
+        // the six commands of B6 (plan B6, T7), with a session up and the secrets of the round in the daemon, the profile and the log: none
+        // answers with one, and the events of the round (the `galleria:update` of the version check among them) carry none either
+        // the texts of the tray are refused here (an empty one): a valid set would make a real indicator in a process with no screen, and
+        // `tray_labels` answers nothing either way; what is looked at is that the answer, the error included, holds nothing of the round
+        note(
+            "tray_labels",
+            world.invoke(
+                "tray_labels",
+                json!({ "labels": {
+                    "open": "", "quit": "Quit", "quit_connected": "Quit (the VPN stays on)",
+                    "connect": "Connect «{name}»", "disconnect": "Disconnect «{name}»", "connected": "Connected to «{name}»",
+                    "disconnected": "Disconnected", "connecting": "Connecting…", "unreachable": "Service not reachable",
+                }}),
+            ),
+        );
+        note("window_show", world.invoke("window_show", json!({})));
+        note("update_view", world.invoke("update_view", json!({})));
+        note(
+            "unsaved_set true",
+            world.invoke("unsaved_set", json!({ "dirty": true })),
+        );
+        note(
+            "window_hide blocked",
+            world.invoke("window_hide", json!({})),
+        );
+        note("app_quit blocked", world.invoke("app_quit", json!({})));
+        note(
+            "unsaved_set false",
+            world.invoke("unsaved_set", json!({ "dirty": false })),
+        );
+        note("window_hide", world.invoke("window_hide", json!({})));
+        note("app_quit", world.invoke("app_quit", json!({})));
         note("disconnect", world.invoke("disconnect", json!({})));
         world.until_state("disconnected", None);
         events.extend(world.events.lock().unwrap().iter().cloned());
+        blocked.extend(window.blocked());
         exported.push_str(&fs::read_to_string(&target).unwrap());
         world.stop();
     }
     // the round happened: the log was read and exported four times, with something in it, and the events include the states
-    assert!(answers.len() >= 30, "{} answers", answers.len());
+    assert!(answers.len() >= 70, "{} answers", answers.len());
+    // the commands of B6 ran: the blocked ones said so, and the page was told why
+    assert!(
+        answers
+            .iter()
+            .any(|(what, text)| what.ends_with("app_quit blocked")
+                && text.contains("\"done\":false")),
+        "a quit with unsaved changes was not stopped: {answers:?}"
+    );
+    assert!(
+        !blocked.is_empty(),
+        "the window was never told that a close was blocked"
+    );
     assert!(
         exported.contains("handshake with key [redatto] done"),
         "the leaky backend's line is in the export, redacted: {exported}"

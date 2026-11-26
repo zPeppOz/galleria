@@ -6,13 +6,13 @@
 //   GALLERIA_SMOKE_DRIVER_PORT  the port tauri-driver listens on
 // Nothing here asks the daemon to connect: no route, DNS or interface is touched.
 import { execFileSync, spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseColour, tintOver, toHex, type Rgb } from "../src/design/color";
-import { bodyText, closeApp, daemon, env, importFixtures, knownUpdateState, openApp, openAppWithState, readState, TEN_SECONDS, waitForBody, type Browser } from "./support";
+import { appRunning, bodyText, cell, closeApp, daemon, env, importFixtures, keyringLookup, knownUpdateState, openApp, openAppWithState, profileId, readState, requestClose, startTrayWatcher, stopTrayWatcher, TEN_SECONDS, trayClick, trayRegistered, trayTexts, until, waitFor, waitForBody, windowState, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 const DISCONNECTED = /Disconnected|Disconnesso/;
@@ -1085,4 +1085,174 @@ describe("the import against the CLI of the phase 1 (plan B4, T7)", () => {
     await waitForBody(b, "Only .ovpn and .conf files can be imported.", "the error of the file never showed");
     expect(await cspViolations(b)).toEqual([]);
   });
+});
+
+// ---- A whole day of use, in one window (plan B6, T7) ---------------------------------------------------------------------------------------
+// The pieces are proved one by one above and in the other files; this is the same app, started once, doing what a person does in a day, in the
+// order a person does it, so that what one step leaves behind meets the next one: no daemon, a daemon, a profile pasted as text, a connection that
+// asks for the credentials and remembers them, numbers that move, the log copied, the window closed into the tray, a replacement from the menu, a
+// second launch that brings the window back, a change that is not saved and the question that stops the close, and «Quit». The app is started
+// through `app-day`, which keeps its `stderr` and its exit status.
+describe("a whole day of use, in one window (plan B6, T7)", () => {
+  const watchCsp = (b: Browser) =>
+    b.execute(() => {
+      const w = window as unknown as { __csp: string[] };
+      w.__csp = [];
+      document.addEventListener("securitypolicyviolation", (e) => w.__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
+    });
+  const cspViolations = (b: Browser) => b.execute(() => (window as unknown as { __csp: string[] }).__csp);
+  const cli = (...args: string[]): string => execFileSync(env("GALLERIA_SMOKE_CLI"), ["--socket", env("GALLERIA_SOCKET"), ...args], { encoding: "utf8" }).trim();
+  const state = () => trayTexts()[0];
+  const dialogs = (b: Browser) => b.$$('[role="dialog"]');
+  const guard = (b: Browser) => b.$('[role="alertdialog"]');
+  // a WebDriver click waits for the page to answer, and a page that is hidden or gone never does: the button is clicked from the page (see tray.e2e.ts)
+  const pressGuard = (b: Browser, label: string) =>
+    b.execute((text) => [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find((button) => button.textContent?.trim() === text)?.click(), label);
+  async function typeAName(b: Browser, name: string): Promise<void> {
+    // the tab «Log» of step 6 is still the one that is open: the name is on «General»
+    await b.$("button=General").click();
+    await b.$('input[name="name"]').click();
+    await b.keys(["Control", "a"]);
+    await b.keys(Array.from(name));
+    await waitForBody(b, "You have changes that are not saved.", "the save bar never appeared");
+  }
+
+  afterEach(() => {
+    stopTrayWatcher();
+    // a day that failed half way leaves the app running (the wrapper is not the app): the next test must not find its lock
+    spawnSync("pkill", ["-KILL", "-x", "galleria-gui"]);
+  });
+
+  it("the_whole_day_in_one_window", async () => {
+    rmSync(env("GALLERIA_SMOKE_DAY_STDERR"), { force: true });
+    rmSync(env("GALLERIA_SMOKE_DAY_EXIT"), { force: true });
+    const files = importFixtures();
+
+    // 1 · the first start: no daemon, and the window says how to start it (D27); the tray is already there
+    daemon("stop");
+    await startTrayWatcher();
+    const b = await openApp(false, "seeded", [], "day");
+    await waitForBody(b, START_THE_SERVICE, "the «Start the service» panel never appeared");
+    await waitForBody(b, SYSTEMCTL, "the panel does not show the command");
+    expect(trayRegistered(), "the app never registered a tray").toBe(true);
+    await watchCsp(b);
+
+    // 2 · the daemon comes up and the window relinks by itself
+    daemon("start", "day");
+    await waitForBody(b, DISCONNECTED, "the window did not relink by itself");
+    await waitForBody(b, CONNECTED, "the bar never showed the active link");
+    await until(trayTexts, (texts) => texts[0] === "Disconnected", "the menu never said «Disconnected»");
+
+    // 3 · a profile pasted as text becomes a profile of the rubrica
+    await b.$("button=Import…").click();
+    const field = await b.$('textarea[name="import-text"]');
+    await field.waitForDisplayed({ timeout: TEN_SECONDS });
+    await b.execute(
+      (selector: string, value: string) => {
+        const el = document.querySelector(selector) as HTMLTextAreaElement;
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(el, value);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      },
+      'textarea[name="import-text"]',
+      readFileSync(files.inline, "utf8"),
+    );
+    await b.$("button=Preview").click();
+    await b.$('input[name="import-name"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    await b.$("button=Import").click();
+    await waitForBody(b, "Imported “Imported profile”.", "the notice of the import never showed");
+    await waitFor(b, async () => (await b.$("h1").getText()) === "Imported profile", "the detail never showed the new profile");
+    const id = profileId("Imported profile");
+
+    // 4 · the connection asks for the credentials, and «Remember» puts them in the keyring
+    await b.$("button=Connect").click();
+    await waitFor(b, async () => (await dialogs(b)).length === 1 && /Credentials for «Imported profile»/.test(await (await dialogs(b))[0].getText()), "the window of the credentials never showed");
+    await b.$("#credentials-username").setValue("carla.v");
+    await b.$("#credentials-password").setValue("PW-day-4f1c-typed");
+    await b.$('[role="dialog"] input[name="remember"]').click();
+    await b.$('[role="dialog"] button[type="submit"]').click();
+    await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the profile never connected");
+    await waitFor(b, async () => keyringLookup(id, "openvpn.password") === "PW-day-4f1c-typed", "the keyring never got the password");
+    expect(keyringLookup(id, "openvpn.username")).toBe("carla.v");
+    expect(cli("status")).toBe("connected");
+
+    // 5 · the numbers move
+    const traffic = async () => (await b.execute(() => document.querySelector('[data-cell="strip.traffic"] dd span')?.getAttribute("title") ?? "")) as string;
+    await waitFor(b, async () => (await traffic()) !== "", "the traffic never showed numbers");
+    const first = await traffic();
+    await waitFor(b, async () => {
+      const now = await traffic();
+      return now !== "" && now !== first;
+    }, `the traffic did not grow: it stayed at ${first}`);
+
+    // 6 · the log of the session, and «Copy»
+    await b.$("button=Log").click();
+    await waitFor(b, async () => (await b.$$(".log-line")).length > 0, "the tab «Log» never showed a line of the session");
+    await b.$("button=Copy").click();
+    await waitForBody(b, "Log copied.", "the outcome of the copy was never said");
+    const clipboard = () => {
+      try {
+        return execFileSync("xclip", ["-o", "-selection", "clipboard"], { encoding: "utf8" });
+      } catch {
+        return "";
+      }
+    };
+    await b.waitUntil(async () => /^\d+ Info Daemon: .*connect/m.test(clipboard()), { timeout: TEN_SECONDS, interval: 250, timeoutMsg: `the clipboard did not receive the log: ${clipboard()}` });
+
+    // 7 · the window is closed: it goes into the tray, the session stays, and the menu says whose it is
+    requestClose();
+    await until(windowState, (shown) => shown === "false", "the window was not hidden by the request to close it");
+    expect(appRunning()).toBe(true);
+    expect(cli("status")).toBe("connected");
+    await until(trayTexts, (texts) => texts[0] === "Connected to «Imported profile»" && texts.includes("Disconnect «Imported profile»"), "the menu never said the session of the imported profile");
+
+    // 8 · from the menu alone, a favourite takes its place, with nobody asked
+    trayClick("Connect «Homelab»");
+    await until(state, (text) => text === "Connected to «Homelab»", "the menu never said the replacement", 20_000);
+    expect((JSON.parse(cli("status", "--json")) as { profile: { name: string } }).profile.name).toBe("Homelab");
+    expect(windowState(), "a replacement that asks nothing does not bring the window back").toBe("false");
+
+    // 9 · a second launch brings the window back, with the page as it was
+    const second = spawnSync(env("GALLERIA_SMOKE_APP"), [], { encoding: "utf8", timeout: 5000 });
+    expect(second.status, `the second launch ended with ${second.status}: ${second.stderr}`).toBe(0);
+    await until(windowState, (shown) => shown === "true", "the second launch did not show the hidden window");
+    expect(await b.$("h1").getText()).toBe("Imported profile");
+    expect(await b.$$('[role="alertdialog"]')).toHaveLength(0);
+
+    // 10 · a change that is not saved stops the close: «Cancel» keeps it all, «Discard» hides the window without the change
+    await typeAName(b, "Sede Day");
+    requestClose();
+    await waitFor(b, async () => guard(b).isExisting(), "the question of the changes never showed after the close");
+    expect(windowState()).toBe("true");
+    await guard(b).$("button=Cancel").click();
+    await waitFor(b, async () => !(await guard(b).isExisting()), "the question stayed after «Cancel»");
+    expect(await b.$('input[name="name"]').getValue()).toBe("Sede Day");
+    requestClose();
+    await waitFor(b, async () => guard(b).isExisting(), "the question never showed the second time");
+    await pressGuard(b, "Discard");
+    await until(windowState, (shown) => shown === "false", "«Discard» did not hide the window");
+    expect(profileId("Imported profile"), "the file of the profile is the one of the import").toBe(id);
+
+    // 11 · «Quit» from the menu with a change that is not saved: the question comes in a window that is shown, and «Discard» ends the app
+    trayClick("Open Galleria");
+    await until(windowState, (shown) => shown === "true", "«Open Galleria» did not show the window");
+    await waitFor(b, async () => (await b.$('input[name="name"]').getValue()) === "Imported profile", "the discarded name came back");
+    await typeAName(b, "Sede Day");
+    trayClick("Quit (the VPN stays on)");
+    await waitFor(b, async () => guard(b).isExisting(), "the question never showed after «Quit»");
+    expect(appRunning()).toBe(true);
+    // what the page held until now: nothing was refused by the policy of the window, in any of the steps
+    expect(await cspViolations(b)).toEqual([]);
+    // the app ends while this call is being answered: a session that is deleted under it is the expected answer
+    await pressGuard(b, "Discard").catch(() => undefined);
+    await until(appRunning, (running) => !running, "«Discard» and the quit did not end the app", 10_000);
+
+    // the end of the day: the process ended by itself with 0, the session is the one of the menu and is still up, and nothing panicked
+    await until(() => (existsSync(env("GALLERIA_SMOKE_DAY_EXIT")) ? readFileSync(env("GALLERIA_SMOKE_DAY_EXIT"), "utf8").trim() : ""), (text) => text !== "", "the wrapper left no exit status", 10_000);
+    expect(readFileSync(env("GALLERIA_SMOKE_DAY_EXIT"), "utf8").trim(), "the exit status of the app").toBe("0");
+    expect(cli("status")).toBe("connected");
+    expect((JSON.parse(cli("status", "--json")) as { profile: { name: string } }).profile.name).toBe("Homelab");
+    const stderr = existsSync(env("GALLERIA_SMOKE_DAY_STDERR")) ? readFileSync(env("GALLERIA_SMOKE_DAY_STDERR"), "utf8") : "";
+    expect(stderr, "the app panicked").not.toMatch(/panicked/i);
+    expect(stderr, "what the app said on stderr must hold none of what was typed").not.toContain("PW-day-4f1c-typed");
+  }, 240_000);
 });

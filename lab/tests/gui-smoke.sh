@@ -33,6 +33,7 @@ fi
 # namespaces; the window only loads our own ui/dist, so the sandbox is switched off for the test only. The DMA-BUF
 # renderer needs a GPU that Xvfb does not have.
 export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 WEBKIT_DISABLE_DMABUF_RENDERER=1
+gui_start_keyring
 gui_start_driver
 
 cd "$GALLERIA_SMOKE_REPO"

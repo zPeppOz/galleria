@@ -683,7 +683,7 @@ describe("the import in the real window", () => {
     await waitFor(b, async () => (await rowNames(b)).length === 5, "the list never showed the five profiles");
     await pasteFile(b, files.inline);
     const shown = await bodyText(b);
-    expect(shown).toContain("Found: private key, TLS encryption key. They will be saved in the secrets archive.");
+    expect(shown).toContain("Found: private key, TLS encryption key. They will be saved in the system keyring.");
     expect(shown, "the secrets are named and never shown").not.toContain("SEED-SECRET-");
     await b.$("button=Import").click();
     await waitForBody(b, "Imported “Imported profile”.", "the notice of the import never showed");
@@ -693,10 +693,47 @@ describe("the import in the real window", () => {
     const profiles = readdirSync(join(configDir(), "profiles")).map((name) => readFileSync(join(configDir(), "profiles", name), "utf8"));
     expect(profiles).toHaveLength(6);
     expect(profiles.filter((text) => text.includes('name = "Imported profile"'))).toHaveLength(1);
-    expect(readdirSync(join(configDir(), "secrets"))).toHaveLength(6);
+    // the keys went to the keyring: the folder of the secrets holds only the five of the seed
+    expect(readdirSync(join(configDir(), "secrets"))).toHaveLength(5);
     // and the CLI of the phase 1 lists it
     expect(runCli("list")).toContain("Imported profile");
     expect(await cspViolations(b)).toEqual([]);
+  });
+
+  it("an_imported_profile_lands_in_the_keyring", async () => {
+    const files = importFixtures();
+    const b = await openShell();
+    await waitFor(b, async () => (await rowNames(b)).length === 5, "the list never showed the five profiles");
+    await pasteFile(b, files.inline);
+    await b.$("button=Import").click();
+    await waitForBody(b, "Imported “Imported profile”.", "the notice of the import never showed");
+    // the profile is on the disk, and its keys are in the keyring, read back the way another program would
+    const dir = join(configDir(), "profiles");
+    const file = readdirSync(dir).find((name) => readFileSync(join(dir, name), "utf8").includes('name = "Imported profile"'));
+    expect(file, "the file of the imported profile").toBeTruthy();
+    const id = file!.replace(/\.toml$/, "");
+    const found = spawnSync("secret-tool", ["search", "--all", "service", "galleria", "profile", id], { encoding: "utf8" });
+    const text = `${found.stdout}${found.stderr}`;
+    expect(text, "the keys of the profile are in the keyring").toContain("attribute.key = openvpn.block.key");
+    expect(text).toContain("attribute.key = openvpn.block.tls-crypt");
+    expect(text).toContain("label = Galleria: Imported profile (openvpn.block.key)");
+    // and not in a file: the folder of the secrets still holds the five of the seed
+    expect(readdirSync(join(configDir(), "secrets"))).toHaveLength(5);
+    expect(readdirSync(join(configDir(), "secrets"))).not.toContain(file);
+  });
+
+  it("without_a_keyring_the_window_says_so_and_writes_the_file", async () => {
+    const files = importFixtures();
+    const b = await openApp(false, "seeded", [], "none");
+    await waitForBody(b, "No system keyring: the keys are saved in a file only you can read.", "the notice of the fallback never showed");
+    await waitFor(b, async () => (await rowNames(b)).length === 5, "the list never showed the five profiles");
+    await pasteFile(b, files.inline);
+    expect(await bodyText(b)).toContain("They will be saved in a file only you can read.");
+    await b.$("button=Import").click();
+    await waitForBody(b, "Imported “Imported profile”.", "the notice of the import never showed");
+    // the notice is still there, and the keys are in the file
+    expect(await bodyText(b)).toContain("No system keyring: the keys are saved in a file only you can read.");
+    expect(readdirSync(join(configDir(), "secrets"))).toHaveLength(6);
   });
 
   it("nothing_is_written_before_import", async () => {
@@ -928,7 +965,8 @@ describe("the import against the CLI of the phase 1 (plan B4, T7)", () => {
     daemon("stop");
     const files = importFixtures();
     // the window: one file as an argument of the process, two as second launches
-    const b = await openApp(false, "empty", [files.inline]);
+    // opened as a session without a keyring, so that the window writes the file the CLI writes and the two can be compared
+    const b = await openApp(false, "empty", [files.inline], "none");
     await waitForBody(b, "File: inline.ovpn", "the preview of inline.ovpn never showed");
     await importIt(b, "inline");
     secondLaunch(files.separate);
@@ -987,7 +1025,7 @@ describe("the import against the CLI of the phase 1 (plan B4, T7)", () => {
     const saved = readdirSync(dir).map((name) => readFileSync(join(dir, name), "utf8"));
     expect(saved).toHaveLength(1);
     expect(saved[0]).toContain('name = "Offline"');
-    expect(readdirSync(join(configDir(), "secrets"))).toHaveLength(1);
+    expect(readdirSync(join(configDir(), "secrets"))).toHaveLength(0);
   });
 
   it("no_csp_violation_during_the_import_tour", async () => {

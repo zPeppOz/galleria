@@ -51,6 +51,7 @@ for _ in $(seq 1 100); do
   sleep 0.1
 done
 
+gui_start_keyring
 gui_start_driver
 # gui_start_driver replaced the EXIT trap; run both.
 trap 'collect; kill "$driver_pid" 2>/dev/null || true; wait "$driver_pid" 2>/dev/null || true' EXIT

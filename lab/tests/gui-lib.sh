@@ -55,6 +55,12 @@ exit 0
 SCRIPT
   chmod +x "$bin/daemon-start" "$bin/daemon-stop"
 
+  # The app as a session without a keyring sees it: the session bus it is given is not there, so `keyring_present()` says no and
+  # the window falls back to the file. The tests that compare the files of the window with the ones of the CLI, and the one that
+  # looks for the notice of the fallback, open the app through it (`openApp(..., "none")`).
+  printf '#!/usr/bin/env bash\nexport DBUS_SESSION_BUS_ADDRESS=unix:path=%s/no-bus\nexec "%s" "$@"\n' "$tmp" "${GALLERIA_SMOKE_APP:-/nonexistent}" > "$bin/app-no-keyring"
+  chmod +x "$bin/app-no-keyring"
+
   # The tests start every run from a rubrica they know: this wipes the profiles and writes the seed again (`--empty`:
   # the store only). It writes inside $XDG_CONFIG_HOME of the run and refuses to run without it.
   cat > "$bin/rubrica-seed" <<SCRIPT
@@ -85,7 +91,20 @@ SCRIPT
   }
   trap gui_cleanup EXIT
 
-  export GALLERIA_SOCKET=$tmp/galleriad.sock GALLERIA_SMOKE_BIN=$bin GALLERIA_SMOKE_REPO=$repo
+  export GALLERIA_SOCKET=$tmp/galleriad.sock GALLERIA_SMOKE_BIN=$bin GALLERIA_SMOKE_REPO=$repo GALLERIA_SMOKE_APP_NO_KEYRING=$bin/app-no-keyring
+}
+
+# A keyring of the run's own for the window (plan B5, T3). GNOME Keyring is installed in the image and starts by itself on the
+# session bus, but a keyring nobody has created asks for a password in a window on the virtual screen the first time a secret
+# is written, and the test would wait for it. So the run starts one unlocked (a throw-away password, its data in the run's
+# temporary folder, gone with it), as lab/tests/gui-keyring.sh does. Call it from the inner half, under the private bus.
+# GALLERIA_SMOKE_KEYRING=absent leaves the keyring out (the window then falls back to the file).
+gui_start_keyring() {
+  [[ ${GALLERIA_SMOKE_KEYRING:-unlocked} == absent ]] && return 0
+  export XDG_DATA_HOME=$XDG_RUNTIME_DIR/keyring-data
+  mkdir -m 700 -p "$XDG_DATA_HOME"
+  printf '%s' galleria-test-keyring | gnome-keyring-daemon --unlock --components=secrets > /dev/null 2>&1 \
+    || { echo "gui_start_keyring: GNOME Keyring did not start" >&2; exit 1; }
 }
 
 gui_start_driver() {

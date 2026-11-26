@@ -96,7 +96,7 @@ describe("the window «Open» of the import under a screen reader", () => {
     // the preview is the second step: the file name, the secrets by name, and nothing written yet
     await waitForBody(b, "File: separate.ovpn", "the preview of the file never showed");
     const preview = await bodyText(b);
-    expect(preview).toContain("Found: private key, TLS encryption key. They will be saved in the secrets archive.");
+    expect(preview).toContain("Found: private key, TLS encryption key. They will be saved in the system keyring.");
     expect(preview, "the folder of the file is not in the page").not.toContain(folder);
     expect(preview, "the secrets are named and never shown").not.toContain("SEED-SECRET-");
     expect(readdirSync(join(configDir(), "profiles")).length, "nothing is written before «Import»").toBe(profilesBefore);
@@ -120,7 +120,8 @@ describe("the window «Open» of the import under a screen reader", () => {
     const saved = profiles.map((name) => join(configDir(), "profiles", name)).find((path) => readFileSync(path, "utf8").includes('name = "separate"'));
     expect(saved, "the profile «separate» is on the disk").toBeTruthy();
     expect(statSync(saved as string).mode & 0o777).toBe(0o600);
-    expect(secrets()).toBe(secretsBefore + 1);
+    // the keys went to the keyring of the run, not to a file
+    expect(secrets()).toBe(secretsBefore);
     // the page never learned the folder, and the new profile is the one chosen, with the focus on its row
     expect(await bodyText(b)).not.toContain(folder);
     expect(findNode(tree, "list item", "separate"), "the profile is in the list").toBeTruthy();

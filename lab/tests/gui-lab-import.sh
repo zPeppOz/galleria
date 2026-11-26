@@ -37,6 +37,8 @@ fi
 
 # Inner half: runs under the private bus and Xvfb.
 export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 WEBKIT_DISABLE_DMABUF_RENDERER=1
+# G3: the profiles go to the file, which the client of the laboratory reads: the window runs as a session without a keyring.
+export GALLERIA_SMOKE_APP=$GALLERIA_SMOKE_APP_NO_KEYRING
 gui_start_driver
 
 cd "$GALLERIA_SMOKE_REPO"

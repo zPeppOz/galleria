@@ -6,6 +6,7 @@ pub mod announce;
 #[cfg(target_os = "linux")]
 pub mod announce_atk;
 pub mod calls;
+pub mod closing;
 pub mod commands;
 pub mod edit;
 pub mod error;
@@ -24,11 +25,13 @@ pub mod rubrica;
 pub mod session;
 pub mod supervisor;
 pub mod tray;
+pub mod tray_host;
 pub mod tray_tauri;
 pub mod ui_state;
 pub mod window;
 
 use announce::Announcer;
+use closing::Closing;
 use commands::app::AppInfo;
 use export::SavePicker;
 use import::Imports;
@@ -66,6 +69,7 @@ pub fn configure_with<R: Runtime>(
         .manage(Arc::clone(&state))
         .on_window_event(move |window, event| {
             window::on_event(&saver, window, event);
+            window::on_close_requested(window, event);
             events::on_drag_drop(window, event);
         })
         .invoke_handler(tauri::generate_handler![
@@ -100,7 +104,10 @@ pub fn configure_with<R: Runtime>(
             commands::logs::logs_get,
             commands::logs::logs_export,
             commands::tray::tray_labels,
-            commands::window::window_show
+            commands::window::window_show,
+            commands::window::unsaved_set,
+            commands::window::window_hide,
+            commands::window::app_quit
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.
@@ -127,11 +134,16 @@ pub fn configure_with<R: Runtime>(
                 let tray = Arc::clone(&tray);
                 move |rubrica| tray.set_favourites(tray_tauri::favourites_of(rubrica))
             });
-            app.manage(tray);
-            // What the commands of the window ask of it (show it): in the state before any page can call them.
+            app.manage(Arc::clone(&tray));
+            // What the commands of the window ask of it (show it, hide it, end the app): in the state before any page can call them.
             app.manage::<Arc<dyn window::WindowControl>>(Arc::new(window::TauriWindow(
                 app.handle().clone(),
             )));
+            // The closing (plan B6, T3): the bit of the page about unsaved changes, and what «the tray is shown» means: there is one of ours,
+            // and the bus says someone draws it, now (Q53).
+            app.manage(Arc::new(Closing::new(move || {
+                tray.available() && tray_host::tray_is_shown()
+            })));
             let sink = std::sync::Arc::new(events::TauriSink(app.handle().clone()));
             let handle = supervisor::spawn(
                 socket.clone(),

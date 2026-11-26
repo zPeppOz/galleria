@@ -1,7 +1,10 @@
 //! The size of the window (Q34): saved when it closes and half a second after the last resize, applied before the
 //! window is shown. The position is not saved: a Wayland client cannot choose it.
 
-use crate::ui_state::{UiStateFile, WindowSize};
+use crate::{
+    closing::{Closing, Intent},
+    ui_state::{UiStateFile, WindowSize},
+};
 use std::{
     sync::{
         Arc,
@@ -103,6 +106,28 @@ pub fn raise<R: Runtime>(app: &tauri::AppHandle<R>) {
     }
 }
 
+/// The request to close the main window (the «X», `Alt+F4`, a window manager): it is always refused, and what is done instead is the decision
+/// of [`Closing`] (plan B6, T3, Q35): hide the window when the tray is shown, end the app when it is not, stop when there are changes that are not saved.
+/// It comes after the size has been saved (`on_event`), and it does not wait for the page.
+pub fn on_close_requested<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
+    use tauri::Manager;
+    if window.label() != "main" {
+        return;
+    }
+    let WindowEvent::CloseRequested { api, .. } = event else {
+        return;
+    };
+    let app = window.app_handle();
+    let (Some(closing), Some(control)) = (
+        app.try_state::<Arc<Closing>>(),
+        app.try_state::<Arc<dyn WindowControl>>(),
+    ) else {
+        return;
+    };
+    api.prevent_close();
+    closing.request(&**control, Intent::Hide);
+}
+
 /// What the commands and the events of the window need of it, without a type of the runtime (a command that is generic over the runtime does
 /// not do for the check that no command takes a path, which reads the signatures; and the tests of level 2 cannot see a window that is hidden
 /// in the mock runtime): the app puts one in its state, like the announcer and the pickers.
@@ -111,8 +136,13 @@ pub trait WindowControl: Send + Sync {
     fn show(&self);
     /// The main window is not shown (it is in the tray).
     fn is_hidden(&self) -> bool;
-    /// Ends the app (`AppHandle::exit`). The daemon keeps the session: it is not the app's.
+    /// Ends the app (`AppHandle::exit`): the only place that does. The daemon keeps the session, it is not the app's.
     fn quit(&self);
+    /// Hides the main window (it stays in the tray).
+    fn hide(&self);
+    /// The changes that are not saved stopped a close or a quit: the window is shown and the page is told what was asked for, to ask the
+    /// person (Q35, P8).
+    fn blocked(&self, intent: Intent);
 }
 
 /// Shows the main window when it is hidden (in the tray) and leaves a window that is shown alone: no focus is taken from whoever has it. A question of
@@ -132,6 +162,25 @@ impl<R: Runtime> WindowControl for TauriWindow<R> {
 
     fn quit(&self) {
         self.0.exit(0);
+    }
+
+    fn hide(&self) {
+        use tauri::Manager;
+        if let Some(main) = self.0.get_webview_window("main") {
+            let _ = main.hide();
+        }
+    }
+
+    fn blocked(&self, intent: Intent) {
+        use tauri::Emitter;
+        raise(&self.0);
+        let payload = crate::events::CloseBlocked { intent };
+        if let Err(e) = self.0.emit(crate::events::EV_CLOSE_BLOCKED, payload) {
+            eprintln!(
+                "galleria-gui: cannot emit {}: {e}",
+                crate::events::EV_CLOSE_BLOCKED
+            );
+        }
     }
 
     fn is_hidden(&self) -> bool {

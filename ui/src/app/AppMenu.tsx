@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useConnection, isLive } from "../connection/store";
 import type { AppInfo } from "../daemon/types";
 import { Menu, type MenuEntry } from "../design/Menu";
 import { useToast } from "../design/Toast";
@@ -6,13 +7,26 @@ import type { ThemeChoice } from "../design/theme";
 import { errorText, useT } from "../i18n";
 import { usePrefs, type LangChoice } from "../prefs";
 import { AboutDialog } from "./AboutDialog";
+import { quitApp } from "./closing";
 
-/** The menu of the title bar: language, theme, and «About Galleria». Language and theme are kept by the preferences. */
+/** The menu of the title bar: language, theme, «Quit» and «About Galleria». Language and theme are kept by the preferences. `Ctrl+Q` quits as «Quit» does. */
 export function AppMenu(props: { info: AppInfo | null; daemonVersion: string | null }) {
   const t = useT();
   const prefs = usePrefs();
   const toast = useToast();
+  const connection = useConnection();
   const [aboutOpen, setAboutOpen] = useState(false);
+  // `Ctrl+Q` is the same request as the entry of the menu: Rust decides (changes that are not saved stop it and the window asks, Q35).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === "q") {
+        event.preventDefault();
+        quitApp();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
   // The choice applies at once; if it cannot be written the user is told it lasts only until the window closes.
   const saved = (write: Promise<void>) => {
     write.catch((error: unknown) => {
@@ -46,6 +60,8 @@ export function AppMenu(props: { info: AppInfo | null; daemonVersion: string | n
       onChange: (value) => saved(prefs.setTheme(value as ThemeChoice)),
     },
     { kind: "separator" },
+    // The session belongs to the service: quitting leaves it up, and the entry says so while there is one (Q54).
+    { kind: "item", id: "quit", label: isLive(connection.status) ? t("tray.quit_connected") : t("tray.quit"), onSelect: quitApp },
     { kind: "item", id: "about", label: t("menu.about"), onSelect: () => setAboutOpen(true) },
   ];
   return (

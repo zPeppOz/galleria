@@ -5,7 +5,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
-import { choose, closeApp, daemon, env, openApp, startTrayWatcher, stopTrayWatcher, trayClick, trayIcon, trayRegistered, trayTexts, until, waitFor, waitForBody, type Browser } from "./support";
+import { choose, closeApp, daemon, env, openApp, startTrayWatcher, stopTrayWatcher, appRunning, requestClose, trayClick, trayIcon, trayRegistered, trayTexts, until, waitFor, waitForBody, windowState, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 
@@ -101,5 +101,39 @@ describe("connecting and disconnecting from the menu of the tray (plan B6, T2)",
     expect((JSON.parse(cli("status", "--json")) as { profile: { name: string } }).profile.name).toBe("Homelab");
     expect(await b.$$('[role="dialog"], [role="alertdialog"]')).toHaveLength(0);
     expect(trayTexts()).toEqual(["Connected to «Homelab»", "Disconnect «Homelab»", "Connect «Ufficio Napoli»", "Open Galleria", "Quit (the VPN stays on)"]);
+  });
+});
+
+describe("closing the window and quitting (plan B6, T3)", () => {
+  it("G10c_closing_the_window_hides_it_and_the_session_stays", async () => {
+    await openWithTray("plain");
+    trayClick("Connect «Ufficio Napoli»");
+    await until(state, (text) => text === "Connected to «Ufficio Napoli»", "the session never came up");
+    expect(await until(windowState, (shown) => shown === "true", "the window is not shown")).toBe("true");
+    // what a window manager would send when the «X» is pressed
+    requestClose();
+    await until(windowState, (shown) => shown === "false", "the window was not hidden by the request to close it");
+    expect(appRunning()).toBe(true);
+    expect(cli("status")).toBe("connected");
+    expect(trayTexts()[0]).toBe("Connected to «Ufficio Napoli»");
+    // G10d: «Open» brings it back, with the page as it was; «Quit» ends the app and the session stays
+    trayClick("Open Galleria");
+    await until(windowState, (shown) => shown === "true", "«Open Galleria» did not show the window");
+    trayClick("Quit (the VPN stays on)");
+    await until(appRunning, (running) => !running, "«Quit» did not end the app", 5000);
+    expect(cli("status")).toBe("connected");
+  });
+
+  it("G10e_without_a_tray_host_closing_quits_and_the_session_stays", async () => {
+    daemon("stop");
+    daemon("start", "plain");
+    // no watcher: nobody shows a tray, so a window that is hidden could not come back (Q53)
+    const b = await openApp();
+    await waitForBody(b, CONNECTED, "the bar never showed the active link");
+    await b.$("button=Connect").click();
+    await waitFor(b, async () => cli("status") === "connected", "the session never came up");
+    requestClose();
+    await until(appRunning, (running) => !running, "the close did not end the app", 5000);
+    expect(cli("status")).toBe("connected");
   });
 });

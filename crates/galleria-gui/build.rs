@@ -33,6 +33,9 @@ const COMMANDS: &[&str] = &[
     "logs_export",
     "tray_labels",
     "window_show",
+    "unsaved_set",
+    "window_hide",
+    "app_quit",
 ];
 
 fn main() {

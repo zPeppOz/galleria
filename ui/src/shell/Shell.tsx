@@ -3,6 +3,7 @@ import type { SortOrder } from "../app/uiState";
 import type { AppInfo, DaemonView } from "../daemon/types";
 import { Button } from "../design/Button";
 import { ConfirmDialog } from "../design/ConfirmDialog";
+import { carryOut, useCloseBlocked, type CloseIntent } from "../app/closing";
 import { useTrayActions } from "../app/tray";
 import { ConnectionProvider } from "../connection/ConnectionProvider";
 import { CredentialsDialog } from "../connection/CredentialsDialog";
@@ -95,6 +96,13 @@ function ShellBody(props: ShellProps) {
   // The form of the chosen profile says whether it has edits that are not saved; the list asks before it moves away.
   const guard = useRef<Guard | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);
+  // A close or a quit that Rust stopped because of changes that are not saved: the same question as for leaving a profile (Q35).
+  const [closing, setClosing] = useState<CloseIntent | null>(null);
+  useCloseBlocked((intent) => {
+    if (guard.current?.dirty) setClosing(intent);
+    // nothing left to save (the bit was late): the same request, and Rust decides again
+    else void carryOut(intent);
+  });
   const [managing, setManaging] = useState(false);
   // The detail shows the session of someone else instead of the chosen profile (D21); it goes back to the profile when the session is gone.
   const [foreignChosen, setForeignChosen] = useState(false);
@@ -163,6 +171,20 @@ function ShellBody(props: ShellProps) {
       // The save was refused: the dialog gave the focus back to the list, and the field with the error takes it again.
       setTimeout(() => guard.current?.focusError(), 0);
     }
+  };
+  // The answer to the same question when it came from a close or a quit: «Save» that worked and «Discard» carry out what was asked, «Cancel» does nothing, and a
+  // save that failed leaves the window where it is, with the error of the form.
+  const finishClosing = async (how: "save" | "discard") => {
+    const intent = closing;
+    setClosing(null);
+    if (intent === null) return;
+    if (how === "discard") {
+      guard.current?.discard();
+    } else if (!(await guard.current?.save())) {
+      setTimeout(() => guard.current?.focusError(), 0);
+      return;
+    }
+    await carryOut(intent);
   };
 
   /**
@@ -270,16 +292,17 @@ function ShellBody(props: ShellProps) {
           </div>
         ) : null}
         <ConfirmDialog
-          open={leaving !== null}
+          open={leaving !== null || closing !== null}
           title={t("leave.title")}
           body={t("leave.body", { name: selected?.name ?? "" })}
           confirmLabel={t("leave.save")}
           alternateLabel={t("leave.discard")}
           cancelLabel={t("leave.cancel")}
-          onConfirm={() => void leave("save")}
-          onAlternate={() => void leave("discard")}
+          onConfirm={() => void (closing !== null ? finishClosing("save") : leave("save"))}
+          onAlternate={() => void (closing !== null ? finishClosing("discard") : leave("discard"))}
           onCancel={() => {
             setLeaving(null);
+            setClosing(null);
             setImported(null);
           }}
         />

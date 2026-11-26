@@ -67,6 +67,8 @@ pub struct Options {
     pub picker: Option<Arc<dyn SavePicker>>,
     /// The window of the test: one that records what is asked of it (the mock runtime cannot tell a window that is hidden).
     pub window: Option<Arc<dyn WindowControl>>,
+    /// The closing of the test (the app makes its own, whose tray is never shown in a mock app: no bus).
+    pub closing: Option<Arc<galleria_gui::closing::Closing>>,
 }
 
 impl Default for Options {
@@ -77,6 +79,7 @@ impl Default for Options {
             secrets: None,
             picker: None,
             window: None,
+            closing: None,
         }
     }
 }
@@ -105,6 +108,9 @@ pub fn start(options: Options) -> World {
         .manage(announcer);
     if let Some(picker) = options.picker {
         builder = builder.manage(picker);
+    }
+    if let Some(closing) = options.closing {
+        builder = builder.manage(closing);
     }
     if let Some(window) = options.window {
         builder = builder.manage(window);
@@ -278,4 +284,70 @@ impl World {
 
 pub fn code(error: &Value) -> &str {
     error["code"].as_str().unwrap()
+}
+
+/// A window that says whether it is hidden and counts what it was asked: to show, to hide, to end the app, and the intents that were blocked
+/// by changes that are not saved. The mock runtime cannot tell a window that is hidden and has no way out, so the tests of the tray and of the
+/// closing give the app this one (`Options::window`).
+pub struct TestWindow {
+    pub hidden: std::sync::atomic::AtomicBool,
+    pub shown: std::sync::atomic::AtomicUsize,
+    pub hides: std::sync::atomic::AtomicUsize,
+    pub quit: std::sync::atomic::AtomicUsize,
+    pub blocked: Mutex<Vec<galleria_gui::closing::Intent>>,
+}
+
+impl TestWindow {
+    pub fn new(hidden: bool) -> Arc<Self> {
+        Arc::new(Self {
+            hidden: std::sync::atomic::AtomicBool::new(hidden),
+            shown: std::sync::atomic::AtomicUsize::new(0),
+            hides: std::sync::atomic::AtomicUsize::new(0),
+            quit: std::sync::atomic::AtomicUsize::new(0),
+            blocked: Mutex::new(vec![]),
+        })
+    }
+
+    pub fn shown(&self) -> usize {
+        self.shown.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    pub fn hides(&self) -> usize {
+        self.hides.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    pub fn quits(&self) -> usize {
+        self.quit.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    pub fn blocked(&self) -> Vec<galleria_gui::closing::Intent> {
+        self.blocked.lock().unwrap().clone()
+    }
+}
+
+impl WindowControl for TestWindow {
+    fn show(&self) {
+        self.shown.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.hidden
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn is_hidden(&self) -> bool {
+        self.hidden.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn quit(&self) {
+        self.quit.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn hide(&self) {
+        self.hides.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.hidden.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn blocked(&self, intent: galleria_gui::closing::Intent) {
+        self.blocked.lock().unwrap().push(intent);
+        self.hidden
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+    }
 }

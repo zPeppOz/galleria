@@ -5,6 +5,7 @@
 //! start without a tray (Q53, point 2 of the review) with one line on `stderr`.
 
 use crate::{
+    closing::{Closing, Intent},
     tray::{Factory, Surface, Tray, TrayAction, TrayEntry, TrayIcon as Icon, literal},
     window::{self, WindowControl},
 };
@@ -180,10 +181,15 @@ pub fn run_action<R: Runtime>(app: &AppHandle<R>, action: &TrayAction) {
             Some(window) => window.show(),
             None => window::raise(app),
         },
-        TrayAction::Quit => match app.try_state::<Arc<dyn WindowControl>>() {
-            Some(window) => window.quit(),
-            None => app.exit(0),
-        },
+        TrayAction::Quit => {
+            // the same decision as the window: with changes that are not saved the window is shown and the page asks
+            if let (Some(closing), Some(window)) = (
+                app.try_state::<Arc<Closing>>(),
+                app.try_state::<Arc<dyn WindowControl>>(),
+            ) {
+                closing.request(&**window, Intent::Quit);
+            }
+        }
         TrayAction::Connect(id) => emit_action(app, &ActionPayload::Connect { id: *id }),
         TrayAction::Disconnect => emit_action(app, &ActionPayload::Disconnect),
     }

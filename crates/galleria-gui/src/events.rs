@@ -122,3 +122,12 @@ pub fn on_drag_drop<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
         _ => {}
     }
 }
+
+/// A close or a quit was stopped by changes that are not saved (plan B6, T3, P8): the window is shown, and the page opens the question
+/// «Save · Discard · Cancel» and, after «Save» that worked or «Discard», asks again for what the intent says.
+pub const EV_CLOSE_BLOCKED: &str = "galleria:close-blocked";
+
+#[derive(serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CloseBlocked {
+    pub intent: crate::closing::Intent,
+}

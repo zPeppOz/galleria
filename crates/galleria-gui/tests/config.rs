@@ -41,6 +41,9 @@ const ALLOWED: &[&str] = &[
     "allow-logs-export",
     "allow-tray-labels",
     "allow-window-show",
+    "allow-unsaved-set",
+    "allow-window-hide",
+    "allow-app-quit",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

@@ -21,13 +21,12 @@ use galleria_ipc::{ProfileRef, State, Status};
 use rstest::rstest;
 use serde_json::{Value, json};
 use std::{
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 use tauri::Listener;
 use uuid::Uuid;
-use world::{Options, World, start};
+use world::{Options, TestWindow, World, start};
 
 fn labels() -> TrayLabels {
     TrayLabels {
@@ -481,42 +480,6 @@ fn a_click_on_connect_reaches_the_page_as_an_action_with_the_id() {
     assert!(world.daemon().harness.connects.lock().unwrap().is_empty());
 }
 
-/// A window that says whether it is hidden and counts how many times it was asked to show and to quit.
-struct TestWindow {
-    hidden: AtomicBool,
-    shown: AtomicUsize,
-    quit: AtomicUsize,
-}
-
-impl TestWindow {
-    fn new(hidden: bool) -> Arc<Self> {
-        Arc::new(Self {
-            hidden: AtomicBool::new(hidden),
-            shown: AtomicUsize::new(0),
-            quit: AtomicUsize::new(0),
-        })
-    }
-
-    fn shown(&self) -> usize {
-        self.shown.load(Ordering::SeqCst)
-    }
-}
-
-impl WindowControl for TestWindow {
-    fn show(&self) {
-        self.shown.fetch_add(1, Ordering::SeqCst);
-        self.hidden.store(false, Ordering::SeqCst);
-    }
-
-    fn is_hidden(&self) -> bool {
-        self.hidden.load(Ordering::SeqCst)
-    }
-
-    fn quit(&self) {
-        self.quit.fetch_add(1, Ordering::SeqCst);
-    }
-}
-
 fn start_with(window: &Arc<TestWindow>, scenario: &'static str) -> World {
     let control: Arc<dyn WindowControl> = Arc::clone(window) as Arc<dyn WindowControl>;
     start(Options {
@@ -534,11 +497,7 @@ fn open_and_quit_never_reach_the_page() {
     run_action(world.app(), &TrayAction::Open);
     assert_eq!(window.shown(), 1, "«Open» shows the window");
     run_action(world.app(), &TrayAction::Quit);
-    assert_eq!(
-        window.quit.load(Ordering::SeqCst),
-        1,
-        "«Quit» asks to end the app"
-    );
+    assert_eq!(window.quits(), 1, "«Quit» asks to end the app");
     std::thread::sleep(Duration::from_millis(150));
     assert!(
         heard.lock().unwrap().is_empty(),

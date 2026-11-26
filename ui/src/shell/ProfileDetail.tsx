@@ -1,3 +1,4 @@
+import { useReportUnsaved } from "../app/closing";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { Button } from "../design/Button";
 import { CommandNotice } from "../connection/CommandNotice";
@@ -122,6 +123,8 @@ function Form({ detail, groups, update, validateRaw, reload, guard, menu }: Pick
   // One write at a time: a second one would carry a time of modification that the first has just made stale.
   const writing = useRef(false);
   const dirty = isDirty(draft, base);
+  // Rust decides a close and a quit on this bit (Q35): the page keeps it up to date.
+  useReportUnsaved(dirty);
   const latest = useRef({ base, dirty });
   latest.current = { base, dirty };
 

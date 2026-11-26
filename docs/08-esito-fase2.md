@@ -1426,7 +1426,7 @@ Piano: `docs/superpowers/plans/2026-11-26-fase2-b5-connessione.md`. Q42–Q47 ap
 
 Prove nuove: `a_full_connection_tour_needs_no_pointer`, `focus_is_never_lost_to_the_body_after_the_credentials_the_confirmations_and_an_error`, `a_notice_of_the_connection_is_said_once_and_shown` (`keyboard.test.tsx`, jsdom); `no_command_returns_a_secret_after_a_full_round` (`tests/connection.rs`); `no_csp_violation_during_the_connection_tour` e `the_cli_sees_the_session_the_window_started` (fumo, `connect.e2e.ts`); `K5a`, `K5b`, `K5c`, `K5d`, `K5f` (Orca, `connection.a11y.ts`; `K5e` era già di T7). Un solo giro di ogni comando di chiusura, a fine gruppo, **non** i giri ripetuti del piano (tre di fumo, due di Orca, due di `lab-connect`): la card del gruppo D chiedeva un giro solo. I giri ripetuti restano da fare a chi vuole dire «stabile».
 
-**Numeri sull'ultimo commit di codice** (tutti in locale, Docker rootless):
+**Numeri storici di T11 su `f33d093`** (tutti in locale, Docker rootless; le verifiche delle correzioni sono riportate più sotto):
 
 | Livello | Comando | Esito |
 |---|---|---|
@@ -1438,33 +1438,62 @@ Prove nuove: `a_full_connection_tour_needs_no_pointer`, `focus_is_never_lost_to_
 | Laboratorio, client 26 | `LAB_BUILD=host scripts/gui.sh lab-connect 26` | `check-gates: 20 proofs of lab-connect ran and passed` |
 | Job `gui` | `scripts/check-gates.py --job gui --cargo-log target/gates/gui-cargo.log` | `check-gates: 5 proofs of gui ran and passed` |
 
-**Orca.** `K5a`: «Disconnect push button.» e poi «Connected to Ufficio Napoli», una volta. `K5d`: «alert Disconnect «Altra rubrica»?», il testo («This connection was not started from this rubrica. …») e «Cancel push button.». **`K5c` è verde ma Orca non dice niente all'apertura della finestra delle credenziali**: l'albero ha il `dialog` con il nome giusto, il fuoco è su «User name», la pagina dietro non è raggiungibile e nessun annuncio parte da Rust (quello che la prova chiede), ma la trascrizione non ha righe di parlato per quell'apertura. Non so se sia il dialogo che WebKitGTK non fa leggere a Orca in quest'immagine o la finestra di ascolto della prova; non l'ho indagato. È la riserva su G12 per le credenziali.
+**Orca, review e correzione.** `K5a`: «Disconnect push button.» e poi «Connected to Ufficio Napoli», una volta. `K5d`: «alert Disconnect «Altra rubrica»?», il testo («This connection was not started from this rubrica. …») e «Cancel push button.». Il verde originario di **`K5c` non provava il parlato**: nella review di `f33d093` Orca diceva **«blank»**, non «niente» come era scritto qui. Ora la prova aspetta con `waitForSpeech` sia «Credentials for «Datacenter Milano»» sia «User name», li asserisce e mantiene il controllo «nessun annuncio da Rust». **È rossa e il difetto non è risolto.** Nei giri di questa correzione il parlato per quell'apertura è anche vuoto (`it said: []`), pur con dialogo e fuoco corretti nell'albero. Non ho aggiunto annunci, cambiato il requisito o conservato un ripiego sul fuoco non verificato. I tentativi e i limiti del giro finale sono sotto.
 
 **Criteri C1–C8 e gate** (le prove sono nel manifesto `lab/tests/gates-b5.tsv`, controllate da `scripts/check-gates.py`):
 
 | # | Esito | Prova · job |
 |---|---|---|
-| C1 · G4 | **Verde in locale su 26**; su 27 e 79 solo WireGuard (S40); **sui tre client aspetta il run di CI** | `G4a`–`G4e` + `gui_session_never_had_two_backends` + `gui_session_left_no_residue` · `lab-connect` |
+| C1 · G4 | **CI verde sui tre client nel run 45769841084 su `f33d093`**, con il vecchio `t18` allentato. **Con il controllo stretto, locale 26: due giri verdi e il terzo rosso**, campione riportato sotto; decisione pendente | `G4a`–`G4e` + `gui_session_never_had_two_backends` + `gui_session_left_no_residue` · `lab-connect` |
 | C2 · G5 | **Verde** sul client 26 e contro GNOME Keyring vero; «Ricorda» contro un portachiavi **bloccato** che chiede lo sblocco **non provato** | `G5a`–`G5e` · `lab-connect`; `keyring_*` · `gui-smoke` (passo `keyring`) |
 | C3 · G6 | **Verde** sul client 26 | `layered_*` · `check`; `the_cli_reads_what_the_keyring_holds` · `gui-smoke`; `G6a`, `G6b` · `lab-connect` |
 | C4 · G7 | **Verde** | `no_command_returns_a_secret`, `no_command_returns_a_secret_after_a_full_round`, `no_event_carries_a_secret`, `the_export_never_carries_a_known_secret` · `gui`; `G7a`, `gui_session_left_no_secret_in_journal_or_argv` · `lab-connect` |
-| C5 · G9 | **Verde** con due utenti veri del gruppo (`alice`, `carla`) | `a_session_outside_the_rubrica_is_foreign`, `disconnecting_a_foreign_session_is_not_automatic` · `gui`; `G9a`–`G9c`, `gui_session_was_driven_by_two_users` · `lab-connect` |
+| C5 · G9 | **Verde** con due utenti veri del gruppo (`alice`, `carla`); la prova della sessione estranea ora usa un uuid valido assente dalla rubrica, e fallisce con la mutazione «è un uuid» | `a_session_outside_the_rubrica_is_foreign`, `disconnecting_a_foreign_session_is_not_automatic` · `gui`; `G9a`–`G9c`, `gui_session_was_driven_by_two_users` · `lab-connect` |
 | C6 | **Verde** | `no_command_takes_a_path`, «Il viaggio di una credenziale» (T6) |
-| C7 · G12 | **Verde con la riserva di `K5c`** (sopra) | `a_full_connection_tour_needs_no_pointer`, `K5a`–`K5f` (locale, Q22) |
-| C8 | **Verde** | diff dei crate vietati vuoto; `lab` e `lab-g3` non toccati da questo gruppo e **non rilanciati** in locale |
+| C7 · G12 | **Non soddisfatto: `K5c` è rossa** con l'asserzione sul parlato; tastiera verde | `a_full_connection_tour_needs_no_pointer`, `K5a`–`K5f` (locale, Q22) |
+| C8 | **Verde** | diff dei crate vietati vuoto; `lab` e `lab-g3` non toccati da queste correzioni e **non rilanciati** in locale |
 
-**Dove si guarda in CI** (il run parte dopo il push, non l'ho fatto io; nessun job di B5 è mai girato su un runner): G4 → job `lab-connect` (matrice 26, 27, 79), righe `G4 vitest G4a_…: ok` … `G4 cargo gui_session_left_no_residue: ok` e l'ultima `check-gates: 20 proofs of lab-connect ran and passed`; G5 → `lab-connect` righe `G5 vitest G5a…G5e: ok` e job `gui-smoke`, passo `scripts/gui.sh keyring`, `check-gates: 10 proofs of gui-smoke ran and passed`; G6 → `check` (`check-gates: … proofs of check`), `gui-smoke` (sopra), `lab-connect` righe `G6 vitest G6a/G6b: ok`; G7 → `gui` (`check-gates: 5 proofs of gui ran and passed`) e `lab-connect` righe `G7 vitest G7a…: ok`, `G7 cargo gui_session_left_no_secret_in_journal_or_argv: ok`; G9 → `gui` e `lab-connect` righe `G9 vitest G9a/G9b/G9c: ok`, `G9 cargo gui_session_was_driven_by_two_users: ok`.
+**CI già eseguita, non più in attesa.** Run **45769841084**, head **`f33d093`**, **15/15 job verdi**: la review `t_d14bbfa2` ha letto i log dei gate, non solo i segni verdi. `check`: 7 prove; `gui`: 5; `gui-smoke`: 10, con le righe `test keyring_* ... ok`; ognuno dei tre `lab-connect` (26, 27, 79): 16 prove Vitest + le 4 di `t18`, e `check-gates: 20 proofs of lab-connect ran and passed`, senza prove saltate. **S39 è sciolta anche sul runner** con Docker non rootless, uid 1001: il ponte ha consentito alla finestra di guidare i demoni veri. Questi fatti riguardano `f33d093`, **non** i commit locali di correzione, non pushati. La CI precedente non sostituisce il controllo stretto nuovo, né prova il parlato di `K5c`.
 
-**Una prova allentata, da sapere.** `gui_session_never_had_two_backends` (`t18`) contava un campione solo (200 ms) con `openvpn` e `glr-wg0` insieme, o due `openvpn`, come violazione di D5. In alcuni giri del laboratorio compariva un campione isolato nel momento in cui un backend partiva o si fermava (l'osservatore legge `pgrep` e `ip link` in due istanti, non in uno). Ora l'osservatore legge `glr-wg0` prima e dopo i processi e lo conta solo se c'era tutte e due le volte, e la prova richiede **due campioni di fila** con due backend vivi. È più debole di prima: un doppio backend vero più breve di 400 ms non verrebbe visto. Non ho una misura che dica che i campioni isolati erano un artefatto: lo dico perché è un'ipotesi (due letture non simultanee), non un fatto provato. Da riguardare nel run di CI.
+**Prova stretta ripristinata, campione da decidere.** `gui_session_never_had_two_backends` (`t18`) torna ad asserire **ogni campione**: nessun `openvpn` insieme a `glr-wg0`, né due `openvpn`. Resta la doppia lettura di `glr-wg0` prima e dopo i processi. Il messaggio di errore stampa il campione completo e le righe `argv` del suo timestamp. Nei tre giri richiesti di `LAB_BUILD=host scripts/gui.sh lab-connect 26`, il primo e il secondo passano tutte le 20 prove; il terzo passa le 16 Vitest e tre Rust, ma fallisce proprio questa:
+
+```text
+sample 1795677936562 openvpn=1 wg=1
+argv 1795677936562 1641 /usr/sbin/openvpn --version
+```
+
+È un processo di sondaggio della versione, non una riga di avvio di un tunnel OpenVPN. Nel codice di fase 1 `galleriad::dispatch` richiama il sondaggio dei backend su `hello`; `galleria_backend_openvpn::probe` esegue `openvpn --version`. **Non ho filtrato il processo né allentato la prova**: distinguere un sondaggio da un backend nella misura richiede una decisione. **Il giornale di quel secondo manca**: `lab/run.sh` aveva rimosso i container all'uscita, prima della raccolta. È un errore di raccolta, non un esito da inventare. Cinque giri diagnostici aggiuntivi con `KEEP=1` sono verdi (20 prove ciascuno), ma **non cancellano il campione del terzo giro** e non ne ricostruiscono il giornale. Laboratorio e container di prova rimossi alla fine.
+
+#### Correzioni della review (card `t_4edd2f74`, senza push)
+
+- **Difetto 1, aperto.** Prova `K5c` rinforzata e lasciata rossa. Indagine entro il tetto di un'ora: confrontato il dialogo dell'import; provato il fuoco dopo l'apertura senza `initialFocus` con ritardi 0, 250 e 1000 ms; provati rifocalizzazione e Tab/Shift+Tab in una sonda temporanea. A 1000 ms Orca legge il titolo e «Close», **non «User name»**: non soddisfa il requisito. Le sonde e le modifiche di produzione sul fuoco sono state rimosse. Nel log AT-SPI il campo vuoto riceve `object:text-caret-moved` prima di `object:state-changed:focused`: Orca 46.1 (`scripts/toolkits/WebKitGtk/script.py`, `onCaretMoved`) imposta il contesto del cursore e il fuoco senza notifica, poi `onFocusedChanged` ritorna quando la sorgente è già il contesto. Non ho cambiato Orca, il requisito o le decisioni Q27/Q22.
+- **Difetto 2, codice corretto ma misura da decidere.** Asserzione stretta e diagnosi sopra; nessuna modifica alla fase 1.
+- **Difetto 3, corretto.** `state_changes_are_announced_once_each` riconsegna tre volte lo stesso `Status` connesso allo stesso `TauriSink` usato dal supervisore: l'annuncio resta uno. Mutazione che toglie il confronto della terna: **rossa**, quattro «Connected to Homelab» invece di uno; ripristino: verde.
+- **Difetto 4, corretto.** Solo la prova di G9 usa `7f0a4c1e-5b3d-4e8a-9c2f-1d6b8a0e3f45` e verifica che non sia in rubrica; `params()` per le altre prove è invariata. Mutazione `is_own = Uuid::parse_str(id).is_ok()`: **quella prova è rossa**; ripristino: verde.
+- **Difetto 5, corretto.** «Ricorda» e «Credenziali salvate» seguono lo stato già letto dalla shell (`keyring`, `file`, generico fino a risposta). Cataloghi italiano e inglese aggiornati; prove Vitest dei due componenti. Nessuna lettura aggiuntiva di segreti o nuova chiamata IPC.
+
+**Verifiche delle correzioni, da non confondere con la tabella storica di T11:**
+
+| Comando | Esito reale |
+|---|---|
+| Gruppo host: fmt, clippy senza GUI con `-D warnings`, test senza GUI, deny, boundaries | verdi, **598 passate / 0 fallite** |
+| `scripts/gui.sh check` | **678 Vitest**, **368 Rust / 0 fallite**, typecheck, clippy e build verdi |
+| `scripts/gui.sh smoke` (tocca i testi del difetto 5) | **50/50**, nessuna saltata |
+| `scripts/gui.sh a11y`, giro completo diagnostico con `K5c` rinforzata | **46 passate, 1 fallita (`K5c`)** |
+| `scripts/gui.sh a11y`, giro completo finale | **26 passate, 10 fallite, 11 saltate**: `K5c` non sente titolo/campo; poi `R5d` va in timeout e il driver non accetta più sessioni (`UND_ERR_SOCKET`/connessione rifiutata). Non corretto fuori scope; non è un giro verde |
+| `LAB_BUILD=host scripts/gui.sh lab-connect 26`, tre giri richiesti | **20/20, 20/20, 19/20**: terzo rosso sul campione sopra |
+
+Sono stati fatti anche giri filtrati e sonde temporanee per l'indagine Orca, oltre al giro completo richiesto: non sono prove di stabilità né sostituiscono il giro finale rosso. **B5 resta aperto** per il parlato delle credenziali e la decisione sulla misura D5; il controllo breve dipendente non viene liberato dichiarando finito un lavoro incompleto.
 
 **Non verificato (B5).**
 - **KWallet** (S38): nessuna prova; si dice nel README.
 - **GNOME Keyring su un desktop vero**: lo sblocco con la finestra del sistema (provato solo senza schermo, con `gnome-keyring-daemon --unlock` da stdin); «Ricorda» contro un portachiavi **bloccato** che chiede lo sblocco.
 - **La finestra su Ubuntu 26.04 e Fedora**, e Wayland: provata solo nell'immagine (Ubuntu 24.04, WebKitGTK 2.52.6, Xvfb).
-- **OpenVPN 2.7 in locale** (client 27 e 79): rosso per il DCO negato da Docker rootless (S40); `G4b` e `G4c` sono rosse su 27 e 79 per questa causa letta nel giornale solo su 27.
-- **Ciò che aspetta il run di CI**: tutti i job `lab-connect`, e il ponte del laboratorio su un runner con Docker non rootless (S39: non provato con uid 1001).
-- **`K5c`**: Orca non legge niente all'apertura della finestra delle credenziali (sopra).
+- **OpenVPN 2.7 in locale** (client 27 e 79): rosso per il DCO negato da Docker rootless (S40); CI su `f33d093` verde su entrambi, che non significa finestra provata sui rispettivi desktop.
+- **CI delle correzioni**: non eseguita, nessun push; CI della base verificata dalla review: run 45769841084, 15/15.
+- **`K5c`**: non legge titolo e primo campo; il vecchio verde accettava anche «blank». Ora la prova è rossa (sopra).
+- **D5 con misura stretta**: campione isolato con `openvpn --version` da decidere, giornale del secondo non raccolto (sopra).
 - **`a_full_rubrica_tour_needs_no_pointer`**: instabile una volta nel gruppo C, verde in tutti i giri di T11; non corretta.
 - «Duplica» con un nome in `secret_refs` senza chiave (dal gruppo B): invariato.
 
-**Punti [S] del blocco**: S12 **provata** con GNOME Keyring (KWallet no); S34, S35, S36, S37 e S45 provate (T1, T2, `keyring`); S38 **non provata**; S39 sciolta per Docker rootless, **non provata su un runner**; S40 confermata; S41 sciolta (AT-SPI senza Orca pilota la finestra «Salva»); S42, S43 e S44 non hanno un esito scritto nelle sezioni di T4–T6: le prove che le toccano sono verdi (`G4a` per i byte che crescono e l'ultimo handshake, `G5a`/`G5b` per i campi `password` riempiti dalla finestra, `K5a` per l'annuncio emesso mentre arriva un evento del demone), ma non ho verificato che i tre punti siano stati letti uno per uno: restano da chiudere a mano.
+**Punti [S] del blocco**: S12 **provata** con GNOME Keyring (KWallet no); S34, S35, S36, S37 e S45 provate (T1, T2, `keyring`); S38 **non provata**; **S39 sciolta in rootless e sul runner nel run 45769841084**; S40 confermata in locale, CI verde su `f33d093`; S41 sciolta (AT-SPI senza Orca pilota la finestra «Salva»); S42, S43 e S44 non hanno un esito scritto nelle sezioni di T4–T6: le prove che le toccano sono verdi (`G4a` per i byte che crescono e l'ultimo handshake, `G5a`/`G5b` per i campi `password` riempiti dalla finestra, `K5a` per l'annuncio emesso mentre arriva un evento del demone), ma non ho verificato che i tre punti siano stati letti uno per uno: restano da chiudere a mano.

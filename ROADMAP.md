@@ -138,8 +138,10 @@ La rubrica in Tauri 2 + React sopra il demone della fase 1, in sei blocchi B1–
 ## Fase 3 · Porting Windows
 Demone come servizio Windows con WireGuardNT e OpenVPN installato come prerequisito, MSI con updater (analisi §10).
 
-- [ ] Spec e piano della fase 3
-  - [ ] criteri Windows rinviati dalla fase 1 (Q2) e punti aperti di `docs/05-esito-spike-windows.md` §8
+- [ ] Spec e piano della fase 3 <!-- branch: galleria/t_efe58c01-galleria-spec-e-piano-della-fase-3-porti · task: t_efe58c01 · by: nello -->
+  - [x] spec `docs/superpowers/specs/2026-11-26-fase3-windows-design.md`: criteri W1–W13, con i due rinviati dalla fase 1 (Q2) e i punti aperti di `docs/05-esito-spike-windows.md` §8; solo documenti, niente eseguito su Windows
+  - [x] piano a blocchi `docs/superpowers/plans/2026-11-26-fase3-windows.md`: essenziale P1–P6 181 h (forchetta 160–240), rifinitura P7–P8 56 h
+  - [ ] decisione di Peppe: se farla e fin dove (Q60), ambiente di prova e ISO (Q58, Q59), firma (Q61); Q58–Q73 nella spec §18
 - [ ] Servizio e named pipe
   - [ ] servizio LocalSystem e pipe con ACL a SYSTEM, Administrators e INTERACTIVE (D18); un utente non autorizzato è rifiutato
 - [ ] Backend WireGuardNT

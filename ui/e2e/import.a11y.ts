@@ -158,10 +158,12 @@ describe("the window «Open» of the import under a screen reader", () => {
     await answerFileWindow({ open: files.separate });
     await waitForBody(b, "File: separate.ovpn", "the preview of the file never showed");
     const tree = await waitForTree(focusedIs("Name"), "the field «Name» focused");
-    // the words Orca uses for the fields are recorded, not asserted (S4b: Orca 46.1 in the image does not say the name of a text field)
-    record("I5d the preview of a file, as a dialog", speechSince(mark), tree);
+    // What Orca says is recorded, not asserted (S4b: Orca 46.1 in the image does not say the name of a text field; and, as for K5c
+    // (Q49 (a)), it says the title of a dialog in some runs and not in others with the same page: the dispatch of its WebKitGtk
+    // script, not ours. 4 runs of 28 of the complete check left it out before this change). The tree is what is asserted.
+    const said = speechSince(mark).some((line) => line.includes("Import profile"));
+    record(`I5d the preview of a file, as a dialog (Orca ${said ? "says" : "does not say"} the title)`, speechSince(mark), tree);
     expect(findNode(tree, "dialog", "Import profile"), "a dialog named «Import profile»").toBeTruthy();
-    expect(speechSince(mark).some((line) => line.includes("Import profile")), `Orca said the name of the window: ${JSON.stringify(speechSince(mark))}`).toBe(true);
     // the other fields of the step are there, named
     expect(findNode(tree, "combo box", "Group") ?? findNode(tree, "menu", "Group") ?? findNode(tree, "list box", "Group"), "the field «Group»").toBeTruthy();
     expect(tree.some((n) => n.role === "push button" && n.name === "Import")).toBe(true);

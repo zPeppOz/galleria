@@ -222,11 +222,14 @@ modificabile senza demone (da B3).
 - **Apertura del file su Linux**: il percorso arriva come argomento della riga di comando di un processo nuovo.
   `RunEvent::Opened` esiste solo su macOS, iOS e Android **[V: `crates/tauri/src/app.rs`, attributo `cfg`; esempio
   ufficiale `examples/file-associations`, che su Linux e Windows legge `std::env::args()`]**.
-- **Istanza unica**: plugin ufficiale `tauri-plugin-single-instance` 2.5.5. Il secondo processo avvisa il primo e
-  termina; il primo riceve `args` e `cwd` del secondo nella funzione passata a `init`. Va registrato per primo. Su
-  Linux usa D-Bus e pubblica il servizio `org.<id>.SingleInstance`, dove `<id>` è l'identificatore con punti e
-  trattini sostituiti da `_` **[V: Tauri, «Single Instance»]**. Conseguenze *(dedotte)*: serve un bus di sessione,
-  quindi nel laboratorio il fumo gira dentro `dbus-run-session`; cosa succede senza bus è **[S]**, B4.
+- **Istanza unica (Q36 (b), come costruita in B4 T5)**: **niente plugin e niente bus**. Il primo processo prende un blocco
+  esclusivo (`flock`) su `gui.lock` e apre il socket Unix `gui.sock`, entrambi in `$XDG_RUNTIME_DIR/galleria` (cartella
+  `0700`, socket `0600`); il secondo processo manda **una riga** `{"v":1,"files":[…]}`, aspetta `ok` ed esce con 0, prima
+  ancora di costruire l'app. Chi accetta controlla lo **stesso uid** con `SO_PEERCRED` prima di leggere un byte, e chi
+  consegna non manda niente a un socket che non sia suo e `0600`. Nessun nome sul bus di sessione: l'ipotesi del plugin
+  ufficiale (`tauri-plugin-single-instance` 2.5.5, servizio `org.<id>.SingleInstance` su D-Bus) è stata scartata, così
+  che non serva un bus e non entri nessun crate nuovo. Senza `XDG_RUNTIME_DIR` (S11) l'app parte da sola, due processi
+  si aprono tutti e due, e ognuno scrive «no single window» su `stderr`.
 
 ## 8. Connessione (D5, D21, D28)
 
@@ -427,9 +430,9 @@ Il mockup resta il riferimento visivo. Dove dice altro, vale questa spec:
 | S6 | Il fumo WebDriver gira nel container e sul runner GitHub | B1-T6 | fumo manuale con lista di controllo scritta |
 | S7 | `navigator.clipboard.writeText` funziona nella webview per «Copia» | B1-T5 | comando Rust `copy_text`, con il plugin degli appunti in sola scrittura |
 | S8 | `oklch()` è disegnato giusto da WebKitGTK su Ubuntu 24.04, 26.04 e Fedora | B2 | colori esadecimali equivalenti nei token |
-| S9 | I percorsi del trascinamento arrivano a Rust senza passare dalla webview | B4 | un comando accetta i percorsi e li tratta come input non fidato: stessa anteprima, stesse regole di `galleria-profile` |
-| S10 | `.ovpn` ha un tipo MIME registrato sulle tre distribuzioni | B4 | il pacchetto installa una definizione MIME propria |
-| S11 | Comportamento del plugin di istanza unica senza bus di sessione | B4 | l'app parte comunque e lo scrive nel log |
+| S9 | I percorsi del trascinamento arrivano a Rust senza passare dalla webview | B4 | un comando accetta i percorsi e li tratta come input non fidato: stessa anteprima, stesse regole di `galleria-profile`. **Esito (T4): vero**, il gestore `WindowEvent::DragDrop` di Rust li riceve con un trascinamento vero sotto Xvfb; il ripiego non è servito |
+| S10 | `.ovpn` ha un tipo MIME registrato sulle tre distribuzioni | B4 | il pacchetto installa una definizione MIME propria. **Esito (T5): vero** su Ubuntu 24.04, 26.04.1 e Fedora 45 (`application/x-openvpn-profile`, con `shared-mime-info`; un file vuoto dà `application/x-zerosize`); un `.conf` dà `text/plain`, coerente con D31. Il ripiego non è servito |
+| S11 | Comportamento del plugin di istanza unica senza bus di sessione | B4 | l'app parte comunque e lo scrive nel log. **Esito (T5): vero**, ma senza il plugin (Q36 (b)): senza `XDG_RUNTIME_DIR` due processi partono tutti e due e ognuno scrive «no single window» su `stderr` |
 | S12 | Crate per Secret Service e comportamento con GNOME Keyring e KWallet | B5, primo task | ripiego sul file (D25) |
 | S13 | `cargo deny check` passa con l'albero di Tauri: mi aspetto avvisi «non più mantenuto» sulle librerie GTK3 per Rust e forse licenze non ancora in elenco (previsione, non eseguito) | B1-T1 | avvisi ignorati uno per uno con il motivo scritto; licenze aggiunte solo se compatibili con GPL-3.0-or-later; una incompatibile ferma il blocco |
 

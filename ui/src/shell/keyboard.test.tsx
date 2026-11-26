@@ -6,12 +6,13 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { DaemonView } from "../daemon/types";
-import type { ProfilePatch, ProfileSummary } from "../rubrica/types";
-import { applyPatch, makeDetail, makeView, SAMPLE_PROFILES } from "../test/fixtures";
+import type { ImportActions } from "../import/types";
+import type { CmdError, ProfilePatch, ProfileSummary } from "../rubrica/types";
+import { applyPatch, makeDetail, makePreview, makeSummary, makeView, SAMPLE_PROFILES } from "../test/fixtures";
 import { renderShell } from "../test/shell";
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -425,6 +426,163 @@ describe("keyboard on the whole shell", () => {
     // the new profile is the chosen one and has the focus: the arrows go on from there
     await waitFor(() => expect(`${roleOf(active())}:${nameOf(active())}`).toMatch(/^option:Casa/));
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Casa");
+  });
+
+  it("a_full_import_tour_needs_no_pointer", async () => {
+    const user = userEvent.setup();
+    const announce = vi.fn();
+    renderShell(makeView(), { announce });
+    const active = () => document.activeElement as HTMLElement;
+    const here = () => `${roleOf(active())}:${nameOf(active())}`;
+    const reach = async (role: string, name: string) => {
+      for (let step = 0; step < 20 && here() !== `${role}:${name}`; step++) await user.tab();
+      expect(here(), "where the focus is").toBe(`${role}:${name}`);
+    };
+    // the text, the preview, a name of our own and a group, «Import»: the keys only
+    await user.keyboard("{Control>}o{/Control}");
+    await screen.findByRole("dialog", { name: "Import profile" });
+    await waitFor(() => expect(here()).toBe("textarea:Paste the text of the profile"));
+    await user.keyboard("client");
+    await reach("button", "Preview");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(here()).toBe("input:Name"));
+    await user.clear(active());
+    await user.keyboard("Casa");
+    await reach("select", "Group");
+    // jsdom does not drive a native `select` with keys: the change is what the keys of a browser would make
+    fireEvent.change(active(), { target: { value: "Lavoro" } });
+    expect((active() as HTMLSelectElement).value).toBe("Lavoro");
+    await reach("button", "Import");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(announce).toHaveBeenCalledWith("Imported “Casa”.", false));
+    await waitFor(() => expect(here()).toMatch(/^option:Casa/));
+    expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(6);
+
+    // and once more: the file is chosen with the button (the window of Rust is a fake), then «Cancel» gives up
+    await user.keyboard("{Control>}o{/Control}");
+    await screen.findByRole("dialog", { name: "Import profile" });
+    await waitFor(() => expect(here()).toBe("textarea:Paste the text of the profile"));
+    await reach("button", "Choose a file…");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(here()).toBe("input:Name"));
+    expect(screen.getByRole("dialog").textContent).toContain("File: separate.ovpn");
+    await reach("button", "Cancel");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(active(), "the focus after «Cancel»").not.toBe(document.body);
+    // nothing new in the list, and nothing said: giving up is not an outcome
+    expect(within(screen.getByRole("listbox")).getAllByRole("option")).toHaveLength(6);
+    expect(announce).toHaveBeenCalledTimes(1);
+  });
+
+  it("focus_is_never_lost_to_the_body_during_the_import", async () => {
+    const notBody = (what: string) => expect(document.activeElement, `the focus after ${what}`).not.toBe(document.body);
+    const refuse = (code: string, data: unknown = null) => async () => Promise.reject({ code, message: "x", data });
+    const importer = (over: Partial<ImportActions> = {}): ImportActions => ({
+      fromText: async () => makePreview(),
+      pickFile: async () => null,
+      commit: async (_id, name) => makeSummary({ id: "made", name }),
+      discard: async () => undefined,
+      ...over,
+    });
+    const open = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.keyboard("{Control>}o{/Control}");
+      await screen.findByRole("dialog", { name: "Import profile" });
+      await waitFor(() => expect(document.activeElement?.tagName).toBe("TEXTAREA"));
+    };
+    const inTheAlert = () => expect(document.querySelector(".import-error")?.contains(document.activeElement), "the alert has the focus").toBe(true);
+
+    // given up: Escape on the first step, and Escape on the preview
+    let user = userEvent.setup();
+    renderShell(makeView(), { importer: importer() });
+    await open(user);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    notBody("giving up the first step");
+    await open(user);
+    await user.keyboard("client{Tab}{Tab}{Enter}");
+    await waitFor(() => expect(document.activeElement?.getAttribute("name")).toBe("import-name"));
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    notBody("giving up the preview");
+    cleanup();
+
+    // an error of the text: the alert has the focus; Escape closes the window and the focus is not lost
+    user = userEvent.setup();
+    renderShell(makeView(), { importer: importer({ fromText: refuse("import_syntax", { line: 2 }) }) });
+    await open(user);
+    await user.keyboard("client{Tab}{Tab}{Enter}");
+    await waitFor(inTheAlert);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    notBody("an error of the text");
+    cleanup();
+
+    // a preview that ran out: the window goes back to the first step, says so and keeps the focus in it
+    user = userEvent.setup();
+    renderShell(makeView(), { importer: importer({ commit: refuse("gui_import_expired") }) });
+    await open(user);
+    await user.keyboard("client{Tab}{Tab}{Enter}");
+    await waitFor(() => expect(document.activeElement?.getAttribute("name")).toBe("import-name"));
+    await user.keyboard("{Enter}");
+    await waitFor(inTheAlert);
+    expect(screen.getByRole("textbox", { name: "Paste the text of the profile" }), "back at the first step").toBeTruthy();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    notBody("a preview that ran out");
+    cleanup();
+
+    // an offer that came from outside: the preview, then an error; each has the focus, and Escape leaves it somewhere
+    user = userEvent.setup();
+    renderShell(makeView(), { incoming: { offer: { preview: makePreview({ origin: "open", file_name: "inline.ovpn", suggested_name: "inline" }) }, turn: 1 } });
+    await waitFor(() => expect(document.activeElement?.getAttribute("name")).toBe("import-name"));
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    notBody("an offer from outside");
+    cleanup();
+    user = userEvent.setup();
+    renderShell(makeView(), { incoming: { offer: { failed: { error: { code: "gui_import_unsupported_file", message: "x", data: { file_name: "a.txt" } } as CmdError, file_name: "a.txt" } }, turn: 1 } });
+    await waitFor(inTheAlert);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    notBody("an error of a file from outside");
+  });
+
+  it("the_outcome_of_an_import_is_said_once_and_an_error_of_the_import_is_not_said", async () => {
+    const user = userEvent.setup();
+    const announce = vi.fn();
+    const notice = (line: number, directive: string) => ({ line, directive, kind: "dangerous" as const, dns_script: false });
+    let fail = false;
+    const importer: ImportActions = {
+      fromText: async () => {
+        if (fail) throw { code: "import_syntax", message: "x", data: { line: 3 } };
+        return makePreview({ suggested_name: "Malicious", removed: 2, notices: [notice(5, "up"), notice(6, "plugin")] });
+      },
+      pickFile: async () => null,
+      commit: async (_id, name) => makeSummary({ id: "made", name }),
+      discard: async () => undefined,
+    };
+    renderShell(makeView(), { announce, importer });
+    const open = async () => {
+      await user.keyboard("{Control>}o{/Control}");
+      await screen.findByRole("dialog", { name: "Import profile" });
+      await waitFor(() => expect(document.activeElement?.tagName).toBe("TEXTAREA"));
+      await user.keyboard("client{Tab}{Tab}{Enter}");
+    };
+    await open();
+    await waitFor(() => expect(document.activeElement?.getAttribute("name")).toBe("import-name"));
+    await user.keyboard("{Enter}");
+    // the text of the notice on the screen is the text that was announced, polite, and once
+    await waitFor(() => expect(announce).toHaveBeenCalledWith("Imported “Malicious”. 2 directives removed.", false));
+    expect(toastStatus().textContent).toContain("Imported “Malicious”. 2 directives removed.");
+    // an error is read where the focus is: nothing is announced and no notice appears (the region stays there, empty)
+    fail = true;
+    await open();
+    await waitFor(() => expect(document.querySelector(".import-error")?.contains(document.activeElement)).toBe(true));
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(".gx-toasts [role=\"alert\"]")?.textContent).toBe("");
+    expect(document.querySelectorAll(".gx-toast")).toHaveLength(1);
   });
 
   it("every_control_of_every_tab_and_of_the_new_dialogs_is_reachable", async () => {

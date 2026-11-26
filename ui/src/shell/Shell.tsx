@@ -57,6 +57,7 @@ export function Shell(props: {
   // A profile was imported: the focus goes to its row once the rubrica has been read again and the selection has moved to it.
   const [imported, setImported] = useState<string | null>(null);
   const list = useRef<{ focus: () => void }>(null);
+  const root = useRef<HTMLDivElement>(null);
   // The form of the chosen profile says whether it has edits that are not saved; the list asks before it moves away.
   const guard = useRef<Guard | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);
@@ -116,6 +117,20 @@ export function Shell(props: {
     }
   };
 
+  /**
+   * The window of the import gives the focus back to what had it. When that was nothing (`Ctrl+O` before any Tab, a file that
+   * came from outside while nothing had the focus) it would go to the `body`, and a person with a keyboard or a screen reader
+   * would be left nowhere: «Import…», the control that opens the window, takes it then.
+   */
+  const closeImport = () => {
+    setImporting(false);
+    setTimeout(() => {
+      const now = document.activeElement;
+      if (now && now !== document.body) return;
+      root.current?.querySelector<HTMLElement>(".top-bar-actions button")?.focus();
+    }, 0);
+  };
+
   const wasImported = (profile: ProfileSummary) => {
     // a search that hides the new profile would leave the focus nowhere
     setQuery("");
@@ -150,7 +165,7 @@ export function Shell(props: {
   );
   return (
     <ToastProvider closeLabel={t("toast.close")} announce={announce}>
-      <div className="shell">
+      <div className="shell" ref={root}>
         <TopBar info={info} daemonVersion={view?.daemon_version ?? null} onImport={() => setImporting(true)} />
         <div className="shell-body">
           <aside className="shell-aside" aria-label={t("shell.profiles")}>
@@ -195,7 +210,7 @@ export function Shell(props: {
         </div>
         <StatusBar view={view} info={info} />
         <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
-        <ImportDialog open={importing} onClose={() => setImporting(false)} actions={importer} onImported={wasImported} incoming={incoming} />
+        <ImportDialog open={importing} onClose={closeImport} actions={importer} onImported={wasImported} incoming={incoming} />
         {dropHover ? (
           <div className="shell-drop" aria-hidden="true">
             <span>{t("import.drop_hover")}</span>

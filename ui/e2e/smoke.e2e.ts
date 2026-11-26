@@ -861,3 +861,161 @@ describe("a file given to the app, and one window only (plan B4, T5)", () => {
     }
   });
 });
+
+// T7 (plan B4, I1, I6): what the window imports is what the CLI of the phase 1 imports from the same file, the CLI lists it,
+// the window imports with the daemon stopped, and the whole tour stays inside the CSP. The files come the way a file
+// manager hands them over (the arguments of the process, then second launches), so the window of «Open» is not needed.
+describe("the import against the CLI of the phase 1 (plan B4, T7)", () => {
+  const app = () => env("GALLERIA_SMOKE_APP");
+  const configDir = (home = env("XDG_CONFIG_HOME")) => join(home, "galleria");
+  const runCli = (args: string[], home?: string) => execFileSync(env("GALLERIA_SMOKE_CLI"), args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...(home ? { env: { ...process.env, XDG_CONFIG_HOME: home } } : {}) });
+  const waitFor = (b: Browser, check: () => Promise<boolean>, timeoutMsg: string) => b.waitUntil(check, { timeout: TEN_SECONDS, interval: 250, timeoutMsg });
+  const rowNames = async (b: Browser) => (await b.execute(() => [...document.querySelectorAll('[role="listbox"] [role="option"] span.profile-name')].map((el) => (el.textContent ?? "").trim()))) as string[];
+  const watchCsp = (b: Browser) =>
+    b.execute(() => {
+      const w = window as unknown as { __csp: string[] };
+      w.__csp = [];
+      document.addEventListener("securitypolicyviolation", (e) => w.__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
+    });
+  const cspViolations = (b: Browser) => b.execute(() => (window as unknown as { __csp: string[] }).__csp);
+
+  /** The next file as a second launch of the app: it hands the file to the window that is open and ends. */
+  const secondLaunch = (path: string) => {
+    const second = spawnSync(app(), [path], { encoding: "utf8", timeout: 5000 });
+    expect(second.status, `the second launch ended with ${second.status}: ${second.stderr}`).toBe(0);
+  };
+  /** The preview that is open is saved with the name it proposes. */
+  const importIt = async (b: Browser, name: string) => {
+    await b.$('input[name="import-name"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    expect(await b.$('input[name="import-name"]').getValue()).toBe(name);
+    await b.$("button=Import").click();
+    await waitForBody(b, `Imported “${name}”.`, `the notice of the import of ${name} never showed`);
+  };
+  /** Pastes `text` into the field of the first step (the setter of the browser and an `input` event, which is what a paste does) and asks for the preview. */
+  const paste = async (b: Browser, text: string) => {
+    const field = await b.$('textarea[name="import-text"]');
+    await field.waitForDisplayed({ timeout: TEN_SECONDS });
+    await b.execute(
+      (selector: string, value: string) => {
+        const el = document.querySelector(selector) as HTMLTextAreaElement;
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(el, value);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      },
+      'textarea[name="import-text"]',
+      text,
+    );
+    await b.$("button=Preview").click();
+  };
+
+  /** A profile as the file holds it, without what differs from one import to the next: its id and its dates. */
+  const same = (text: string) =>
+    text
+      .split("\n")
+      .filter((line) => !/^(id|created|modified) = /.test(line))
+      .join("\n");
+  /** The profiles of a folder by name: the file of the profile and the file of its secrets, both without the id. */
+  const byName = (home: string): Record<string, { profile: string; secrets: string }> => {
+    const out: Record<string, { profile: string; secrets: string }> = {};
+    for (const file of readdirSync(join(configDir(home), "profiles"))) {
+      const text = readFileSync(join(configDir(home), "profiles", file), "utf8");
+      const name = /^name = "(.*)"$/m.exec(text)?.[1] ?? file;
+      out[name] = { profile: same(text), secrets: readFileSync(join(configDir(home), "secrets", file), "utf8") };
+    }
+    return out;
+  };
+
+  it("gui_import_equals_cli_import", async () => {
+    daemon("stop");
+    const files = importFixtures();
+    // the window: one file as an argument of the process, two as second launches
+    const b = await openApp(false, "empty", [files.inline]);
+    await waitForBody(b, "File: inline.ovpn", "the preview of inline.ovpn never showed");
+    await importIt(b, "inline");
+    secondLaunch(files.separate);
+    await waitForBody(b, "File: separate.ovpn", "the preview of separate.ovpn never showed");
+    await importIt(b, "separate");
+    secondLaunch(files.office);
+    await waitForBody(b, "File: office.conf", "the preview of office.conf never showed");
+    await importIt(b, "office");
+    // the CLI of the phase 1: the same three files, into another folder of profiles
+    const other = mkdtempSync(join(tmpdir(), "galleria-cli-import-"));
+    try {
+      for (const [file, name] of [[files.inline, "inline"], [files.separate, "separate"], [files.office, "office"]]) runCli(["import", file, "--name", name], other);
+      const window = byName(env("XDG_CONFIG_HOME"));
+      const cli = byName(other);
+      expect(Object.keys(window).sort()).toEqual(["inline", "office", "separate"]);
+      expect(Object.keys(cli).sort()).toEqual(["inline", "office", "separate"]);
+      for (const name of Object.keys(window)) {
+        expect(window[name].profile, `the profile «${name}» is not what the CLI saves`).toBe(cli[name].profile);
+        expect(window[name].secrets, `the secrets of «${name}» are not what the CLI saves`).toBe(cli[name].secrets);
+        expect(window[name].secrets.length, `«${name}» has secrets to compare`).toBeGreaterThan(0);
+      }
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+
+  it("the_cli_lists_what_the_window_imported", async () => {
+    daemon("stop");
+    const files = importFixtures();
+    const b = await openApp(false, "seeded", [files.inline]);
+    await waitForBody(b, "File: inline.ovpn", "the preview of inline.ovpn never showed");
+    await importIt(b, "inline");
+    secondLaunch(files.office);
+    await waitForBody(b, "File: office.conf", "the preview of office.conf never showed");
+    await importIt(b, "office");
+    const listed = runCli(["list"]);
+    const names = listed.trim().split("\n").map((line) => line.split(" ").slice(1).join(" ").replace(/ "?(Open[Vv]pn|Wire[Gg]uard)"?$/, ""));
+    expect(names.sort(), `galleria list says: ${listed}`).toEqual(["Cliente Rossi", "Datacenter Milano", "Homelab", "Ufficio Napoli", "VPS Hetzner", "inline", "office"]);
+  });
+
+  it("import_works_with_the_daemon_stopped", async () => {
+    daemon("stop");
+    const files = importFixtures();
+    const b = await openApp(false, "empty");
+    await waitForBody(b, START_THE_SERVICE, "the «Start the service» panel never appeared");
+    await b.$("button=Import a profile…").click();
+    await paste(b, readFileSync(files.inline, "utf8"));
+    await b.$('input[name="import-name"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    await b.$('input[name="import-name"]').setValue("Offline");
+    await b.$("button=Import").click();
+    await waitForBody(b, "Imported “Offline”.", "the notice of the import never showed");
+    await waitFor(b, async () => (await rowNames(b)).join() === "Offline", "the list did not show the new profile");
+    // the panel of the missing service is still there next to it, and the files are on the disk
+    expect(await bodyText(b)).toContain("Start the service");
+    const dir = join(configDir(), "profiles");
+    const saved = readdirSync(dir).map((name) => readFileSync(join(dir, name), "utf8"));
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toContain('name = "Offline"');
+    expect(readdirSync(join(configDir(), "secrets"))).toHaveLength(1);
+  });
+
+  it("no_csp_violation_during_the_import_tour", async () => {
+    daemon("start");
+    const files = importFixtures();
+    const b = await openApp();
+    await waitForBody(b, CONNECTED, "the bar never showed the active link");
+    await watchCsp(b);
+    // the text: preview, back, cancel; then the text again and import
+    await b.$("button=Import…").click();
+    await paste(b, readFileSync(files.malicious, "utf8"));
+    await b.$('input[name="import-name"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    await b.$("button=Back").click();
+    await b.$('textarea[name="import-text"]').waitForDisplayed({ timeout: TEN_SECONDS });
+    await b.$("button=Cancel").click();
+    await waitFor(b, async () => (await b.$$('[role="dialog"]')).length === 0, "the window did not close");
+    // a file handed over by a second launch: the one with the removed directives, saved; then a hook of WireGuard, given up; then an error
+    secondLaunch(files.malicious);
+    await waitForBody(b, "File: malicious.ovpn", "the preview of malicious.ovpn never showed");
+    await importIt(b, "malicious");
+    secondLaunch(files.office);
+    await waitForBody(b, "File: office.conf", "the preview of office.conf never showed");
+    await b.$("button=Cancel").click();
+    await waitFor(b, async () => (await b.$$('[role="dialog"]')).length === 0, "the window did not close");
+    const notAProfile = join(env("XDG_RUNTIME_DIR"), "not-a-profile.txt");
+    writeFileSync(notAProfile, "hello\n");
+    secondLaunch(notAProfile);
+    await waitForBody(b, "Only .ovpn and .conf files can be imported.", "the error of the file never showed");
+    expect(await cspViolations(b)).toEqual([]);
+  });
+});

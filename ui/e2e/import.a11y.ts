@@ -6,11 +6,13 @@
 //   I5c  «Cancel» in the real window changes nothing: no notice, no preview, the focus on the button
 //   I5d  the preview is read as a dialog: its name, and the focus on «Name»
 //   I5e  a file dragged onto the window with a real drag (T4) is previewed with the text of D19, and imported: one notice
+//   I5f  an error of the import takes the focus (the notice has the focus, the alert is inside it) and is not announced (T7)
+//   I5g  the text of D19 is in the tree, as the name of the items of the list of what the import changed (T7)
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  answerFileWindow, atspiTree, bodyText, closeApp, daemon, dragFile, dumpFileWindow, env, findNode, focusedNode, importFixtures, openApp, orcaDebugLines, record, speechMark, speechSince,
+  answerFileWindow, atspiTree, bodyText, closeApp, daemon, descendants, dragFile, dumpFileWindow, env, findNode, focusedNode, importFixtures, openApp, orcaDebugLines, record, speechMark, speechSince,
   waitForBody, waitForSpeech, waitForTree,
   type AtNode, type Browser,
 } from "./support";
@@ -202,5 +204,70 @@ describe("a file dragged onto the window under a screen reader", () => {
     for (const line of lines) expect(line).toContain(`(1, 0, ${DONE})`);
     expect(readdirSync(join(configDir(), "profiles"))).toHaveLength(profilesBefore + 1);
     expect(await bodyText(b)).not.toContain(folder);
+  });
+});
+
+describe("the errors and the text of D19 of the import under a screen reader (T7)", () => {
+  /** Opens the window of the import with the keyboard and puts `text` in the field of the first step, as a paste does. */
+  async function pasteText(text: string): Promise<void> {
+    await key("Tab");
+    await waitForTree(focusedIs("Import…"), "the Import button focused");
+    await key("Enter");
+    await waitForTree((t) => !!findNode(t, "dialog", "Import profile"), "the window «Import profile» open");
+    await b.execute(
+      (selector: string, value: string) => {
+        const el = document.querySelector(selector) as HTMLTextAreaElement;
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(el, value);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      },
+      'textarea[name="import-text"]',
+      text,
+    );
+  }
+
+  it("I5f_an_error_of_the_import_takes_the_focus_and_is_not_announced", async () => {
+    const before = onDisk();
+    const announced = orcaDebugLines(/Dequeued object:announcement/).length;
+    await pasteText("client\n<key>\nnever closed\n");
+    const mark = speechMark();
+    await b.$("button=Preview").click();
+    await waitForBody(b, "The profile was not imported", "the error of the import never showed");
+    // the notice of the error is the node that has the focus, and the alert (WebKitGTK exports `role=alert` as `notification`) is inside it: Q27, it is read where the focus is
+    const holdsTheAlert = (t: AtNode[]) => {
+      const focused = focusedNode(t);
+      return !!focused && descendants(t, focused).some((n) => n.role === "notification") && descendants(t, focused).some((n) => n.role === "image" && n.name === "Error");
+    };
+    const tree = await waitForTree(holdsTheAlert, "the focus on the notice of the error, with the alert inside");
+    await settle(1500);
+    const focus = await b.execute(() => ({ inside: Boolean(document.querySelector(".import-error")?.contains(document.activeElement)), text: document.querySelector(".import-error")?.textContent ?? "" }));
+    record("I5f an error of the import", speechSince(mark), tree);
+    expect(focus.inside, "the notice of the error has the focus").toBe(true);
+    expect(focus.text).toContain("The profile cannot be read: there is an error at line 2.");
+    expect(holdsTheAlert(atspiTree()), "after a moment the focus is still there").toBe(true);
+    expect(findNode(tree, "dialog", "Import profile"), "the window is still the first step").toBeTruthy();
+    // no announcement was sent for it, and nothing was written
+    expect(orcaDebugLines(/Dequeued object:announcement/).slice(announced), "no announcement was sent").toEqual([]);
+    expect(onDisk()).toBe(before);
+  });
+
+  it("I5g_the_text_of_d19_is_in_the_tree_as_the_text_of_the_list", async () => {
+    const files = importFixtures();
+    const mark = speechMark();
+    await pasteText(readFileSync(files.malicious, "utf8"));
+    await b.$("button=Preview").click();
+    await b.$('input[name="import-name"]').waitForDisplayed({ timeout: 10_000 });
+    const D19 = "Galleria does not run the scripts of profiles. If the profile depends on it, it may not work fully.";
+    // WebKitGTK gives each item of the list the whole sentence as its name: the line, the directive and the reason
+    const tree = await waitForTree((t) => t.some((n) => n.role === "list item" && n.name.includes(D19)), "a list item with the text of D19");
+    const items = tree.filter((n) => n.role === "list item" && n.name.includes("Directive"));
+    record("I5g the notices of the preview of the malicious profile", speechSince(mark), tree);
+    const names = JSON.stringify(items.map((n) => n.name));
+    expect(items.find((n) => n.name.includes(" up "))?.name, names).toContain(D19);
+    expect(items.find((n) => n.name.includes(" plugin "))?.name, names).toContain(D19);
+    // one item for each line that was taken out, in a list of its own with a title
+    expect(items, names).toHaveLength(5);
+    expect(tree.some((n) => n.role === "heading" && /what the import changed/i.test(n.name)), "the list has its title").toBe(true);
+    // what is read is the line, the name of the directive and the reason, never an argument of it
+    for (const item of items) expect(item.name).not.toMatch(/PWNED|touch|EVIL/);
   });
 });

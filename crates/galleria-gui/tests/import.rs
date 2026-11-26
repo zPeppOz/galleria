@@ -1276,6 +1276,210 @@ fn the_offer_goes_to_the_page_as_the_open_file_event() {
     assert_clean(&payload, &[world.root.path()]);
 }
 
+// ---- the whole round (T7) -------------------------------------------------------------------------------------------
+
+#[test]
+fn no_import_command_returns_a_secret_after_a_full_round() {
+    // every way a file reaches the window, and every way it ends: nothing that comes back through a command, or that the
+    // page hears as an event, holds a secret, a key or the folder of a file (I3)
+    let world = World::seeded();
+    let (gui, _picker) = gui_picking(&world, Some(world.files.separate.clone()));
+    let heard: Arc<Mutex<Vec<String>>> = Arc::default();
+    for event in [
+        galleria_gui::events::EV_OPEN_FILE,
+        galleria_gui::events::EV_DROP_HOVER,
+    ] {
+        let sink = Arc::clone(&heard);
+        gui._app.handle().listen(event, move |e| {
+            sink.lock().unwrap().push(e.payload().to_owned());
+        });
+    }
+    let mut seen: Vec<(&str, String)> = vec![];
+    let mut note = |what: &'static str, answer: Result<Value, Value>| {
+        let value = answer.unwrap_or_else(|e| e);
+        seen.push((what, value.to_string()));
+        value
+    };
+    let malicious = fs::read_to_string(&world.files.malicious).unwrap();
+    let inline = fs::read_to_string(&world.files.inline).unwrap();
+
+    // pasted text, saved
+    let text = note(
+        "import_from_text",
+        invoke(
+            &gui.window,
+            "import_from_text",
+            json!({ "text": malicious }),
+        ),
+    );
+    note(
+        "import_commit (text)",
+        invoke(
+            &gui.window,
+            "import_commit",
+            json!({ "id": text["id"], "name": "Text", "group": null }),
+        ),
+    );
+    // a file chosen in the window «Open»: first given up, then saved
+    let picked = note(
+        "import_pick_file",
+        invoke(&gui.window, "import_pick_file", json!({})),
+    );
+    note(
+        "import_discard (picked)",
+        invoke(&gui.window, "import_discard", json!({ "id": picked["id"] })),
+    );
+    let picked = note(
+        "import_pick_file (again)",
+        invoke(&gui.window, "import_pick_file", json!({})),
+    );
+    note(
+        "import_commit (picked)",
+        invoke(
+            &gui.window,
+            "import_commit",
+            json!({ "id": picked["id"], "name": "Picked", "group": "Lavoro" }),
+        ),
+    );
+    // a file dragged onto the window, saved; and one opened from outside, given up
+    galleria_gui::events::offer_from_outside(
+        gui._app.handle(),
+        std::slice::from_ref(&world.files.office),
+        Origin::Drop,
+    );
+    let dropped = note(
+        "import_pending (drop)",
+        invoke(&gui.window, "import_pending", json!({})),
+    );
+    note(
+        "import_commit (drop)",
+        invoke(
+            &gui.window,
+            "import_commit",
+            json!({ "id": dropped["preview"]["id"], "name": "Dropped", "group": null }),
+        ),
+    );
+    galleria_gui::events::offer_from_outside(
+        gui._app.handle(),
+        std::slice::from_ref(&world.files.inline),
+        Origin::Open,
+    );
+    let opened = note(
+        "import_pending (open)",
+        invoke(&gui.window, "import_pending", json!({})),
+    );
+    note(
+        "import_discard (open)",
+        invoke(
+            &gui.window,
+            "import_discard",
+            json!({ "id": opened["preview"]["id"] }),
+        ),
+    );
+    // the errors: a text with a secret in it that is not a profile, a file outside its folder, two files, a preview that is gone
+    note(
+        "import_from_text (broken)",
+        invoke(
+            &gui.window,
+            "import_from_text",
+            json!({ "text": format!("client\n<key>\n{SECRET_MARK}broken\n") }),
+        ),
+    );
+    note(
+        "import_from_text (missing file)",
+        invoke(
+            &gui.window,
+            "import_from_text",
+            json!({ "text": "client\nca missing.crt\n" }),
+        ),
+    );
+    galleria_gui::events::offer_from_outside(
+        gui._app.handle(),
+        std::slice::from_ref(&world.files.outside),
+        Origin::Open,
+    );
+    note(
+        "import_pending (outside folder)",
+        invoke(&gui.window, "import_pending", json!({})),
+    );
+    galleria_gui::events::offer_from_outside(
+        gui._app.handle(),
+        &[world.files.inline.clone(), world.files.office.clone()],
+        Origin::Drop,
+    );
+    note(
+        "import_pending (two files)",
+        invoke(&gui.window, "import_pending", json!({})),
+    );
+    note(
+        "import_commit (gone)",
+        invoke(
+            &gui.window,
+            "import_commit",
+            json!({ "id": text["id"], "name": "Again", "group": null }),
+        ),
+    );
+    let again = note(
+        "import_from_text (to refuse the name)",
+        invoke(&gui.window, "import_from_text", json!({ "text": inline })),
+    );
+    note(
+        "import_commit (name refused)",
+        invoke(
+            &gui.window,
+            "import_commit",
+            json!({ "id": again["id"], "name": "   ", "group": null }),
+        ),
+    );
+    note(
+        "import_discard (last)",
+        invoke(&gui.window, "import_discard", json!({ "id": again["id"] })),
+    );
+    // and what the window shows afterwards: the list and one imported profile
+    let list = note(
+        "profiles_list",
+        invoke(&gui.window, "profiles_list", json!({})),
+    );
+    assert_eq!(list["profiles"].as_array().unwrap().len(), 8);
+    note(
+        "profile_get",
+        invoke(
+            &gui.window,
+            "profile_get",
+            json!({ "id": list["profiles"][0]["id"] }),
+        ),
+    );
+
+    assert!(
+        seen.iter().all(|(_, shown)| shown.len() > 2),
+        "a command answered nothing: {seen:?}"
+    );
+    let folder = world.files.inline.parent().unwrap().to_string_lossy();
+    let root = world.root.path().to_string_lossy();
+    let events = heard.lock().unwrap();
+    assert!(events.len() >= 4, "the page heard too little: {events:?}");
+    for shown in seen
+        .iter()
+        .map(|(what, shown)| (*what, shown.as_str()))
+        .chain(events.iter().map(|shown| ("an event", shown.as_str())))
+    {
+        let (what, shown) = shown;
+        assert!(
+            !shown.contains(SECRET_MARK),
+            "{what}: a secret is in {shown}"
+        );
+        assert!(
+            !shown.contains("PRIVATE KEY"),
+            "{what}: a key is in {shown}"
+        );
+        assert!(
+            !shown.contains(&*folder),
+            "{what}: the folder is in {shown}"
+        );
+        assert!(!shown.contains(&*root), "{what}: the folder is in {shown}");
+    }
+}
+
 // ---- the fixtures ---------------------------------------------------------------------------------------------------
 
 #[test]

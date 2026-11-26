@@ -1150,3 +1150,114 @@ Il rosso su 27 e 79 **non è di B4**: è il DCO del kernel che Docker rootless n
 - Il profilo malevolo, importato dalla finestra e connesso dalla CLI sul 26, arriva a **`connected`**, come il piano si aspettava ma non aveva eseguito: tolte le direttive resta il profilo `base`. `openvpn` parte come `/usr/sbin/openvpn --config /dev/stdin`: la configurazione passa dallo standard input, quindi gli argomenti non dicono nulla delle direttive (il controllo su `--up`, `--plugin` e `--management 0.0.0.0` negli argomenti è debole; quello che conta è che le righe non sono nel profilo salvato e che nessun file `PWNED-*` compare, né nel `/tmp` del client né in quello privato del demone).
 - `/tmp` del client contiene già, come sottocartella, il `/tmp` privato del demone (`/tmp/systemd-private-…-galleriad.service-…/tmp`): il `find` su `/tmp` basterebbe, e quello su `/proc/<pid>/root/tmp` è una seconda via sullo stesso posto, tenuta per chiarezza.
 - Per la GUI il «Gtk-CRITICAL» di T3 non compare qui: nessuna finestra «Apri» è in gioco (i file arrivano come argomenti).
+
+### B4 · chiusura: tastiera, fumo, screen reader (T7)
+
+**Cosa ha trovato il giro da tastiera.** Un buco vero: con `Ctrl+O` premuto prima di qualunque `Tab` (il fuoco è sul `body`, come all'avvio) la finestra di import, chiusa con `Esc` o «Annulla», **ridava il fuoco al `body`**: la libreria lo restituisce a ciò che lo aveva, e allora non c'era niente. Succede anche con una finestra aperta da un file che arriva da fuori (secondo avvio, trascinamento) mentre nulla ha il fuoco. `focus_is_never_lost_to_the_body_during_the_import` è stata **rossa** («the focus after giving up the first step: expected body not to be body») e corretta in `Shell.tsx` (`closeImport`: se dopo la chiusura il fuoco è sul `body`, va a «Import…», il controllo che apre la finestra); poi verde. Nient'altro nei componenti.
+
+**Prove nuove di T7.**
+
+| Livello | Prova | Cosa dice |
+|---|---|---|
+| Vitest (`keyboard.test.tsx`) | `a_full_import_tour_needs_no_pointer` | `Ctrl+O`, testo, anteprima, un nome nostro e un gruppo scelto (`fireEvent.change` sul `select`: jsdom non lo guida con i tasti), «Importa» (fuoco sulla riga nuova, «Imported “Casa”.»); poi `Ctrl+O`, «Choose a file…» (la finestra di Rust è finta), «Cancel»: niente in lista, niente detto |
+| | `focus_is_never_lost_to_the_body_during_the_import` | il fuoco non finisce sul `body` dopo: finestra annullata (primo e secondo passo), errore del testo, anteprima scaduta, offerta arrivata da fuori (anteprima e errore). **Rossa e corretta**, vedi sopra. Il piano diceva «esteso» il `focus_is_never_lost_to_the_body` di B2: è una prova sorella, perché ognuna di queste vie vuole un'app con un importatore suo |
+| | `the_outcome_of_an_import_is_said_once_and_an_error_of_the_import_is_not_said` | al posto di estendere `no_outcome_depends_on_a_live_region_alone` (che resta com'è e controlla che nessun `ToastProvider` fuori da `design/` manchi di `announce`): l'esito con «2 directives removed» arriva a `announce` una volta, *polite*, con il testo dell'avviso; un errore dell'import non chiama `announce` e non fa comparire un avviso |
+| Rust (`tests/import.rs`) | `no_import_command_returns_a_secret_after_a_full_round` | testo, file scelto (lasciato e poi salvato), file trascinato, file aperto, quattro errori (testo rotto, file mancante, fuori cartella, due file), `import_pending`, `import_commit` (anche su un'anteprima che non c'è più e con un nome rifiutato), `import_discard`, la lista e un `profile_get`: nessuna risposta e nessuno degli eventi sentiti dalla pagina contiene `SEED-SECRET-`, `PRIVATE KEY` o la cartella (I3). Per scelta non c'è un testo che nomina un file con `SEED-SECRET-` nel nome: `data.file` rimanda il nome del file **che l'utente stesso ha scritto**, come già ammette `no_import_command_returns_a_secret` |
+| Fumo | `gui_import_equals_cli_import` | `inline.ovpn` (argomento del processo), `separate.ovpn` e `office.conf` (secondo avvio) importati dalla finestra e, in un'altra `XDG_CONFIG_HOME`, da `galleria import`: **i file dei profili sono uguali** salvo id e date, e **i file dei segreti uguali** (I6). Provata rossa cambiando a mano il file che importa la CLI (`office.conf` al posto di `inline.ovpn`: «the profile «inline» is not what the CLI saves»). Con `dns.ovpn` al posto di `inline.ovpn` resta **verde**, e non per un difetto: l'import toglie le due righe `up`/`down` e il risultato è lo stesso profilo |
+| | `the_cli_lists_what_the_window_imported` | dopo due import, `galleria list` elenca i sette profili |
+| | `import_works_with_the_daemon_stopped` | a demone fermo, dalla rubrica vuota: «Import a profile…», testo, nome, «Importa»; il pannello «Start the service» è ancora lì, un profilo e un file di segreti sul disco |
+| | `no_csp_violation_during_the_import_tour` | testo, anteprima, «Back», «Cancel», file consegnato da un secondo avvio (profilo malevolo, salvato; hook di WireGuard, annullato; file non supportato): nessuna violazione |
+| Orca (`import.a11y.ts`) | `I5f_an_error_of_the_import_takes_the_focus_and_is_not_announced` | un testo con un blocco `<key>` non chiuso: la nota dell'errore (`section`) **ha il fuoco** e dentro c'è l'avviso (`notification` con l'immagine «Error»: WebKitGTK esporta `role=alert` come `notification`); dopo 1,5 s il fuoco è ancora lì; **nessun** `object:announcement`; niente scritto |
+| | `I5g_the_text_of_d19_is_in_the_tree_as_the_text_of_the_list` | il testo di D19 è nell'albero come **nome** delle voci dell'elenco: «Line 30 · Directive up removed: Galleria does not run the scripts of profiles. If the profile depends on it, it may not work fully.» (e `plugin`; `status`, `writepid`, `setenv`: «Galleria does not allow it in profiles.»): cinque voci, con il titolo «WHAT THE IMPORT CHANGED» (maiuscolo per il CSS, che l'albero riporta) |
+
+**Cosa si è visto e che il piano non diceva.**
+
+- **L'errore dell'import non è detto da Orca 46.1 nell'immagine.** Nel parlato registrato di `I5f` ci sono la finestra e il campo («Import profile dialog…», «Paste the text of the profile entry client.») e **nessuna riga con il testo dell'errore**, benché il fuoco sia sulla sua nota. L'albero è giusto (fuoco, `notification`, immagine «Error»). È la famiglia dei buchi già scritti in B2 e B3 (`S4b`, errore di campo `R5a`): il fuoco su un `div` non è letto da Orca 46.1 con WebKitGTK nell'immagine, mentre su un GNOME vero Orca 50.3 e 51.1 dicono i nomi dei campi (spike). **Non asserito**, come scrive il piano («parlato registrato»), e **non è un difetto da correggere in B4**: Q27 è chiusa (un errore prende il fuoco e non si annuncia). Va ricontrollato su un GNOME vero (B6, Q28).
+- Il testo di D19 sta nel **nome** delle voci dell'elenco, non solo nell'interfaccia del testo: `atspi-dump.py` non ha avuto bisogno di una colonna in più (una prima prova con una colonna del testo è stata scritta e poi tolta).
+- Il difetto trovato è lo stesso di B2 in un posto nuovo: chi apre una finestra senza che nulla abbia il fuoco.
+
+**Criteri di uscita del blocco.**
+
+| # | Esito | Prova |
+|---|---|---|
+| I1 | **Verde.** Testo, file scelto, file trascinato e file aperto (argomento, secondo avvio, `gio launch`) portano alla stessa anteprima; sul disco non cambia nulla prima di «Importa»; «Annulla», la chiusura e la scadenza non lasciano niente | `nothing_is_written_before_import`, `a_dropped_file_becomes_a_pending_preview` e le altre di `tests/import.rs`; `I5b`, `I5c`, `I5e`; `the_app_started_with_a_file_opens_its_preview` |
+| I2 | **Verde sul 26; sul 27 e 79 verde per «nessuno script gira», rosso per la connessione OpenVPN (DCO, vedi T6).** Il testo di D19 è nell'anteprima, «N direttive rimosse» dopo l'import, lo script non gira mai | `the_malicious_profile_shows_the_d19_text_and_runs_nothing`, `I5g`; `t17`: `PWNED-*` vuoto sui tre client (con la prova di controllo) |
+| I3 | **Verde** | `no_import_command_returns_a_secret`, `…_after_a_full_round`, `no_command_takes_a_path`, `the_page_never_listens_to_the_drag_events_of_tauri`; i permessi nuovi sono solo i comandi |
+| I4 | **Verde, con le riserve di T5** (nessun secondo utente vero sul socket, nessun file manager vero, nessun Wayland) | `tests/instance.rs`, `a_second_launch_hands_the_file_to_the_first_window`, `a_second_launch_without_a_runtime_dir_opens_a_second_window`, `tests/config.rs` |
+| I5 | **Verde, con un buco di Orca dichiarato** (l'errore non è pronunciato nell'immagine, vedi sopra): tastiera per ogni componente e per il giro intero; axe nei file di prova; esito detto **una volta**, *polite* (`(1, 0, Imported “separate”.)`, `(1, 0, Imported “office”. 1 directive removed.)`); l'anteprima è un `dialog` col fuoco su «Name»; un errore ha il fuoco | `keyboard.test.tsx`, `I5a`–`I5g` |
+| I6 | **Verde.** `git diff main -- crates/galleria-ipc crates/galleriad 'crates/galleria-backend*' crates/galleria-cli` **vuoto**; in `galleria-profile/src` **202 righe aggiunte e 0 tolte**; ciò che la finestra importa è ciò che importa la CLI | gruppo dell'host verde; `gui_import_equals_cli_import` |
+| G3 | **Verde sul 26, parziale su 27 e 79** (T6): finestra e CLI importano uguale, la CLI e il demone elencano e connettono ciò che la finestra ha importato, nessun `PWNED-*`; su 27 e 79 la connessione OpenVPN non arriva (DCO negato da Docker rootless: limite noto, stesso errore della prova `t16` già esistente) | `lab-import.e2e.ts`, `t17_gui_import` sui tre client, `gui_import_equals_cli_import` |
+
+**Punti [S] di B4** (S9–S11 anche nella spec §17).
+
+| # | Esito | Dove |
+|---|---|---|
+| S9 | **Vero**: i percorsi del trascinamento arrivano a Rust senza passare dalla pagina | T4 |
+| S10 | **Vero** su Ubuntu 24.04, 26.04.1 e Fedora 45: `.ovpn` è `application/x-openvpn-profile`, `.conf` è `text/plain` | T5 |
+| S11 | **Vero**: senza `XDG_RUNTIME_DIR` l'app parte e lo dice su `stderr` | T5 |
+| S27 | **Vero con una correzione** (il campo del percorso compare scrivendo `/`, non con `Ctrl+L` via AT-SPI) | T3 |
+| S28 | **Vero** al primo tentativo: il trascinamento vero sotto Xvfb senza gestore di finestre, con `Atspi.generate_mouse_event` | T4 |
+| S29 | **Vero**: `Secret` si azzera quando cade (letto nel sorgente, non misurato) | T1 |
+| S30 | **Vero**: `tauri-driver` passa gli argomenti di `tauri:options.args` | T5 |
+| S31 | **Chiamate fatte, effetto non verificato**: `show`, `unminimize`, `set_focus` non danno errore; che la finestra salga davanti e prenda il fuoco non è provato (nessun gestore di finestre sotto Xvfb; su Wayland il compositore può negarlo) | T5 |
+| S32 | **Vero con `gio launch`** (non con un file manager vero) | T5 |
+| S33 | **Vero**: `lab/out/` è leggibile dall'immagine della GUI, niente `docker cp` | T6 |
+
+**Trascrizione di Orca del giro** (Orca 46.1 nell'immagine, righe `SPEECH OUTPUT` di `target/gui-a11y/transcript.txt` così come sono, dal secondo giro).
+
+```
+## I5b the import of a file chosen in the real window
+SPEECH OUTPUT: Imported “separate”.
+SPEECH OUTPUT: landmark Profile list
+SPEECH OUTPUT: Connections list box
+SPEECH OUTPUT: separate.
+SPEECH OUTPUT: vpn.fixture.example:1194 OpenVPN.
+## I5d the preview of a file, as a dialog
+SPEECH OUTPUT: Import… push button.
+SPEECH OUTPUT: Import profile dialog Choose a file or paste the text of the profile. Nothing is saved until you choose Import.
+SPEECH OUTPUT: Paste the text of the profile entry.
+SPEECH OUTPUT: Choose a file… push button.
+SPEECH OUTPUT: file chooser.
+SPEECH OUTPUT: /
+SPEECH OUTPUT: Files.
+SPEECH OUTPUT: table with 1 row 4 columns.
+SPEECH OUTPUT: text.
+SPEECH OUTPUT: /tmp/tmp.gHVgkJi1el/fixtures/separate.ovpn.
+## I5e the import of a dropped file
+SPEECH OUTPUT: Galleria frame.
+SPEECH OUTPUT: Name entry office.
+SPEECH OUTPUT: Imported “office”. 1 directive removed.
+SPEECH OUTPUT: office.
+SPEECH OUTPUT: office.fixture.example:51820 WireGuard.
+## I5f an error of the import
+SPEECH OUTPUT: Import profile dialog Choose a file or paste the text of the profile. Nothing is saved until you choose Import.
+SPEECH OUTPUT: Paste the text of the profile entry client.
+SPEECH OUTPUT: client
+```
+
+(Le righe di `I5d` e `I5e` sono selezionate dal file: tra una e l'altra Orca dice anche altro, per esempio le finestre del trascinamento.) La riga dell'evento (file di debug di Orca): `EVENT MANAGER: Dequeued object:announcement for [frame: 'Galleria'] in [application: 'galleria-gui'] (1, 0, Imported “separate”.)` e `(1, 0, Imported “office”. 1 directive removed.)`: **una volta ciascuna**, *polite*. Per `I5f` non c'è nessuna riga `announcement`, e nemmeno una riga `SPEECH OUTPUT` con il testo dell'errore (vedi sopra).
+
+**Numeri per livello** (sull'ultimo commit di codice; un giro ciascuno salvo dove scritto).
+
+| Livello | Numero |
+|---|---|
+| Vitest (`scripts/gui.sh check`) | **550** prove in 44 file (547 dopo T5, 3 nuove di tastiera) |
+| Rust, `galleria-gui` (`scripts/gui.sh check`) | **304** prove, 0 rosse (`import` 47, `instance` 28, `config` 12) |
+| Rust, host (`cargo test --workspace --exclude galleria-gui`) | **582** prove, 0 rosse; fmt, clippy, `cargo deny`, confini verdi |
+| Fumo (`scripts/gui.sh smoke`) | **36/36**, **tre giri di fila** (32 dopo T5, 4 nuove di T7) |
+| Orca (`scripts/gui.sh a11y`) | **41/41**, **due giri di fila** (`shell` 12, `rubrica` 11, `overlays` 11, `import` 7: `I5a`–`I5g`) |
+| Laboratorio (`scripts/gui.sh lab-g3 <client>`, `t17`) | **26: 4/4**; **27 e 79: 2/4** (elenco e WireGuard verdi; le due con OpenVPN rosse per il DCO) |
+
+**Non verificato (B4).**
+
+- **Il trascinamento da un file manager vero** (Nautilus, Dolphin) e **su Wayland**: provato solo con una finestra GTK che offre `text/uri-list` e un mouse sintetico via AT-SPI, sotto Xvfb senza gestore di finestre.
+- **La finestra «Apri» sotto un portale del desktop** (GNOME, `xdg-desktop-portal`: un altro processo, un altro albero AT-SPI) e **su Wayland**; la scelta con il mouse in una cartella e la scelta di un file che il filtro nasconde.
+- **Il doppio click in un file manager vero**: l'associazione è provata con `gio launch` su un `.desktop` scritto nella prova, non con l'app installata da un pacchetto (niente `desktop-file-utils` nell'immagine: il `mimeinfo.cache` lo scrive la prova).
+- **La finestra portata davanti** (S31) e che prenda il fuoco, su Wayland e su un desktop vero.
+- **Un secondo utente reale sul socket dell'istanza unica** (la prova serve «l'uid successivo»), e una cartella d'esecuzione su un filesystem senza `flock` (NFS).
+- **L'import nella finestra su Ubuntu 26.04 e Fedora** (Q37 (a)): la finestra gira solo nell'immagine di Ubuntu 24.04; sui tre client girano la CLI e il demone. Resta alla passata manuale di B6. In B5 la finestra deve parlare con il demone vero e la domanda di Q37 torna.
+- **La connessione OpenVPN dei profili importati su 26.04 e Fedora** (DCO negato da Docker rootless, lo stesso limite di T13 e T16): da rifare sul job `lab` della CI.
+- **Il tipo MIME dove non è stato guardato**: Ubuntu 24.04, 26.04.1 e Fedora 45 con `shared-mime-info` installato; non altri.
+- **L'errore dell'import detto da Orca**: il parlato non c'è nell'immagine (Orca 46.1); su GNOME vero va ricontrollato.
+- **Il job `gui` e `gui-smoke` di CI** con il codice di B4: non girati su un runner (nessun push).
+- **Il `Gtk-CRITICAL … WIDGET_REALIZED_FOR_EVENT` di T3** non è stato toccato.

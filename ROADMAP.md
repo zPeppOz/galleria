@@ -110,11 +110,12 @@ La rubrica in Tauri 2 + React sopra il demone della fase 1, in sei blocchi B1–
   - [x] editor raw con la validazione delle direttive della fase 1: `a_script_directive_cannot_be_saved_from_the_editor`, `a_comment_typed_in_the_editor_is_saved_as_written`, `R5d`
   - [x] duplica, esporta ed elimina profilo; «ultimo uso» in `state.toml` (D32): duplica ed elimina provati nella finestra vera, da tastiera e con Orca (`rubrica_works_with_the_daemon_stopped`, `R4b`, `R4c`); «Esporta» provato anche con la finestra «Salva» GTK vera, pilotata via AT-SPI (`R4e` salva, `R4f` annulla, `a11y` verde due giri di fila; resta non provata sotto un portale del desktop o Wayland, docs/08 «Non verificato»)
   - [ ] ci si può fermare qui: rubrica completa sui profili importati dalla CLI, senza connettere: R1–R6 verdi tranne Orca su un GNOME vero (docs/08, «B3 · chiusura»)
-- [ ] B4 · Import
-  - [ ] `.ovpn` con blocchi inline o file separati e `.conf` WireGuard, da file, trascinamento o testo incollato
-  - [ ] anteprima con gli avvisi e il testo di D19, salvataggio solo dopo «Importa» (G3)
-  - [ ] associazione di `.ovpn` e istanza unica; QR WireGuard fuori dalla fase 2 (D31)
-  - [ ] ci si può fermare qui: si importa dalla GUI e si connette ancora dalla CLI
+- [ ] B4 · Import <!-- branch: galleria/t_39398d55-galleria-b4-gruppo-c-t6-e-t7-g3-nel-labo · task: t_39398d55 · by: genny -->
+  - [x] `.ovpn` con blocchi inline o file separati e `.conf` WireGuard, da file, trascinamento o testo incollato: `import_file_reads_inline_and_separate_files_into_the_same_profile`, `a_profile_pasted_as_text_is_imported`, `I5b` (file scelto nella finestra «Apri» GTK vera), `I5e` (trascinamento vero), `gui_import_equals_cli_import` (la finestra e la CLI della fase 1 salvano gli stessi file)
+  - [x] anteprima con gli avvisi e il testo di D19, salvataggio solo dopo «Importa» (G3): `nothing_is_written_before_import`, `the_malicious_profile_shows_the_d19_text_and_runs_nothing`, `I5g`; nel laboratorio `t17_gui_import` sul client 26 (profilo malevolo importato dalla finestra, connesso dalla CLI, nessun `PWNED-*`) e `find` vuoto anche su 27 e 79
+  - [ ] connessione OpenVPN dei profili importati su Ubuntu 26.04 e Fedora: rossa per il DCO che Docker rootless nega (EPERM, lo stesso limite di T13 e T16), da rifare sul job `lab` della CI; WireGuard e `galleria list` sono verdi sui tre client
+  - [x] associazione di `.ovpn` e istanza unica; QR WireGuard fuori dalla fase 2 (D31): `an_ovpn_is_opened_by_the_desktop_entry` (con `gio launch`), `a_second_launch_hands_the_file_to_the_first_window`, `tests/instance.rs`; non provati un file manager vero e Wayland
+  - [x] ci si può fermare qui: si importa dalla GUI e si connette ancora dalla CLI (I1–I6 e G3 con la loro prova, i buchi sono in `docs/08-esito-fase2.md`, «B4 · chiusura»; il job `gui` e `gui-smoke` di CI non sono ancora girati su un runner, niente push)
 - [ ] B5 · Connessione
   - [ ] archivio dei segreti con Secret Service e ripiego sul file `0600`, lettura da entrambi anche nella CLI (D25, G6; crate oggi [S])
   - [ ] connetti, disconnetti e sostituisci senza conferma tra profili propri (D5, D28, G4); sette stati, `detail` e statistiche dal vivo

@@ -19,6 +19,13 @@ export interface Question {
 /** A question about a session that is not of this rubrica, waiting for the answer (D21): ending it, or replacing it with the profile `target`. `name` is the name of that session. */
 export interface Confirmation { kind: "disconnect" | "replace"; name: string; target?: string }
 
+/**
+ * Asked of `connect` and `disconnect` by what does not start from a button of the window (the menu of the tray): called when the call
+ * ended in something that needs the person, a question or an error, so that the window can be shown (plan B6, P7). Not called when the
+ * call did what it was asked.
+ */
+export interface Attention { onAttention?: () => void }
+
 /** What the page knows of the connection and can do about it. The state is the flow of events (spec §3.3), never the answer of a call. */
 export interface Connection {
   /** The link to the service; `null` before the first answer. */
@@ -44,8 +51,8 @@ export interface Connection {
   askToDisconnect: () => void;
   /** The answer: `true` does what was asked (ends it, or replaces it), `false` drops the question and does nothing. */
   answerConfirmation: (yes: boolean) => Promise<void>;
-  connect: (id: string) => Promise<void>;
-  disconnect: () => Promise<void>;
+  connect: (id: string, options?: Attention) => Promise<void>;
+  disconnect: (options?: Attention) => Promise<void>;
   /** Answers the open question. What was typed goes into this one call and nowhere else: the caller empties its fields before it waits. */
   provide: (values: InputAnswer, remember: boolean) => Promise<void>;
   /** Takes the remembered credentials of a profile out of the keyring. */

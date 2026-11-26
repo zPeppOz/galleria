@@ -9,8 +9,9 @@ use crate::{
     supervisor::EventSink,
     tray::Tray,
     tray_tauri::favourites_of,
+    window::{self, WindowControl},
 };
-use galleria_ipc::{LogEntry, Stats, Status};
+use galleria_ipc::{LogEntry, State, Stats, Status};
 use std::{path::PathBuf, sync::Arc};
 use tauri::{AppHandle, DragDropEvent, Emitter, Manager, Runtime, Window, WindowEvent};
 
@@ -58,6 +59,13 @@ impl<R: Runtime> EventSink for TauriSink<R> {
         }
         if let Some(tray) = self.0.try_state::<Arc<Tray>>() {
             tray.set_status(status);
+        }
+        // A question of the daemon needs the person: a window that is hidden in the tray is shown (plan B6, point 4). It is Rust that does
+        // it, from here, so it does not depend on a page that could be stopped.
+        if status.state == State::NeedsInput
+            && let Some(window) = self.0.try_state::<Arc<dyn WindowControl>>()
+        {
+            window::show_if_hidden(&**window);
         }
         self.emit(EV_STATE, status);
     }

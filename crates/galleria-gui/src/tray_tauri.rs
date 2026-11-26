@@ -6,7 +6,7 @@
 
 use crate::{
     tray::{Factory, Surface, Tray, TrayAction, TrayEntry, TrayIcon as Icon, literal},
-    window,
+    window::{self, WindowControl},
 };
 use std::{
     panic::{AssertUnwindSafe, catch_unwind},
@@ -176,8 +176,14 @@ pub fn factory<R: Runtime>(app: AppHandle<R>) -> Factory {
 /// has all the rules of B5 (the replacement, the foreign session, the credentials) and is alive with the window hidden (Q52).
 pub fn run_action<R: Runtime>(app: &AppHandle<R>, action: &TrayAction) {
     match action {
-        TrayAction::Open => window::raise(app),
-        TrayAction::Quit => app.exit(0),
+        TrayAction::Open => match app.try_state::<Arc<dyn WindowControl>>() {
+            Some(window) => window.show(),
+            None => window::raise(app),
+        },
+        TrayAction::Quit => match app.try_state::<Arc<dyn WindowControl>>() {
+            Some(window) => window.quit(),
+            None => app.exit(0),
+        },
         TrayAction::Connect(id) => emit_action(app, &ActionPayload::Connect { id: *id }),
         TrayAction::Disconnect => emit_action(app, &ActionPayload::Disconnect),
     }

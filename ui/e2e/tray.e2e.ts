@@ -2,9 +2,10 @@
 // real WebKitGTK window against the fake daemon, with the menu of its tray read and clicked from the session bus by
 // lab/tests/tray-probe.py. Under Xvfb there is no desktop to show a tray, so the probe stands in for it (`startTrayWatcher`); a test
 // that wants no tray starts no watcher. Run by lab/tests/gui-smoke.sh with the other `*.e2e.ts` files.
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it } from "vitest";
-import { choose, closeApp, daemon, env, openApp, startTrayWatcher, stopTrayWatcher, trayIcon, trayRegistered, trayTexts, until, waitFor, waitForBody, type Browser } from "./support";
+import { choose, closeApp, daemon, env, openApp, startTrayWatcher, stopTrayWatcher, trayClick, trayIcon, trayRegistered, trayTexts, until, waitFor, waitForBody, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 
@@ -67,5 +68,38 @@ describe("the menu of the tray, read from the bus (plan B6, T1)", () => {
     const stderr = await until(() => readFileSync(env("GALLERIA_SMOKE_NO_INDICATOR_STDERR"), "utf8"), (text) => text.includes("no tray"), "stderr never said there is no tray");
     expect(stderr).toMatch(/galleria-gui: no tray/);
     expect(stderr).not.toMatch(/panicked/);
+  });
+});
+
+const cli = (...args: string[]): string => execFileSync(env("GALLERIA_SMOKE_CLI"), ["--socket", env("GALLERIA_SOCKET"), ...args], { encoding: "utf8" }).trim();
+const state = () => trayTexts()[0];
+
+describe("connecting and disconnecting from the menu of the tray (plan B6, T2)", () => {
+  it("G10b_a_favourite_connects_and_disconnects_from_the_menu_alone", async () => {
+    await openWithTray("plain");
+    await until(trayTexts, (texts) => texts.includes("Connect «Ufficio Napoli»"), "the menu never offered «Connect «Ufficio Napoli»»");
+    // no call to the window between the two clicks: the menu and the page do it all
+    trayClick("Connect «Ufficio Napoli»");
+    await until(state, (text) => text === "Connected to «Ufficio Napoli»", "the line of the state never said «Connected to «Ufficio Napoli»»");
+    expect(await until(trayIcon, (icon) => icon === "on", "the icon never became the one of «connected»")).toBe("on");
+    expect(cli("status")).toBe("connected");
+    expect(trayTexts()).toContain("Disconnect «Ufficio Napoli»");
+    trayClick("Disconnect «Ufficio Napoli»");
+    await until(state, (text) => text === "Disconnected", "the line of the state never went back to «Disconnected»");
+    expect(cli("status")).toBe("disconnected");
+    expect(await until(trayIcon, (icon) => icon === "off", "the icon never went back")).toBe("off");
+  });
+
+  it("switching_favourite_from_the_menu_replaces_without_asking", async () => {
+    const b = await openWithTray("plain");
+    await until(trayTexts, (texts) => texts.includes("Connect «Ufficio Napoli»"), "no entry to connect");
+    trayClick("Connect «Ufficio Napoli»");
+    await until(state, (text) => text === "Connected to «Ufficio Napoli»", "the first favourite never connected");
+    trayClick("Connect «Homelab»");
+    await until(state, (text) => text === "Connected to «Homelab»", "the second favourite never replaced the first");
+    // one session, of the second profile, and nobody was asked
+    expect((JSON.parse(cli("status", "--json")) as { profile: { name: string } }).profile.name).toBe("Homelab");
+    expect(await b.$$('[role="dialog"], [role="alertdialog"]')).toHaveLength(0);
+    expect(trayTexts()).toEqual(["Connected to «Homelab»", "Disconnect «Homelab»", "Connect «Ufficio Napoli»", "Open Galleria", "Quit (the VPN stays on)"]);
   });
 });

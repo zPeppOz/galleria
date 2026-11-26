@@ -3,7 +3,7 @@ import { connectProfile, disconnectSession, forgetCredentials, provideInput, typ
 import type { DaemonView, Status } from "../daemon/types";
 import { useToast } from "../design/Toast";
 import { useT } from "../i18n";
-import { ConnectionContext, connectOrReplace, type Confirmation, type Connection, type Question } from "./store";
+import { ConnectionContext, connectOrReplace, type Attention, type Confirmation, type Connection, type Question } from "./store";
 
 /** How long a button stays busy waiting for the first event of a connection that was accepted. */
 const PENDING_MS = 10_000;
@@ -100,7 +100,7 @@ export function ConnectionProvider({ view, ownIds, onCredentialsChanged, childre
   const open = useRef<Question | null>(null);
   open.current = question;
 
-  const connect = useCallback(async (id: string) => {
+  const connect = useCallback(async (id: string, options?: Attention) => {
     setError(null);
     setPending(id);
     try {
@@ -114,21 +114,24 @@ export function ConnectionProvider({ view, ownIds, onCredentialsChanged, childre
         const profile = refused.data.profile as { name?: string } | undefined;
         setPending(null);
         setConfirmation({ kind: "replace", name: profile?.name ?? "", target: id });
+        options?.onAttention?.();
         return;
       }
       setPending(null);
       setError({ id, error: refused });
+      options?.onAttention?.();
     }
   }, []);
 
   const current = useRef(status);
   current.current = status;
-  const disconnect = useCallback(async () => {
+  const disconnect = useCallback(async (options?: Attention) => {
     setError(null);
     try {
       await disconnectSession();
     } catch (failure) {
       setError({ id: current.current?.profile?.id ?? "", error: failure as CommandError });
+      options?.onAttention?.();
     }
   }, []);
   const provide = useCallback(async (values: InputAnswer, remember: boolean) => {

@@ -99,7 +99,8 @@ pub fn configure_with<R: Runtime>(
             commands::connection::forget_credentials,
             commands::logs::logs_get,
             commands::logs::logs_export,
-            commands::tray::tray_labels
+            commands::tray::tray_labels,
+            commands::window::window_show
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.
@@ -127,6 +128,10 @@ pub fn configure_with<R: Runtime>(
                 move |rubrica| tray.set_favourites(tray_tauri::favourites_of(rubrica))
             });
             app.manage(tray);
+            // What the commands of the window ask of it (show it): in the state before any page can call them.
+            app.manage::<Arc<dyn window::WindowControl>>(Arc::new(window::TauriWindow(
+                app.handle().clone(),
+            )));
             let sink = std::sync::Arc::new(events::TauriSink(app.handle().clone()));
             let handle = supervisor::spawn(
                 socket.clone(),

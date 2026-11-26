@@ -2,17 +2,32 @@
 //! only when it changed; the texts of the page; and, on the mock runtime, the click on an entry.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+#[path = "support/seed.rs"]
+mod seed;
+mod support;
+#[path = "support/world.rs"]
+mod world;
+
+use galleria_gui::window::WindowControl;
 use galleria_gui::{
     link::{DaemonView, LinkState},
     tray::{
         LABEL_MAX, MAX_FAVOURITES, Surface, Tray, TrayAction, TrayEntry, TrayIcon, TrayInput,
         TrayLabels, literal, model,
     },
+    tray_tauri::{ActionPayload, EV_TRAY_ACTION, run_action},
 };
 use galleria_ipc::{ProfileRef, State, Status};
 use rstest::rstest;
-use std::sync::{Arc, Mutex};
+use serde_json::{Value, json};
+use std::{
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
+use tauri::Listener;
 use uuid::Uuid;
+use world::{Options, World, start};
 
 fn labels() -> TrayLabels {
     TrayLabels {
@@ -420,4 +435,160 @@ fn a_click_asks_for_what_the_entry_of_that_menu_says() {
     // a click on a menu that was written again since asks for nothing
     tray.set_status(&status(State::Connected, Some((id(1), "Ufficio"))));
     assert_eq!(tray.action(generation, at(&TrayAction::Quit)), None);
+}
+
+// ---- a click on the menu (plan B6, T2): `Connect` and `Disconnect` go to the page, `Open` and `Quit` are Rust's ---------------
+
+/// What the page is asked to do, as it would hear it.
+fn hear(world: &World) -> Arc<Mutex<Vec<Value>>> {
+    let heard = Arc::new(Mutex::new(vec![]));
+    let sink = Arc::clone(&heard);
+    world.app().listen(EV_TRAY_ACTION, move |event| {
+        sink.lock()
+            .unwrap()
+            .push(serde_json::from_str(event.payload()).unwrap());
+    });
+    heard
+}
+
+fn wait_for(what: &str, ready: impl Fn() -> bool) {
+    let begun = Instant::now();
+    while !ready() {
+        assert!(
+            begun.elapsed() < Duration::from_secs(8),
+            "never happened: {what}"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[test]
+fn a_click_on_connect_reaches_the_page_as_an_action_with_the_id() {
+    let world = start(Options::default());
+    let heard = hear(&world);
+    let homelab = world.id("Homelab");
+    run_action(world.app(), &TrayAction::Connect(homelab));
+    wait_for("the action", || heard.lock().unwrap().len() == 1);
+    assert_eq!(
+        heard.lock().unwrap()[0],
+        json!({ "action": "connect", "id": homelab.to_string() })
+    );
+    run_action(world.app(), &TrayAction::Disconnect);
+    wait_for("the second action", || heard.lock().unwrap().len() == 2);
+    assert_eq!(heard.lock().unwrap()[1], json!({ "action": "disconnect" }));
+    // Rust did not connect anything on its own: the session is the page's to ask for
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(world.daemon().harness.connects.lock().unwrap().is_empty());
+}
+
+/// A window that says whether it is hidden and counts how many times it was asked to show and to quit.
+struct TestWindow {
+    hidden: AtomicBool,
+    shown: AtomicUsize,
+    quit: AtomicUsize,
+}
+
+impl TestWindow {
+    fn new(hidden: bool) -> Arc<Self> {
+        Arc::new(Self {
+            hidden: AtomicBool::new(hidden),
+            shown: AtomicUsize::new(0),
+            quit: AtomicUsize::new(0),
+        })
+    }
+
+    fn shown(&self) -> usize {
+        self.shown.load(Ordering::SeqCst)
+    }
+}
+
+impl WindowControl for TestWindow {
+    fn show(&self) {
+        self.shown.fetch_add(1, Ordering::SeqCst);
+        self.hidden.store(false, Ordering::SeqCst);
+    }
+
+    fn is_hidden(&self) -> bool {
+        self.hidden.load(Ordering::SeqCst)
+    }
+
+    fn quit(&self) {
+        self.quit.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+fn start_with(window: &Arc<TestWindow>, scenario: &'static str) -> World {
+    let control: Arc<dyn WindowControl> = Arc::clone(window) as Arc<dyn WindowControl>;
+    start(Options {
+        scenario,
+        window: Some(control),
+        ..Options::default()
+    })
+}
+
+#[test]
+fn open_and_quit_never_reach_the_page() {
+    let window = TestWindow::new(true);
+    let world = start_with(&window, "plain");
+    let heard = hear(&world);
+    run_action(world.app(), &TrayAction::Open);
+    assert_eq!(window.shown(), 1, "«Open» shows the window");
+    run_action(world.app(), &TrayAction::Quit);
+    assert_eq!(
+        window.quit.load(Ordering::SeqCst),
+        1,
+        "«Quit» asks to end the app"
+    );
+    std::thread::sleep(Duration::from_millis(150));
+    assert!(
+        heard.lock().unwrap().is_empty(),
+        "{:?}",
+        heard.lock().unwrap()
+    );
+}
+
+#[test]
+fn no_tray_action_carries_more_than_an_action_and_an_id() {
+    let id = Uuid::from_u128(7);
+    assert_eq!(
+        serde_json::to_value(ActionPayload::Connect { id }).unwrap(),
+        json!({ "action": "connect", "id": id.to_string() })
+    );
+    assert_eq!(
+        serde_json::to_value(ActionPayload::Disconnect).unwrap(),
+        json!({ "action": "disconnect" })
+    );
+}
+
+#[test]
+fn needs_input_shows_the_hidden_window() {
+    let window = TestWindow::new(true);
+    let world = start_with(&window, "credentials");
+    world.connect("Datacenter Milano", false).unwrap();
+    world.until_state("needs_input", None);
+    wait_for("the hidden window to show on the question", || {
+        window.shown() == 1
+    });
+}
+
+#[test]
+fn a_question_leaves_a_window_that_is_shown_alone() {
+    let window = TestWindow::new(false);
+    let world = start_with(&window, "credentials");
+    world.connect("Datacenter Milano", false).unwrap();
+    world.until_state("needs_input", None);
+    std::thread::sleep(Duration::from_millis(150));
+    assert_eq!(
+        window.shown(),
+        0,
+        "the focus of a window that is open is not taken"
+    );
+}
+
+#[test]
+fn window_show_is_a_command_with_no_parameter() {
+    let window = TestWindow::new(true);
+    let world = start_with(&window, "plain");
+    assert_eq!(world.invoke("window_show", json!({})).unwrap(), Value::Null);
+    assert_eq!(window.shown(), 1);
 }

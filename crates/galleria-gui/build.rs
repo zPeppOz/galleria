@@ -32,6 +32,7 @@ const COMMANDS: &[&str] = &[
     "logs_get",
     "logs_export",
     "tray_labels",
+    "window_show",
 ];
 
 fn main() {

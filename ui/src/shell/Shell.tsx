@@ -3,6 +3,7 @@ import type { SortOrder } from "../app/uiState";
 import type { AppInfo, DaemonView } from "../daemon/types";
 import { Button } from "../design/Button";
 import { ConfirmDialog } from "../design/ConfirmDialog";
+import { useTrayActions } from "../app/tray";
 import { ConnectionProvider } from "../connection/ConnectionProvider";
 import { CredentialsDialog } from "../connection/CredentialsDialog";
 import { ForeignDetail, ForeignRow } from "../connection/ForeignRow";
@@ -73,6 +74,7 @@ export function Shell(props: ShellProps) {
 }
 
 function ShellBody(props: ShellProps) {
+  useTrayActions();
   const { view, info, onRetry, rubrica, importer, incoming = null, dropHover = false, secretStore = null, sort, onSortChange } = props;
   const connection = useConnection();
   const t = useT();

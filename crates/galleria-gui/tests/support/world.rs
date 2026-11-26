@@ -13,6 +13,7 @@ use galleria_gui::{
     rubrica::{Rubrica, SecretFactory},
     supervisor::RelinkPolicy,
     ui_state::UiStateFile,
+    window::WindowControl,
 };
 use serde_json::{Value, json};
 use std::{
@@ -64,6 +65,8 @@ pub struct Options {
     pub secrets: Option<SecretFactory>,
     /// The window «Save» of the test; without one the app keeps its own (which, in a mock app, has no window to ask).
     pub picker: Option<Arc<dyn SavePicker>>,
+    /// The window of the test: one that records what is asked of it (the mock runtime cannot tell a window that is hidden).
+    pub window: Option<Arc<dyn WindowControl>>,
 }
 
 impl Default for Options {
@@ -73,6 +76,7 @@ impl Default for Options {
             daemon: true,
             secrets: None,
             picker: None,
+            window: None,
         }
     }
 }
@@ -101,6 +105,9 @@ pub fn start(options: Options) -> World {
         .manage(announcer);
     if let Some(picker) = options.picker {
         builder = builder.manage(picker);
+    }
+    if let Some(window) = options.window {
+        builder = builder.manage(window);
     }
     let mut app = configure_with(
         builder,
@@ -159,6 +166,11 @@ pub fn start(options: Options) -> World {
 }
 
 impl World {
+    /// The handle of the app, for what happens outside a command (a click on the tray).
+    pub fn app(&self) -> &tauri::AppHandle<MockRuntime> {
+        self._app.handle()
+    }
+
     pub fn id(&self, name: &str) -> Uuid {
         self.seeded
             .profiles

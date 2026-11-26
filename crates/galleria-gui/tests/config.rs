@@ -40,6 +40,7 @@ const ALLOWED: &[&str] = &[
     "allow-logs-get",
     "allow-logs-export",
     "allow-tray-labels",
+    "allow-window-show",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

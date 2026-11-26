@@ -40,3 +40,6 @@ export const logsGet = (after: number | null, limit: number): Promise<{ entries:
  * no place and is not told where it went; `saved` is `false` when the person cancelled.
  */
 export const logsExport = (): Promise<{ saved: boolean }> => invoke("logs_export");
+
+/** Shows the window of the app when it is hidden in the tray (plan B6, P7): an action of the menu of the tray that needs the person calls it first. */
+export const windowShow = (): Promise<void> => invoke<void>("window_show");

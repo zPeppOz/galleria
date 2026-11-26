@@ -36,6 +36,7 @@
     "allow-forget-credentials",
     "allow-logs-get",
     "allow-logs-export",
-    "allow-tray-labels"
+    "allow-tray-labels",
+    "allow-window-show"
   ]
 }

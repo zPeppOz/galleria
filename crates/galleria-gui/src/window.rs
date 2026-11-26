@@ -102,3 +102,42 @@ pub fn raise<R: Runtime>(app: &tauri::AppHandle<R>) {
         let _ = main.set_focus();
     }
 }
+
+/// What the commands and the events of the window need of it, without a type of the runtime (a command that is generic over the runtime does
+/// not do for the check that no command takes a path, which reads the signatures; and the tests of level 2 cannot see a window that is hidden
+/// in the mock runtime): the app puts one in its state, like the announcer and the pickers.
+pub trait WindowControl: Send + Sync {
+    /// Brings the main window forward (`raise`).
+    fn show(&self);
+    /// The main window is not shown (it is in the tray).
+    fn is_hidden(&self) -> bool;
+    /// Ends the app (`AppHandle::exit`). The daemon keeps the session: it is not the app's.
+    fn quit(&self);
+}
+
+/// Shows the main window when it is hidden (in the tray) and leaves a window that is shown alone: no focus is taken from whoever has it. A question of
+/// the daemon (`needs_input`) calls it from the place that receives the state, so it does not depend on a page that could be stopped (plan B6, point 4).
+pub fn show_if_hidden(window: &dyn WindowControl) {
+    if window.is_hidden() {
+        window.show();
+    }
+}
+
+pub struct TauriWindow<R: Runtime>(pub tauri::AppHandle<R>);
+
+impl<R: Runtime> WindowControl for TauriWindow<R> {
+    fn show(&self) {
+        raise(&self.0);
+    }
+
+    fn quit(&self) {
+        self.0.exit(0);
+    }
+
+    fn is_hidden(&self) -> bool {
+        use tauri::Manager;
+        self.0
+            .get_webview_window("main")
+            .is_some_and(|main| !main.is_visible().unwrap_or(true))
+    }
+}

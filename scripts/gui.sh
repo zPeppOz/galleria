@@ -126,7 +126,11 @@ case "${1:-}" in
   smoke-here) smoke_here ;;
   a11y) run_in_image scripts/gui.sh a11y-here ;;
   a11y-here) a11y_here ;;
-  lab-import) run_in_image scripts/gui.sh lab-import-here ;;
+  lab-import)
+    # The profiles of the laboratory are made in containers, root-owned and 0600. With rootless Docker container root is the
+    # invoking user and reads them; on a runner with plain Docker (CI, uid 1001) only container root does.
+    if [[ -r lab/out/base.ovpn ]]; then run_in_image scripts/gui.sh lab-import-here
+    else GUI_UID=0 GUI_GID=0 run_in_image scripts/gui.sh lab-import-here; fi ;;
   lab-import-here) lab_import_here ;;
   lab-g3)
     # The WireGuard keys of the laboratory are new at every `lab/up.sh`, so the window imports after the laboratory is up and

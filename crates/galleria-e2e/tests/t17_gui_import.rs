@@ -1,7 +1,8 @@
 //! G3 in the laboratory (plan B4, T6, Q37 (a)): the profiles the window of the GUI imported are read and connected by the
 //! real CLI and the real daemon on the client. The window itself runs in the `galleria-gui-dev` image (`scripts/gui.sh
 //! lab-import`), which writes its folder of profiles to `target/gui-lab/config/galleria`; the client sees the repository
-//! at `/lab`. Without `GALLERIA_E2E_GUI_STORE=1` every test here skips and says so, as the DCO test does.
+//! at `/lab`. `lab/run.sh` does not run this file without `GALLERIA_E2E_GUI_STORE=1` (a test that skips itself counts as
+//! `ok`); the check below stays for whoever runs the executable by hand.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 use galleria_e2e::*;
 use galleria_ipc::*;

@@ -22,6 +22,11 @@ if [[ -n ${LAB_BEFORE_TESTS:-} ]]; then bash -euc "$LAB_BEFORE_TESTS"; fi
 matched=0
 for executable in lab/out/tests/*; do
   name=$(basename "$executable")
+  # t17 needs the profiles the window imported (scripts/gui.sh lab-g3). Run without them it would pass by skipping itself.
+  if [[ $name == t17_gui_import && ${GALLERIA_E2E_GUI_STORE:-0} != 1 ]]; then
+    echo "lab/run.sh: $name not run: it needs GALLERIA_E2E_GUI_STORE=1 (scripts/gui.sh lab-g3 $client)"
+    continue
+  fi
   args=()
   if [[ -n $filter && $name != *"$filter"* ]]; then args+=("$filter"); fi
   # Count real matches so a misspelled filter cannot produce a false green run.

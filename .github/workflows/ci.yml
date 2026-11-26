@@ -89,6 +89,29 @@ jobs:
           modinfo ovpn | head -n 5
       - run: GALLERIA_E2E_DCO=1 LAB_BUILD=host lab/run.sh ${{ matrix.client }} dco
 
+  # G3 (plan B4, T6): the real window of the GUI imports the profiles of the laboratory and the real CLI and daemon on the
+  # client list and connect them (crates/galleria-e2e/tests/t17_gui_import.rs). `lab` does not run t17 (lab/run.sh says so):
+  # without the imported profiles it would pass by skipping itself, run 45735331757.
+  # The window runs in the image of lab/images/gui.Dockerfile, as in `gui-smoke`: the runner is uid 1001, which the verb
+  # handles, and the toolchain installed here is the one the image mounts. `ovpn` is not loaded: `lab` already connects
+  # OpenVPN 2.7 on 27 and 79 without it (`cli_openvpn_with_password_stdin` of t16, run 45735331757), and `lab-dco` is
+  # the one job that proves the module.
+  lab-g3:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        client: [26, 27, 79]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy,llvm-tools-preview
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - run: sudo modprobe wireguard
+      - run: LAB_BUILD=host scripts/gui.sh lab-g3 ${{ matrix.client }}
+
   # galleria-gui is outside check, coverage and lab/build.sh (they exclude it): it needs WebKitGTK and Node.
   # Locally the same steps run in the image built from lab/images/gui.Dockerfile: scripts/gui.sh check.
   gui:

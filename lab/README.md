@@ -60,5 +60,7 @@ finestra vera (immagine `galleria-gui-dev`, sotto Xvfb) i profili `base.ovpn`, `
 la CLI e il demone veri elencano e connettono ciò che la finestra ha importato, e nessun `PWNED-*` compare. Le chiavi
 WireGuard di `wg-split.conf` cambiano a ogni `lab/up.sh`, quindi l'import avviene dopo `up.sh` e prima dei test:
 `lab/run.sh` esegue `LAB_BEFORE_TESTS` in quel punto. A mano: `GALLERIA_E2E_GUI_STORE=1 LAB_BEFORE_TESTS='scripts/gui.sh
-lab-import' lab/run.sh 26 t17`. Senza `GALLERIA_E2E_GUI_STORE=1` le prove di `t17` si saltano e lo dicono. La finestra gira
+lab-import' lab/run.sh 26 t17`. Senza `GALLERIA_E2E_GUI_STORE=1` `lab/run.sh` non esegue `t17` e lo dice in una riga (una prova che si
+salta risulterebbe «ok»): nel giro intero lo salta, con `t17` come filtro esce con errore. Nella CI lo fa il job `lab-g3`
+(`LAB_BUILD=host scripts/gui.sh lab-g3 <client>`, client 26, 27 e 79). La finestra gira
 solo nell'immagine Ubuntu 24.04 (Q37 (a)): sui tre client girano la CLI e il demone, non WebKit.

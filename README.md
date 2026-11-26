@@ -11,9 +11,20 @@ Vedi [esito della fase 1](docs/06-esito-fase1.md) e [laboratorio](lab/README.md)
 
 Un solo `galleria-gui` alla volta: avviato con un file (`galleria-gui profilo.ovpn`, o il doppio click) mentre la finestra è già aperta,
 le consegna il file e termina; il canale è un socket `0600` in `$XDG_RUNTIME_DIR/galleria` (senza quella cartella l'app parte lo stesso, per conto suo).
-Solo i `.ovpn` sono associati all'app (`packaging/linux/io.github.zpeppoz.galleria.desktop`, non installato da nessuno script: i pacchetti sono della fase 4).
+Solo i `.ovpn` sono associati all'app (`packaging/linux/io.github.zpeppoz.galleria.desktop`, non installato dall'installer del prodotto: i pacchetti sono della fase 4; `lab/vm/gui-vm.sh` lo installa solo nelle VM del laboratorio).
 
 **Portachiavi.** La finestra salva le chiavi dei profili (e utente e password, solo se si spunta «Ricorda») nel portachiavi di sistema (Secret Service: GNOME Keyring; KWallet non è stato verificato). Senza portachiavi ripiega su un file `0600` in `~/.config/galleria/secrets/` e lo dice con un avviso fisso; un portachiavi bloccato è un errore, mai un ripiego silenzioso. Il codice OTP e la passphrase della chiave non si salvano mai. La CLI legge dai due archivi, ma scrive solo nel file.
+
+**Limiti delle prove sui desktop (B6).** Su Ubuntu 24.04/GNOME 46/Orca 46.1 i nomi Name, Server e Notes
+sono stati letti nel giro dal file di debug; l'apertura del dialogo credenziali e il primo campo User name
+sono invece rimasti muti in quel giro (apertura inizialmente inattiva su Wayland), pur avendo nome, ruolo
+e fuoco nell'albero AT-SPI. Con Tab è stato letto Password (non il valore). La causa del silenzio non è
+isolata dal fuoco del compositore: **la prova Q49 con apertura già attiva va ripetuta**; non è l'assenza
+delle etichette. Nessun ascolto
+umano è stato eseguito. KWallet, portali in sandbox, doppio click/trascinamento Nautilus, sblocco del
+portachiavi in VM e l'intera passata della tray non sono verificati da questa consegna. Su Wayland il
+compositore può negare il primo piano. **La fase 2 non è dichiarata chiusa**: tabella e prove in
+[passata desktop B6](docs/08-b6-desktop-pass.md), [lista cuffie di 20 minuti](docs/b6-ascolto-20-minuti.md).
 
 **Chi è nel gruppo `galleria` comanda la VPN della macchina** (D21): può connettere, disconnettere e vedere stato e log di ogni sessione, anche di un altro utente; la finestra mostra una sessione avviata da altri come «avviata fuori da questa rubrica» e chiede conferma prima di chiuderla o sostituirla. **Log del demone** (D20): `journalctl -u galleriad`; la finestra ne mostra il buffer (2000 righe) ed «Esporta log…» lo salva in un file `0600`.
 

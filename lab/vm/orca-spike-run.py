@@ -17,7 +17,10 @@ S = "~/spike/orca-spike-vm.sh"
 
 
 def ssh(cmd):
-    return subprocess.run(["/mnt/b/vm/vmctl.sh", "ssh", VM, cmd], capture_output=True, text=True, timeout=60).stdout
+    result = subprocess.run([__file__.rsplit("/", 1)[0] + "/vmctl.sh", "ssh", VM, cmd], capture_output=True, text=True, timeout=90)
+    if result.returncode:
+        raise RuntimeError(f"{VM}: {cmd}: exit {result.returncode}: {result.stderr}\n{result.stdout}")
+    return result.stdout
 
 
 def keys(*ks, wait=0.6):
@@ -27,7 +30,7 @@ def keys(*ks, wait=0.6):
 out_lines = []
 
 
-PORT = {"ubuntu": 5901, "fedora": 5902}
+PORT = {"ubuntu": 5901, "fedora": 5902, "ubuntu24": 5903}
 
 
 def step(label, *ks, wait=2.5, action=None, shot=None):
@@ -52,21 +55,18 @@ def step(label, *ks, wait=2.5, action=None, shot=None):
 
 
 def fields():
-    # dalla finestra appena aperta: Menu, riga, ↓, More actions, scheda General, poi i campi della scheda
-    step("Tab (Menu)", "tab")
-    step("Tab (riga della lista)", "tab")
-    step("Down", "down")
-    step("Tab (More actions)", "tab")
-    step("Tab (scheda General)", "tab")
+    # The current app has Import and Search stops which the B2 tour did not have. Anchor to the Name entry and record the actual focus at every
+    # step, instead of calling whatever the old Tab count reaches a field. The rubrica in ~/spike/cfg must be seeded (gui-vm.sh install + seed).
+    step("focus Name (AT-SPI)", action=lambda: ssh(f"{S} focus Name"))
     for i in range(1, 5):
-        step(f"Tab {i} dentro la scheda", "tab")
-    for i in range(1, 6):
+        step(f"Tab {i} from Name", "tab")
+    for i in range(1, 5):
         step(f"Shift+Tab {i}", "shift-tab")
 
 
 def toast():
-    # col fuoco su More actions (dopo `fields`): apre il menu, «Duplicate» → avviso a scomparsa
-    step("Enter (apre il menu)", "ret")
+    step("focus More actions (AT-SPI)", action=lambda: ssh(f"{S} focus 'More actions'"))
+    step("Enter (opens More actions)", "ret")
     step("Enter su Duplicate (avviso a scomparsa)", "ret", wait=6, shot=f"/mnt/b/vm/spike/{VM}-toast.png")
 
 
@@ -77,6 +77,16 @@ def statusbar():
 
 scenarios = {"fields": fields, "toast": toast, "statusbar": statusbar}
 which = sys.argv[2]
+# A successful AT-SPI grab_focus does not give the window compositor focus on Wayland. Without this check the old tour can
+# log the Welcome window's speech while its AT-SPI target is a Galleria entry. Try the real window switcher, then fail visibly.
+for attempt in range(4):
+    tree = ssh(f"{S} dump")
+    if any(len(c := line.split("\t")) > 3 and c[1] == "frame" and "active" in c[3].split(",") for line in tree.splitlines()):
+        break
+    if attempt == 3:
+        raise RuntimeError(f"{VM}: Galleria does not have compositor focus; no speech conclusions can be drawn")
+    keys("alt-tab")
+    time.sleep(1)
 for name in (scenarios if which == "all" else [which]):
     out_lines.append(f"# {VM} · {name}")
     scenarios[name]()

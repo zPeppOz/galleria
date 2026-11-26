@@ -44,7 +44,7 @@ case ${1:-} in
     rm -rf "$S/run"; mkdir -p "$S/run"
     run --unit=spike-daemon "$S/fake-daemon" "$S/run"
     for _ in $(seq 1 50); do [[ -S $S/run/galleriad.sock ]] && break; sleep 0.2; done
-    run --unit=spike-app -E GALLERIA_SOCKET="$S/run/galleriad.sock" "$S/galleria-gui"
+    run --unit=spike-app -E GALLERIA_SOCKET="$S/run/galleriad.sock" -E XDG_CONFIG_HOME="$S/cfg" "$S/galleria-gui"
     ;;
   app-spike)
     # la build con la prova scritta nel patch lab/vm/orca-spike-inapp.patch: da dentro il processo, ogni 12 s, un segnale ATK
@@ -61,6 +61,30 @@ case ${1:-} in
   daemon-down) stop_unit spike-daemon.service ;;
   daemon-up) rm -f "$S/run/galleriad.sock"; run --unit=spike-daemon "$S/fake-daemon" "$S/run" ;;
   announce) python3 "$S/atspi-announce.py" "${@:2}" ;;
+  focus)
+    # Anchor a tour to the actual control, not the number of Tab stops of an older version of the app.
+    python3 - "$2" <<'PY'
+import sys
+import gi
+gi.require_version("Atspi", "2.0")
+from gi.repository import Atspi
+def walk(n, depth=0):
+    if depth > 40: return False
+    if n.get_name() == sys.argv[1] and n.get_role_name() in ("entry", "combo box", "push button", "button", "page tab", "list item"):
+        if n.get_component_iface().grab_focus():
+            print("focused", n.get_role_name(), repr(n.get_name()))
+            return True
+    for i in range(n.get_child_count()):
+        c = n.get_child_at_index(i)
+        if c and walk(c, depth + 1): return True
+    return False
+d = Atspi.get_desktop(0)
+for i in range(d.get_child_count()):
+    a = d.get_child_at_index(i)
+    if a and "galleria" in (a.get_name() or "").lower() and walk(a): raise SystemExit(0)
+raise SystemExit("no focus target " + sys.argv[1])
+PY
+    ;;
   dump) python3 "$S/atspi-dump.py" "${@:2}" ;;
   *) sed -n '2,15p' "$0"; exit 2 ;;
 esac

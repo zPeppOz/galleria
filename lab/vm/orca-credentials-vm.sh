@@ -25,7 +25,7 @@ from gi.repository import Atspi
 def find(node, role, name, depth=0):
     if depth > 40:
         return None
-    if node.get_role_name() == role and (node.get_name() or "") == name:
+    if node.get_role_name() in (role, "push button" if role == "button" else role) and (node.get_name() or "") == name:
         return node
     for i in range(node.get_child_count()):
         child = node.get_child_at_index(i)
@@ -94,7 +94,7 @@ for i in range(d.get_child_count()):
     if a and "galleria" in (a.get_name() or "").lower(): walk(a)
 PY
       sleep 2
-      click_connect
+      click_connect || exit 1
       sleep 5
       echo "--- round $round: what Orca said after «Connect»"
       grep 'SPEECH OUTPUT' "$LOG" | tail -n +$((before + 1)) | sed -E "s/^.*SPEECH OUTPUT: //; s/ ?[{]'established'.*$//"

@@ -186,8 +186,10 @@ pub fn configure_with<R: Runtime>(
                     }));
                 }
             }
+            startup_mark("setup_done");
             if let Some(main) = app.get_webview_window("main") {
                 window::restore(&main, &state);
+                startup_mark("window_shown");
             }
             Ok(())
         })
@@ -293,6 +295,27 @@ impl Launch {
     }
 }
 
+static STARTUP_CLOCK: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
+/// G13, P14: optional stderr marks, from entry to `run` (not the dynamic loader before it).
+/// `window_shown` is the return of the show request, not a claim that the compositor has painted a frame.
+fn startup_mark(mark: &str) {
+    if let Some(start) = STARTUP_CLOCK.get() {
+        eprintln!(
+            "galleria-startup: {mark} +{} ms",
+            start.elapsed().as_millis()
+        );
+    }
+}
+
+/// The first command of the page is its saved-state request, before React mounts. Only once, even if it is read again.
+pub(crate) fn startup_page_first_call() {
+    static FIRST: std::sync::Once = std::sync::Once::new();
+    if STARTUP_CLOCK.get().is_some() {
+        FIRST.call_once(|| startup_mark("page_first_call"));
+    }
+}
+
 /// Builds the Tauri application from `tauri.conf.json` and runs it until the last window closes. The daemon
 /// socket is `GALLERIA_SOCKET` when set, the default path otherwise.
 ///
@@ -304,6 +327,10 @@ impl Launch {
 ///
 /// Returns the Tauri error when the application cannot be built or crashes while running.
 pub fn run() -> tauri::Result<std::process::ExitCode> {
+    if std::env::var("GALLERIA_STARTUP_TRACE").as_deref() == Ok("1") {
+        STARTUP_CLOCK.get_or_init(std::time::Instant::now);
+        startup_mark("main");
+    }
     let socket = link::socket_path(std::env::var_os("GALLERIA_SOCKET"));
     let cwd = std::env::current_dir().unwrap_or_default();
     let files = instance::files_in_args(std::env::args_os().skip(1), &cwd);

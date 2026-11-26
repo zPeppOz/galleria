@@ -20,6 +20,8 @@ impl From<UiStateError> for CmdError {
 /// Never fails: a file that is missing or broken gives the defaults.
 #[tauri::command]
 pub fn ui_state_get(state: State<'_, Arc<UiStateFile>>) -> UiState {
+    // The page already reads this before mounting: no new IPC command or page-side clock for G13.
+    crate::startup_page_first_call();
     state.load()
 }
 

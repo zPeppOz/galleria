@@ -68,7 +68,8 @@ daemon)
   *) echo "daemon fake <scenario> | real" >&2; exit 2 ;;
   esac
   ;;
-app) vssh "export XDG_RUNTIME_DIR=/run/user/\$(id -u); export DBUS_SESSION_BUS_ADDRESS=unix:path=\$XDG_RUNTIME_DIR/bus WAYLAND_DISPLAY=wayland-0; systemd-run --user --quiet --collect --unit=spike-app -E WAYLAND_DISPLAY -E XDG_SESSION_TYPE=wayland $(printf -- '-E %q ' "$@") bash -c 'exec /usr/local/bin/galleria-gui 2> ~/spike/app.log'" ;;
+app) extra=''; if (($#)); then printf -v extra -- '-E %q ' "$@"; fi
+  vssh "export XDG_RUNTIME_DIR=/run/user/\$(id -u); export DBUS_SESSION_BUS_ADDRESS=unix:path=\$XDG_RUNTIME_DIR/bus WAYLAND_DISPLAY=wayland-0; systemd-run --user --quiet --collect --unit=spike-app -E WAYLAND_DISPLAY -E XDG_SESSION_TYPE=wayland ${extra:-} bash -c 'exec /usr/local/bin/galleria-gui 2> ~/spike/app.log'" ;;
 sh) vssh "$@" ;;
 *) sed -n '2,16p' "$0"; exit 2 ;;
 esac

@@ -80,7 +80,7 @@ Particolarità da riprendere **prima di G10 manuale**:
 | Riserva | Esito/prova o limite preciso |
 |---|---|
 | R1 modifiche non salvate alla chiusura | Verificata nel gruppo C (G10f e tastiera), nessuna nuova prova VM qui. |
-| R2 Q28/Q49, Orca 46 | Vedi T10: **nome dei campi generali letto** su GNOME46; **dialogo credenziali non annunciato all'apertura e User name non detto nel giro**. Limite Q49(a) per il parlato su 24.04; albero con nome/ruolo/fuoco presente. Non estendere quel limite a tutti i campi. |
+| R2 Q28/Q49, Orca 46 | Vedi T10: **nome dei campi generali letto** su GNOME46; **dialogo credenziali non annunciato all'apertura e User name non detto nel giro**. Limite **delle prove Q49**: apertura inizialmente inattiva, non isolata la causa focus/Orca46; riapertura da frame già attivo non eseguita. Albero con nome/ruolo/fuoco presente; Q49(a) invariata. Non estendere quel limite a tutti i campi. |
 | R3 Q22/Q56 | Passata parziale dal debug; nessun ascolto umano. G12 non interamente verificato (mancano i quattro giri nuovi per VM). Lista cuffie sotto, non bloccante. |
 | R4 Wayland/portale | Chooser GTK osservato su Wayland 24.04 (M7-native). Apri/Salva sulle altre due e scrittura file: non verificati qui. **Portale/sandbox resta limite dichiarato**: niente Flatpak/Snap in fase 2. |
 | R5 file manager vero | Limite delle prove: doppio click e trascinamento Nautilus **non verificati**; resta l'associazione provata con `gio launch` in B4, non una prova col file manager. |
@@ -92,3 +92,101 @@ Particolarità da riprendere **prima di G10 manuale**:
 | R11 dimensioni su Wayland | Limite delle prove: persistenza dimensioni non verificata su Wayland in questo giro. |
 | R12 S42–S44 | T11 (gruppo E), non riesaminati qui. |
 | R13 instabilità a11y | Card dedicata e gruppo C; numeri di quel giro non riciclati come nuova passata VM. |
+
+### T10: parlato di Orca, non ascolto umano
+
+**Nessun ascolto umano.** È letto il file di debug, come Q56(a). Le frasi sono ciò che Orca ha mandato
+alla sintesi, non una valutazione di volume/velocità/comprensibilità. Lista non bloccante per Peppe:
+[dieci passi in venti minuti](b6-ascolto-20-minuti.md).
+
+Il vecchio giro dello spike aveva due difetti di banco: la 24.04 nuova non aveva una rubrica nella
+configurazione predefinita, e i vecchi Tab contavano controlli prima dell'aggiunta di Import/Search.
+La prima passata 24.04 (`T10-all.txt`) ha perciò visitato «No connections yet»/Manage groups: **non è
+una prova dei campi**. Lo script ora usa la rubrica seminata in `~/spike/cfg`, ancora il giro a Name e
+More actions via AT-SPI e registra il fuoco reale dopo ogni tasto. Il tour usa il `vmctl.sh` del worktree,
+con il terzo nome; una SSH fallita non diventa più silenzio del lettore.
+
+Altro difetto del banco: un `grab_focus` AT-SPI riuscito non significa che il compositore abbia dato il
+fuoco alla finestra. Il primo giro 26 leggeva Welcome to Ubuntu, quello Fedora era nella panoramica.
+Ora il tour esige la proprietà **active del frame** prima di partire, prova Alt+Tab e fallisce se non
+la ottiene. `fedora/T10-all-active-run.txt` conserva quel fallimento; `T10-no-focus.png` mostra la
+panoramica. Dopo Esc è stato rifatto il giro (`T10-all-after-escape-run.txt`). I primi giri non sono
+usati per attribuire difetti all'app o a Orca.
+
+| Giro | VM | Detto (ordine/estratti) | Non detto o non verificato | Detto due volte nel giro |
+|---|---|---|---|---|
+| Campi generali | 24.04/46.1 | Name entry Ufficio Napoli → Group combo box/Lavoro → Server read only entry selected → Transport/UDP → Notes entry; al ritorno stessi controlli in ordine inverso | — per questi campi; non prova tutti i form | nessun nome di campo duplicato nello stesso passo; i ritorni con Shift+Tab sono voluti |
+| Campi generali | 26.04/50.3 | main content → Name/entry/Ufficio Napoli/Focus mode; Group, Server, Transport/UDP, Notes; ritorno inverso | — per questi campi | alcuni «tab»/«left shift» due volte, non il contenuto del campo |
+| Campi generali | Fedora/51.1 | main content → Name/entry/Ufficio Napoli/Focus mode | Nei Tab successivi il fuoco registrato è rimasto Name: **resto del giro inconclusivo**, non dichiarare gli altri campi muti | alcuni «tab» e «return» due volte |
+| More actions/Duplicate | 24.04 | More actions combo box → More actions menu → Duplicate → More actions combo box | non trovato nel parlato il testo di conferma della duplicazione; nessun ascolto | «More actions combo box» poi la stessa frase con punto; non doppio annuncio di successo |
+| More actions/Duplicate | 26.04 | More actions/menu/Duplicate; dopo Invio una stringa vuota/di spazi e Browse mode | conferma della duplicazione non letta in quel passo (`T10-all-active-orca.log`, riga SPEECH OUTPUT multilinea) | nessun successo duplicato osservato |
+| More actions/Duplicate | Fedora | tentativo registrato | giro non arrivato al menu Duplicate: **inconclusivo** | un «return» doppio in un tentativo precedente; non un avviso dell'app |
+| Barra di stato, daemon-down/up | tutte e tre | nessuna frase di stato nei 7 s osservati per ciascun passo | In down l'albero mostra Start the service; in up a 7 s lo mostra ancora: **ripristino non verificato in questa finestra**, non un verde e non una diagnosi della causa | nessuna |
+| Credenziali | 24.04/46.1 | all'apertura niente; dopo attivazione alt-tab Galleria frame; Tab legge Password password text | titolo del dialogo e User name non detti nel giro, anche se il fuoco AT-SPI è User name | non osservata duplicazione del contenuto; «left alt» due volte |
+| Credenziali | 26.04/50.3 | main content → Cancel/button → Browse mode → Credentials for «Datacenter Milano»/dialog → User name/entry required → invalid entry/Focus mode | non ascoltato l'audio | nessuna ripetizione del titolo/nome osservata |
+| Credenziali | Fedora/51.1 | primo giro: titolo, dialog/form, User name entry required, invalid entry; giro finale: solo required, invalid entry, Focus mode | titolo/nome non ripetuti nel giro finale; **risultato variabile**, non una promessa basata sul primo giro | nessun titolo doppio osservato |
+
+Fonti (tutte sotto la radice delle prove):
+- 24.04: `T10-all-seeded.txt`, `T10-all-orca.log`, `T10-credentials.txt`,
+  `T10-credentials-activated.txt`, `T10-credentials-full.txt`, `T10-credentials.png`.
+- 26.04: **`T10-all-active.txt`**, `T10-all-active-orca.log`, `T10-credentials.txt`.
+- Fedora: **`T10-all-active.txt`**, `T10-all-active-orca.log`, `T10-all-after-escape-run.txt`,
+  `T10-credentials.txt` (primo giro), `T10-credentials-final.txt`.
+- `orca-summary.json` raccoglie 14 passi per VM e il parlato per passo; è un indice, non sostituisce
+  il debug originale per le stringhe multilinea.
+
+**Q28/S57/R2:** i nomi dei campi generali funzionano con Orca46 nel desktop vero, quindi il buco
+osservato nell'immagine non va esteso a tutti i campi della 24.04. Il dialogo credenziali conserva il
+limite delle prove osservato sopra; **l'apertura su 24.04 era inizialmente inattiva**. Dopo Alt+Tab il frame
+è attivo, Tab legge Password e il ritorno a User name resta muto, ma non è stato riaperto il dialogo
+partendo da un frame già attivo. **Non è isolata la causa focus/compositore contro Orca46**: ripetere
+questo controllo prima di sciogliere S57 per il dialogo. Q49(a) non cambia, né cambia il codice del dialogo. `NO_KEYRING=1` nei giri credenziali
+isola il lettore dal portachiavi bloccato: **R8 non è provata**. Il primo script non trovava Connect perché
+AT-SPI 2.52 lo chiama `push button` (non `button`): prima prova conservata, poi il helper accetta entrambi
+e fallisce se il click non c'è. Non è stato corretto il prodotto per un errore della sonda.
+
+**R3/G12 ancora parziali:** non eseguiti i quattro giri nuovi completi per ogni VM (rubrica con salvataggio,
+import con anteprima, connessione/stato/errore, tray/guardia/annuncio a finestra nascosta). Nessuno di questi
+viene dedotto dal giro di campi o dalla suite a11y del gruppo C. Prima della chiusura della fase occorre
+riprenderli, insieme a T9.
+
+### G13 / Q57(a): avvio a freddo, tre numeri per due VM
+
+`lab/vm/startup-time.sh <vm> [tag]` fa tre volte `sync; echo 3 > /proc/sys/vm/drop_caches` **nella sola VM**,
+mai sull'host, avvia l'app installata con `GALLERIA_STARTUP_TRACE=1`, esige i quattro segni una volta ciascuno
+e conserva anche gli stderr dei giri falliti. È stato visto **rosso** senza la strumentazione:
+`ubuntu24/startup-red-without-trace/run.txt`, exit 1, «main occurred 0 times». Dopo la modifica, entrambe
+le serie sotto escono con 0. L'app senza variabile non scrive i segni (giro normale, `ubuntu/T10-without-trace.txt`).
+
+| VM/giro | main | fine setup | ritorno di show | prima chiamata pagina |
+|---|---:|---:|---:|---:|
+| 24.04 #1 | 0 ms | 212 ms | 212 ms | **512 ms** |
+| 24.04 #2 | 0 ms | 229 ms | 229 ms | **517 ms** |
+| 24.04 #3 | 0 ms | 237 ms | 237 ms | **537 ms** |
+| 26.04 #1 | 0 ms | 3834 ms | 3834 ms | **4307 ms** |
+| 26.04 #2 | 0 ms | 220 ms | 220 ms | **420 ms** |
+| 26.04 #3 | 0 ms | 208 ms | 208 ms | **408 ms** |
+
+Fonti: `ubuntu24/startup-trace-green/{run.txt,stderr.txt}` e `ubuntu/startup-trace-green/{run.txt,stderr.txt}`.
+Il **4307 ms** non è tolto come anomalo. G13 non blocca, né si dichiara «sempre sotto 1 s».
+
+Macchina: Intel Core i9-9900KF @ 3.60 GHz, KVM, 4 vCPU e 4 GiB assegnati per VM; `free` nel giro misura
+3909 MiB accessibili sulla 24.04 e 3391 MiB sulla 26.04. Dischi su `/mnt/b`, HDD Seagate ST2000DM008
+rotazionale, non SSD. **È una VM sulla macchina di Peppe, non la macchina di Peppe.** I cache dell'host
+non sono stati svuotati. L'altra VM e il build/check hanno potuto contendere risorse: misura locale,
+non un benchmark isolato e non un confronto delle distribuzioni.
+
+Confine della misura, importante: l'orologio parte entrando in `run()`, **non comprende il caricatore
+dinamico prima del codice Rust**. `window_shown` è il ritorno della richiesta di show, non il primo
+fotogramma dipinto. `page_first_call` è `ui_state_get`, già invocata dalla pagina prima di montare React:
+**non è ancora il primo paint né la piena usabilità**. Per questo questi numeri non dimostrano alla lettera
+«finestra usabile entro un secondo». Scostamento da P14: non serve modificare `main.tsx` né aggiungere un
+comando IPC: si marca la prima chiamata che la pagina fa già.
+
+### Verifiche e uscita del banco
+
+- `scripts/gui.sh build`: exit 0 (`build-trace.log`); il GUI strumentato è installato sulle tre.
+- `scripts/gui.sh check`: exit 0 (`check-trace.log`), **Vitest 710/710**, cargo GUI **484/0**, clippy/typecheck verdi.
+- `cargo fmt --all --check` e `scripts/check-boundaries.sh`: verdi. Crate vietati, Cargo.lock, design e docs/00–07 non toccati.
+- Nessun nuovo `smoke`, `a11y` di container o CI in questo gruppo: non riciclare i numeri del C come eseguiti sul nuovo trace.
+- Fine banco: `final-vm-status.txt`, **ubuntu24/ubuntu/fedora stopped**. Dischi lasciati in `/mnt/b/vm/disks/`, nessuna immagine nel repo.

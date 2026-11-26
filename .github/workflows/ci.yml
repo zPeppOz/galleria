@@ -171,6 +171,9 @@ jobs:
       - run: scripts/gui.sh check-here
       - run: scripts/tests/check-boundaries.sh
       - run: cargo deny check
+      # G7 and G9 of the level 2 (plan B5, T10): `check-here` keeps the output of `cargo test -p galleria-gui` in target/gates/gui-cargo.log, and
+      # the proofs that close those gates must be in it with `ok`, not skipped or missing
+      - run: scripts/check-gates.py --job gui --cargo-log target/gates/gui-cargo.log
 
   # Level 3 (spec §14, Q13): the real app in a WebKitGTK window under Xvfb, driven by tauri-driver and
   # WebKitWebDriver, against a fake daemon.

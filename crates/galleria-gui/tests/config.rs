@@ -266,7 +266,7 @@ fn repo_file(name: &str) -> PathBuf {
 
 /// The gates of B5 that have at least one proof written so far. Each task that closes a gate adds it here in the same
 /// commit as its first row in `lab/tests/gates-b5.tsv`; at the end of the block this list is G4, G5, G6, G7 and G9.
-const GATES_WITH_PROOFS: &[&str] = &["G4", "G5", "G6"];
+const GATES_WITH_PROOFS: &[&str] = &["G4", "G5", "G6", "G7", "G9"];
 const ALL_GATES: &[&str] = &["G4", "G5", "G6", "G7", "G9"];
 
 /// `(gate, job, kind, name)` of every row of the manifest.

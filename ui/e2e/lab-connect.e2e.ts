@@ -12,14 +12,16 @@
 // takes the password on stdin.
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHmac } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { barState, bodyText, cell, choose, closeApp, env, openApp, TEN_SECONDS, waitFor, waitForBody, type Browser } from "./support";
+import { answerFileWindow, barState, bodyText, cell, choose, closeApp, env, keyringItems, keyringLookup, openApp, profileId, TEN_SECONDS, waitFor, waitForBody, type Browser } from "./support";
 
 afterEach(closeApp);
 
 const CARLA = env("GALLERIA_LAB_SOCKET");
+const ALICE = env("GALLERIA_LAB_SOCKET_OTHER");
 const USED_OTP = env("GALLERIA_LAB_USED_OTP");
 const RUN_OUT = env("GALLERIA_LAB_RUN_OUT");
 const THIRTY_SECONDS = 30_000;
@@ -29,6 +31,7 @@ const labFile = (name: string): string => {
   if (!existsSync(path)) throw new Error(`${path} is not there: the laboratory makes it (lab/gen-pki.sh writes the .ovpn files, lab/up.sh starts the WireGuard server that writes wg-split.conf)`);
   return path;
 };
+const configDir = () => join(env("XDG_CONFIG_HOME"), "galleria");
 
 /** The `galleria` of the phase 1, as a user of the rubrica `home` through the socket (the bridge of `carla` or of `alice`). */
 function cli(socket: string, home: string, args: string[], input = ""): string {
@@ -65,6 +68,7 @@ function totp(): string {
   const value = ((hash[offset] & 0x7f) << 24) | (hash[offset + 1] << 16) | (hash[offset + 2] << 8) | hash[offset + 3];
   return String(value % 1_000_000).padStart(6, "0");
 }
+const usedCodes = (): string[] => (existsSync(USED_OTP) ? readFileSync(USED_OTP, "utf8").split("\n").filter((l) => l.trim() !== "") : []);
 
 // ---- The window of the credentials ---------------------------------------------------------------------------------------------
 
@@ -142,6 +146,11 @@ async function connectProfile(b: Browser, name: string, answers: Answers = {}): 
   return seen;
 }
 
+const secretFiles = (): string[] => {
+  const dir = join(configDir(), "secrets");
+  return existsSync(dir) ? readdirSync(dir).map((name) => readFileSync(join(dir, name), "utf8")) : [];
+};
+
 // ---- The profiles of the laboratory enter through the window -------------------------------------------------------------------
 
 function secondLaunch(path: string): void {
@@ -171,7 +180,16 @@ beforeAll(async () => {
 afterAll(async () => {
   await closeApp();
   await ensureDisconnected();
+  try {
+    cli(ALICE, aliceHome(), ["disconnect"]);
+  } catch {
+    // nothing of alice's was left
+  }
 });
+
+let aliceRubrica: string | undefined;
+/** The rubrica of `alice`: another `XDG_CONFIG_HOME`, so the window does not know her profile. */
+const aliceHome = (): string => (aliceRubrica ??= mkdtempSync(join(tmpdir(), "galleria-alice-")));
 
 // ================================ G4 ========================================================================================
 
@@ -262,3 +280,289 @@ describe("G4: connect, disconnect and replace from the window", () => {
   });
 });
 
+// ================================ G5 ========================================================================================
+
+describe("G5: the credentials, only what is asked, and the keyring", () => {
+  it("G5a_only_the_asked_field_is_shown", async () => {
+    await ensureDisconnected();
+    const b = await openApp(true);
+    // base: the user and the password, no code
+    const base = await connectProfile(b, "base");
+    expect(base).toHaveLength(1);
+    expect(base[0]).toMatchObject({ kind: "credentials", fields: ["username", "password"], remember: true });
+    await disconnectFromWindow(b);
+    // otp: the credentials, and then a second window with the code and nothing else, labelled with the prompt of the server
+    const otp = await connectProfile(b, "otp", { user: "bob", password: "bob-secret" });
+    expect(otp.map((a) => a.kind)).toEqual(["credentials", "otp"]);
+    expect(otp[1]).toMatchObject({ fields: ["otp"], remember: false, label: "Enter OTP" });
+    await disconnectFromWindow(b);
+    // enckey: the credentials, and the passphrase alone
+    const enckey = await connectProfile(b, "enckey");
+    expect(enckey.map((a) => a.kind).sort()).toEqual(["credentials", "passphrase"]);
+    expect(enckey.find((a) => a.kind === "passphrase")).toMatchObject({ fields: ["passphrase"], remember: false });
+    await disconnectFromWindow(b);
+  });
+
+  it("G5b_remember_saves_to_the_keyring_and_the_next_connection_does_not_ask", async () => {
+    await ensureDisconnected();
+    const b = await openApp(true);
+    const id = profileId("base");
+    await connectProfile(b, "base", { remember: true });
+    await waitFor(b, async () => keyringLookup(id, "openvpn.password") === "alice-secret", `the keyring has no password for the profile: ${keyringItems(id)}`);
+    expect(keyringLookup(id, "openvpn.username")).toBe("alice");
+    // no file of the rubrica holds the password, and the profile only names the two entries
+    expect(secretFiles().filter((text) => text.includes("alice-secret"))).toEqual([]);
+    const profile = readFileSync(join(configDir(), "profiles", `${id}.toml`), "utf8");
+    expect(profile).toContain("openvpn.password");
+    expect(profile).not.toContain("alice-secret");
+    await disconnectFromWindow(b);
+    // the next one does not ask
+    await connectButton(b).click();
+    expect(await answerUntil(b, "Connected"), "a window asked for what the keyring holds").toEqual([]);
+    await disconnectFromWindow(b);
+  });
+
+  it("G5c_the_otp_is_never_saved", async () => {
+    await ensureDisconnected();
+    const b = await openApp(true);
+    const id = profileId("otp");
+    await connectProfile(b, "otp", { user: "bob", password: "bob-secret", remember: true });
+    await waitFor(b, async () => keyringLookup(id, "openvpn.password") === "bob-secret", `the keyring has no password for the profile: ${keyringItems(id)}`);
+    expect(keyringLookup(id, "openvpn.username")).toBe("bob");
+    const items = keyringItems(id);
+    expect(usedCodes().length).toBeGreaterThan(0);
+    for (const code of usedCodes()) expect(items, `a code that was used is in the keyring: ${code}`).not.toContain(code);
+    expect(keyringLookup(id, "openvpn.otp")).toBe("");
+    await disconnectFromWindow(b);
+    // the connection after asks only the code
+    await connectButton(b).click();
+    expect((await answerUntil(b, "Connected")).map((a) => a.kind)).toEqual(["otp"]);
+    await disconnectFromWindow(b);
+  });
+
+  it("G5d_the_passphrase_is_never_saved", async () => {
+    await ensureDisconnected();
+    const b = await openApp(true);
+    const id = profileId("enckey");
+    for (const turn of [1, 2]) {
+      let asked: Asked[];
+      if (turn === 1) {
+        asked = await connectProfile(b, "enckey");
+      } else {
+        await connectButton(b).click();
+        asked = await answerUntil(b, "Connected");
+      }
+      expect(asked.map((a) => a.kind), `turn ${turn}`).toContain("passphrase");
+      await disconnectFromWindow(b);
+    }
+    expect(keyringItems(id)).not.toContain("key-passphrase");
+    expect(`${spawnSync("secret-tool", ["search", "--all", "service", "galleria"], { encoding: "utf8" }).stdout}`).not.toContain("key-passphrase");
+  });
+
+  it("G5e_a_refused_saved_password_offers_to_forget_it", async () => {
+    await ensureDisconnected();
+    const b = await openApp(true);
+    const id = profileId("base");
+    // G5b left the credentials in the keyring: «Forget» takes them out, and the connection asks again
+    await choose(b, "base");
+    await b.$("button=Authentication").click();
+    await b.$("button=Forget").click();
+    await waitFor(b, async () => keyringLookup(id, "openvpn.password") === "" && keyringLookup(id, "openvpn.username") === "", "«Forget» left the credentials in the keyring");
+    // a wrong password with «Remember»: the error, translated, and nothing is saved
+    await connectButton(b).click();
+    expect((await answerUntil(b, "Error", { password: "not-the-password", remember: true })).map((a) => a.kind)).toEqual(["credentials"]);
+    await waitForBody(b, "Authentication failed", "the error of the refused password was never shown");
+    expect(keyringLookup(id, "openvpn.password"), "a password that failed was saved").toBe("");
+    await b.$("button=Close").click();
+    await waitFor(b, async () => (await barState(b)) === "Disconnected", "«Close» did not leave the error");
+    // the right one is remembered, and a wrong one is put in its place by hand, as secret-tool would (from stdin)
+    await connectButton(b).click();
+    await answerUntil(b, "Connected", { remember: true });
+    await waitFor(b, async () => keyringLookup(id, "openvpn.password") === "alice-secret", "the password was not saved");
+    await disconnectFromWindow(b);
+    const stored = spawnSync("secret-tool", ["store", "--label=galleria lab: a password that the server refuses", "service", "galleria", "profile", id, "key", "openvpn.password"], { input: "wrong-saved-password", encoding: "utf8" });
+    expect(stored.status, stored.stderr).toBe(0);
+    expect(keyringLookup(id, "openvpn.password")).toBe("wrong-saved-password");
+    // the saved one is sent without asking, refused, and the error offers to forget it
+    await connectButton(b).click();
+    expect(await answerUntil(b, "Error"), "a window asked while the keyring held the credentials").toEqual([]);
+    await waitForBody(b, "Authentication failed", "the error of the refused saved password was never shown");
+    await b.$("button=Forget the saved credentials").click();
+    await waitFor(b, async () => keyringLookup(id, "openvpn.password") === "", "the password is still in the keyring after «Forget the saved credentials»");
+    // and the connection after asks
+    await b.$("button=Retry").click();
+    expect((await answerUntil(b, "Connected")).map((a) => a.kind)).toEqual(["credentials"]);
+    await disconnectFromWindow(b);
+  });
+});
+
+// ================================ G6 ========================================================================================
+
+describe("G6: a profile imported on one side connects from the other", () => {
+  it("G6a_a_profile_imported_by_the_cli_connects_from_the_window", async () => {
+    await ensureDisconnected();
+    // the CLI of the image, in the rubrica of the window: the secrets go to the file
+    const imported = carlaCli("import", labFile("wg-split.conf"), "--name", "wg-from-cli");
+    const id = imported.trim().split(/\s+/)[0];
+    expect(id, `the CLI said: ${imported}`).toMatch(/^[0-9a-f-]{36}$/);
+    expect(secretFiles().some((text) => text.includes("PrivateKey") || text.includes("wireguard.private_key")), "the secrets of the profile are not in the file").toBe(true);
+    expect(keyringItems(id), "the CLI wrote to the keyring").toBe("");
+    // the window lists it and connects it
+    const b = await openApp(true);
+    await connectProfile(b, "wg-from-cli");
+    expect(carlaStatus()).toBe("connected");
+    await disconnectFromWindow(b);
+  });
+
+  it("G6b_a_profile_imported_by_the_window_connects_from_the_cli", async () => {
+    await ensureDisconnected();
+    const id = profileId("base");
+    // imported by the window: the key is in the keyring and the files of the rubrica have none
+    expect(keyringItems(id)).toContain("openvpn.block.key");
+    expect(secretFiles().filter((text) => text.includes("PRIVATE KEY"))).toEqual([]);
+    expect(existsSync(join(configDir(), "secrets", `${id}.toml`))).toBe(false);
+    expect(cli(CARLA, env("XDG_CONFIG_HOME"), ["connect", "base", "--username", "alice", "--password-stdin"], "alice-secret\n").length).toBeGreaterThan(0);
+    expect(carlaStatus()).toBe("connected");
+    // the window shows the session as its own
+    const b = await openApp(true);
+    await choose(b, "base");
+    await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the window never showed the session of the CLI");
+    expect(await b.$('[role="group"][aria-label="Session started outside this rubrica"]').isExisting(), "the session of the CLI was shown as foreign").toBe(false);
+    expect(await bodyText(b)).not.toContain("started outside this rubrica");
+    await disconnectFromWindow(b);
+  });
+});
+
+// ================================ G7 ========================================================================================
+
+/** Every process of this user: what it was started with and its environment. */
+function processText(): string[] {
+  const out: string[] = [];
+  for (const pid of readdirSync("/proc").filter((name) => /^\d+$/.test(name))) {
+    for (const file of ["cmdline", "environ"]) {
+      try {
+        out.push(readFileSync(join("/proc", pid, file), "latin1"));
+      } catch {
+        // not ours, or gone
+      }
+    }
+  }
+  return out;
+}
+
+describe("G7: no known secret leaves the keyring and the connection", () => {
+  it("G7a_no_known_secret_reaches_the_log_the_export_or_the_stderr", async () => {
+    await ensureDisconnected();
+    const b = await openApp(true);
+    const lines = async () => (await b.execute(() => [...document.querySelectorAll(".log-line")].map((el) => (el.textContent ?? "").trim()))) as string[];
+    const page: string[] = [];
+    // the profile with the second factor and the one with the passphrase: the log of each, while it is up and after
+    await connectProfile(b, "otp", { user: "bob", password: "bob-secret" });
+    await b.$("button=Log").click();
+    await waitFor(b, async () => (await lines()).length > 0, "the tab «Log» of otp never showed a line");
+    page.push(...(await lines()));
+    await disconnectFromWindow(b);
+    await waitFor(b, async () => (await lines()).length > 0, "the tab «Log» of otp shows nothing after the session");
+    page.push(...(await lines()));
+    await connectProfile(b, "enckey");
+    await b.$("button=Log").click();
+    await waitFor(b, async () => (await lines()).length > 0, "the tab «Log» of enckey never showed a line");
+    page.push(...(await lines()));
+    // «Export log…» through the real window «Save», driven over AT-SPI without Orca (S41)
+    const exported = join(RUN_OUT, "exported-log.txt");
+    await b.execute(() => [...document.querySelectorAll<HTMLElement>("button")].find((el) => /^Export log/.test(el.textContent ?? ""))?.focus());
+    void b.keys(["Enter"]).catch(() => undefined);
+    expect(await answerFileWindow({ save: exported })).toMatchObject({ pressed: "Save", closed: true });
+    await waitForBody(b, "Log exported.", "the export was never said to be done");
+    expect(statSync(exported).mode & 0o777).toBe(0o600);
+    const file = readFileSync(exported, "utf8");
+    expect(file, "the exported file is empty").toMatch(/^\d+ \w+ \w+: /m);
+    await disconnectFromWindow(b);
+
+    // what the laboratory knows and must not find
+    const ovpn = readFileSync(labFile("base.ovpn"), "utf8");
+    const keyLine = ovpn.split("<key>")[1]?.split("\n").find((l) => l.length > 40 && !l.startsWith("-")) ?? "";
+    const wgKey = /^PrivateKey = (.+)$/m.exec(readFileSync(labFile("wg-split.conf"), "utf8"))?.[1]?.trim() ?? "";
+    expect(keyLine).not.toBe("");
+    expect(wgKey).not.toBe("");
+    expect(usedCodes().length, "no code was used: the profile with the second factor never connected").toBeGreaterThan(0);
+    const secrets = ["alice-secret", "bob-secret", "key-passphrase", ...usedCodes(), keyLine, wgKey];
+    const stderr = existsSync(join(RUN_OUT, "app.stderr")) ? readFileSync(join(RUN_OUT, "app.stderr"), "utf8") : "";
+    expect(existsSync(join(RUN_OUT, "app.stderr")), "the stderr of the app was not kept: lab/tests/gui-lab-connect.sh starts it through a shim that does").toBe(true);
+    const places: [string, string][] = [
+      ["the tab «Log»", page.join("\n")],
+      ["the file of «Export log…»", file],
+      ["the stderr of the app", stderr],
+      ...processText().map((text): [string, string] => ["the arguments or the environment of a process", text]),
+    ];
+    expect(page.length, "the tab «Log» had no line to look at").toBeGreaterThan(2);
+    for (const [where, text] of places) {
+      for (const secret of secrets) expect(text.includes(secret), `a known secret is in ${where}`).toBe(false);
+    }
+  });
+});
+
+// ================================ G9 ========================================================================================
+
+describe("G9: a session of another user of the group", () => {
+  const GROUP = '[role="group"][aria-label="Session started outside this rubrica"]';
+  const alertDialogs = (b: Browser) => b.$$('[role="alertdialog"]');
+  const aliceStatus = () => cli(ALICE, aliceHome(), ["status"]).trim();
+  /** The name of the profile of the session that is up, whoever started it. */
+  const active = () => (JSON.parse(cli(ALICE, aliceHome(), ["status", "--json"])) as { profile: { name: string } | null }).profile?.name ?? null;
+  const aliceConnects = () => {
+    cli(ALICE, aliceHome(), ["connect", "alice-wg"]);
+    expect(aliceStatus()).toBe("connected");
+    expect(active()).toBe("alice-wg");
+  };
+
+  it("G9a_a_session_started_by_another_user_is_shown_as_foreign", async () => {
+    await ensureDisconnected();
+    // `alice`, from her own rubrica and through her own bridge: the daemon sees another uid of the group
+    cli(ALICE, aliceHome(), ["import", labFile("wg-split.conf"), "--name", "alice-wg"]);
+    aliceConnects();
+    const b = await openApp(true);
+    await waitFor(b, async () => await b.$(GROUP).isExisting(), "the list never showed the fixed row of the session of someone else", THIRTY_SECONDS);
+    const text = (await b.execute((sel: string) => document.querySelector(sel)?.textContent ?? "", GROUP)) as string;
+    expect(text).toContain("alice-wg");
+    expect(text).toMatch(/started outside this rubrica/i);
+    await waitFor(b, async () => (await b.$(".status-bar-session").isExisting()) && (await b.$(".status-bar-session").getText()).includes("Active connection: «alice-wg» — started outside this rubrica"), "the bar never said whose the session is");
+    // the detail is a session and not a profile; its log has lines
+    await b.$(`${GROUP} button[aria-describedby]`).click();
+    await waitFor(b, async () => (await b.$("h1").getText()) === "alice-wg", "the detail never showed the session of alice");
+    await b.$("button=Log").click();
+    await waitFor(b, async () => (await b.$$(".log-line")).length > 0, "the log of the session of someone else has no line");
+  });
+
+  it("G9b_disconnecting_it_asks_first", async () => {
+    // the session of G9a is still up: a window of its own, and no one closes it before
+    expect(aliceStatus()).toBe("connected");
+    const b = await openApp(true);
+    await waitFor(b, async () => await b.$(GROUP).isExisting(), "the list never showed the fixed row of the session of someone else", THIRTY_SECONDS);
+    await b.$(`${GROUP} button[aria-label^="Disconnect"]`).click();
+    await waitFor(b, async () => (await alertDialogs(b)).length === 1, "the confirmation never showed");
+    await b.$('[role="alertdialog"]').$("button=Cancel").click();
+    await waitFor(b, async () => (await alertDialogs(b)).length === 0, "the confirmation never closed");
+    expect(aliceStatus(), "«Cancel» ended the session of alice").toBe("connected");
+    expect(active()).toBe("alice-wg");
+    await b.$(`${GROUP} button[aria-label^="Disconnect"]`).click();
+    await waitFor(b, async () => (await alertDialogs(b)).length === 1, "the confirmation never showed the second time");
+    await b.$('[role="alertdialog"]').$("button=Disconnect").click();
+    await waitFor(b, async () => aliceStatus() === "disconnected", "the session of alice was never ended", THIRTY_SECONDS);
+  });
+
+  it("G9c_replacing_it_asks_first", async () => {
+    aliceConnects();
+    const b = await openApp(true);
+    await waitFor(b, async () => await b.$(GROUP).isExisting(), "the list never showed the fixed row of the session of someone else", THIRTY_SECONDS);
+    await choose(b, "wg-split");
+    await connectButton(b).click();
+    await waitFor(b, async () => (await alertDialogs(b)).length === 1, "the confirmation of the replacement never showed");
+    expect(await (await alertDialogs(b))[0].getText()).toMatch(/Replace «alice-wg»\?/);
+    expect(active(), "the session of alice ended before the answer").toBe("alice-wg");
+    await b.$('[role="alertdialog"]').$("button=Replace").click();
+    await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the profile of carla never connected after the replacement", THIRTY_SECONDS);
+    expect(active(), "the session that is up is not the one of carla").toBe("wg-split");
+    await disconnectFromWindow(b);
+  });
+});

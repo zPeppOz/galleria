@@ -3,7 +3,10 @@ use galleria_ipc::{
     client::{Client, ClientError},
     *,
 };
-use galleria_profile::{FileSecretStore, ProfileStore, SecretStore};
+use galleria_profile::{
+    FileSecretStore, KeyringSecretStore, LayeredSecretStore, ProfileStore, SecretStore, StoreError,
+    Writes,
+};
 use std::io::Write;
 use zeroize::Zeroizing;
 #[derive(Debug)]
@@ -60,6 +63,17 @@ async fn daemon(socket: &std::path::Path) -> Result<Client, CliError> {
         .await
         .map_err(ipc)?;
     Ok(c)
+}
+/// The archive `connect` reads the key material from (D25): the keyring when the session has one, then the file. The CLI
+/// writes only to the file (`import` is unchanged), so a keyring is only ever read here. Without a session bus there is
+/// no keyring and nothing changes: no wait, nothing printed.
+fn layered_secrets(dir: &std::path::Path) -> Result<LayeredSecretStore, StoreError> {
+    let keyring = KeyringSecretStore::open().map(|k| Box::new(k) as Box<dyn SecretStore>);
+    Ok(LayeredSecretStore::new(
+        keyring,
+        Box::new(FileSecretStore::open(dir)?),
+        Writes::File,
+    ))
 }
 fn print_log(entry: &LogEntry) -> Result<(), CliError> {
     println!(
@@ -144,7 +158,7 @@ pub async fn run(cli: Cli) -> Result<(), CliError> {
         } => {
             let store = ProfileStore::open(&dir).map_err(storage)?;
             let p = store.find(&profile).map_err(storage)?;
-            let secrets = FileSecretStore::open(&dir).map_err(storage)?;
+            let secrets = layered_secrets(&dir).map_err(storage)?;
             let mut params =
                 galleria_profile::to_connect_params(&p, &secrets, replace).map_err(storage)?;
             let values = stdin_secrets(&mut std::io::stdin().lock(), password_stdin, otp_stdin)?;

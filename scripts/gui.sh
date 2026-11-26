@@ -15,6 +15,8 @@
 #                                 tests, then t17 on that client (the real CLI and daemon list and connect what the window imported)
 #   scripts/gui.sh socket-owner   the owner check of the single-instance socket against two real users (uid 1001 and 1002) and root, in
 #                                 the image as root (lab/tests/gui-socket-owner.sh): the unit tests run as one user and cannot hold it
+#   scripts/gui.sh keyring        the keyring store against a real GNOME Keyring (unlocked, locked, absent) and the CLI on the same
+#                                 keyring (lab/tests/gui-keyring.sh); ends with scripts/check-gates.py on what ran
 #   scripts/gui.sh pnpm-version   print the pnpm version pinned in package.json (for CI)
 #
 # GUI_UID / GUI_GID set the user of the container (default: the invoking user), to try a uid the image does not know.
@@ -80,11 +82,13 @@ check_here() {
   pnpm install --frozen-lockfile
   scripts/check-js-licenses.mjs
   scripts/tests/check-js-licenses.sh
-  pnpm --dir ui test
+  mkdir -p target/gates
+  # the output of the tests is kept for scripts/check-gates.py: a proof that was skipped must not pass as green (plan B5)
+  pnpm --dir ui test --reporter=default --reporter=json --outputFile.json=../target/gates/gui-vitest.json
   pnpm --dir ui typecheck
   pnpm --dir ui build
   cargo clippy -p galleria-gui --all-targets -- -D warnings
-  cargo test -p galleria-gui
+  cargo test -p galleria-gui 2>&1 | tee target/gates/gui-cargo.log
 }
 
 # The Tauri CLI sets the `custom-protocol` feature of `tauri` for release builds. It must run from the repository
@@ -139,6 +143,8 @@ case "${1:-}" in
     run_in_image scripts/gui.sh build-here
     GUI_UID=0 GUI_GID=0 run_in_image scripts/gui.sh socket-owner-here ;;
   socket-owner-here) GALLERIA_SMOKE_APP="${CARGO_TARGET_DIR:-$PWD/target}/release/galleria-gui" exec lab/tests/gui-socket-owner.sh ;;
+  keyring) run_in_image scripts/gui.sh keyring-here ;;
+  keyring-here) exec lab/tests/gui-keyring.sh ;;
   lab-g3)
     # The WireGuard keys of the laboratory are new at every `lab/up.sh`, so the window imports after the laboratory is up and
     # before the tests: lab/run.sh runs LAB_BEFORE_TESTS at that point. Host side: it needs docker, the lab images and the image of the GUI.
@@ -146,5 +152,5 @@ case "${1:-}" in
     ensure_image
     GALLERIA_E2E_GUI_STORE=1 LAB_BEFORE_TESTS='scripts/gui.sh lab-import' exec lab/run.sh "$2" t17 ;;
   pnpm-version) pnpm_version ;;
-  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|a11y|lab-import|lab-g3 <26|27|79>|socket-owner|pnpm-version>' >&2; exit 2 ;;
+  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|a11y|lab-import|lab-g3 <26|27|79>|socket-owner|keyring|pnpm-version>' >&2; exit 2 ;;
 esac

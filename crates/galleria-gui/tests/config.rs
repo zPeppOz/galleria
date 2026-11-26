@@ -249,3 +249,113 @@ fn bundle_stays_off() {
     // the packages are phase 4: the association is declared and tried with the file `.desktop`, not installed
     assert_eq!(tauri_conf()["bundle"]["active"], Value::Bool(false));
 }
+
+// ---- the gates of B5 (plan B5, T2): a gate has a job, and the job ends by checking that its proofs ran ----
+
+fn repo_file(name: &str) -> PathBuf {
+    crate_file("../..").join(name)
+}
+
+/// The gates of B5 that have at least one proof written so far. Each task that closes a gate adds it here in the same
+/// commit as its first row in `lab/tests/gates-b5.tsv`; at the end of the block this list is G4, G5, G6, G7 and G9.
+const GATES_WITH_PROOFS: &[&str] = &["G5", "G6"];
+const ALL_GATES: &[&str] = &["G4", "G5", "G6", "G7", "G9"];
+
+/// `(gate, job, kind, name)` of every row of the manifest.
+fn gate_rows() -> Vec<[String; 4]> {
+    let path = repo_file("lab/tests/gates-b5.tsv");
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    text.lines()
+        .filter(|l| !l.trim().is_empty() && !l.trim_start().starts_with('#'))
+        .map(|l| {
+            let cells: Vec<String> = l.split('\t').map(|c| c.trim().to_string()).collect();
+            <[String; 4]>::try_from(cells)
+                .unwrap_or_else(|c| panic!("a row of the manifest needs 4 cells: {c:?}"))
+        })
+        .collect()
+}
+
+/// The text of a job of `ci.yml`: from its name, at two spaces, to the next job.
+fn ci_job(ci: &str, job: &str) -> String {
+    let header = format!("  {job}:");
+    let mut lines = ci.lines().skip_while(|l| *l != header);
+    assert!(lines.next().is_some(), "ci.yml has no job {job}");
+    // up to the next job: a key at two spaces (comments at two spaces do not count)
+    let body: Vec<&str> = lines
+        .take_while(|l| {
+            !l.starts_with("  ")
+                || l.starts_with("   ")
+                || !l.trim_end().ends_with(':')
+                || l.trim_start().starts_with('#')
+        })
+        .collect();
+    body.join("\n")
+}
+
+fn every_rust_source(dir: &std::path::Path, out: &mut String) {
+    for entry in std::fs::read_dir(dir).unwrap().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if path.file_name().is_some_and(|n| n != "target") {
+                every_rust_source(&path, out);
+            }
+        } else if path.extension().is_some_and(|e| e == "rs") {
+            out.push_str(&std::fs::read_to_string(&path).unwrap_or_default());
+        }
+    }
+}
+
+#[test]
+fn every_b5_gate_has_a_job() {
+    let rows = gate_rows();
+    assert!(!rows.is_empty(), "the manifest of the gates is empty");
+    for gate in GATES_WITH_PROOFS {
+        assert!(
+            rows.iter().any(|r| &r[0] == gate),
+            "{gate} has no proof in lab/tests/gates-b5.tsv"
+        );
+    }
+    for [gate, job, kind, name] in &rows {
+        assert!(
+            ALL_GATES.contains(&gate.as_str()),
+            "{gate} is not a gate of B5 ({name})"
+        );
+        assert!(
+            ["cargo", "vitest", "lab"].contains(&kind.as_str()),
+            "{kind} is not a kind ({name})"
+        );
+        assert!(!job.is_empty() && !name.is_empty());
+    }
+    // every job of the manifest is in ci.yml, and its last step is the check of its own proofs
+    let ci = std::fs::read_to_string(repo_file(".github/workflows/ci.yml")).unwrap();
+    let mut jobs: Vec<&String> = rows.iter().map(|r| &r[1]).collect();
+    jobs.sort();
+    jobs.dedup();
+    for job in jobs {
+        let text = ci_job(&ci, job);
+        let last_step = text
+            .split("\n      - ")
+            .last()
+            .unwrap_or_default()
+            .to_string();
+        assert!(
+            last_step.contains(&format!("check-gates.py --job {job}")),
+            "the last step of the job {job} of ci.yml must call `scripts/check-gates.py --job {job}`, it is:\n{last_step}"
+        );
+    }
+}
+
+#[test]
+fn every_cargo_proof_of_the_manifest_is_a_test_that_exists() {
+    // a name with a typo would be MISSING in CI only after the push: here it fails before
+    let mut sources = String::new();
+    every_rust_source(&repo_file("crates"), &mut sources);
+    for [gate, _, kind, name] in gate_rows() {
+        if kind == "cargo" {
+            assert!(
+                sources.contains(&format!("fn {name}(")),
+                "{gate}: no test function {name} in crates/"
+            );
+        }
+    }
+}

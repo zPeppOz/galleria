@@ -24,11 +24,18 @@ jobs:
           tool: cargo-deny
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --exclude galleria-gui --all-targets -- -D warnings
-      - run: cargo test --workspace --exclude galleria-gui
+      # the output is kept for scripts/check-gates.py (the last step): a proof that is ignored or missing must not pass as green
+      - name: cargo test
+        shell: bash
+        run: |
+          mkdir -p target/gates
+          cargo test --workspace --exclude galleria-gui 2>&1 | tee target/gates/check-cargo.log
       - run: cargo deny check
       - run: scripts/check-boundaries.sh
       - run: lab/tests/check-wsl.sh
       - run: bash lab/tests/build-user.sh
+      - run: scripts/tests/check-gates.sh
+      - run: scripts/check-gates.py --job check --cargo-log target/gates/check-cargo.log
 
   coverage:
     runs-on: ubuntu-latest
@@ -160,3 +167,8 @@ jobs:
       # The owner check of the single-instance socket against two real users (lab/tests/gui-socket-owner.sh). It counts its checks
       # and ends with an error if one was skipped, so it cannot be green without running.
       - run: scripts/gui.sh socket-owner
+      # GNOME Keyring unlocked, locked and absent: the keyring store and the CLI on it (lab/tests/gui-keyring.sh, plan B5, T2).
+      # The tests are `#[ignore]` for `cargo test`, fail under the wrong case, and the check at the end wants each of them with
+      # `ok` in the log: a round that ran nothing is red.
+      - run: scripts/gui.sh keyring
+      - run: scripts/check-gates.py --job gui-smoke --kind cargo --cargo-log target/gates/keyring-unlocked.log --cargo-log target/gates/keyring-locked.log --cargo-log target/gates/keyring-absent.log

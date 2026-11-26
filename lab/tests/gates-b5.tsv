@@ -1,0 +1,22 @@
+# The proofs of the gates of block B5 (plan 2026-11-26-fase2-b5-connessione.md, «Dove gira ogni gate in CI»).
+# gate <TAB> job <TAB> kind <TAB> name of the proof. `scripts/check-gates.py --job <job>` runs at the end of the job that
+# declares the gate and fails if a proof listed here for that job is missing from the output, skipped, ignored or red.
+# A task that adds a proof adds its row in the same commit; tests/config.rs (`every_b5_gate_has_a_job`) keeps the jobs
+# of this file and the ones of ci.yml together.
+G5	gui-smoke	cargo	keyring_roundtrip
+G5	gui-smoke	cargo	keyring_items_carry_the_three_attributes_and_the_label
+G5	gui-smoke	cargo	keyring_delete_one_and_all
+G5	gui-smoke	cargo	keyring_two_profiles_do_not_mix
+G5	gui-smoke	cargo	keyring_value_with_newlines_survives
+G5	gui-smoke	cargo	keyring_locked_is_reported_within_five_seconds
+G5	gui-smoke	cargo	keyring_present_does_not_unlock
+G5	gui-smoke	cargo	keyring_absent_opens_as_none
+G6	gui-smoke	cargo	the_cli_reads_what_the_keyring_holds
+G6	gui-smoke	cargo	the_cli_without_a_keyring_reads_the_file
+G6	check	cargo	layered_reads_the_keyring_first_then_the_file
+G6	check	cargo	layered_gui_writes_go_to_the_keyring_and_the_file_copy_is_removed
+G6	check	cargo	layered_without_a_keyring_writes_the_file
+G6	check	cargo	layered_cli_writes_stay_in_the_file
+G6	check	cargo	a_locked_keyring_is_an_error_and_writes_no_file
+G6	check	cargo	to_connect_params_reads_through_the_layers
+G6	check	cargo	the_cli_without_a_session_bus_reads_the_file_and_stays_quiet

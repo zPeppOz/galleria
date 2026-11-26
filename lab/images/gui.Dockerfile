@@ -31,3 +31,7 @@ RUN set -eux; \
     rm -f "${tarball}" SHASUMS256.txt
 ENV PATH=/opt/node/bin:$PATH
 RUN npm install --global "pnpm@${PNPM_VERSION}" && pnpm --version
+# A real Secret Service for the keyring tests (`scripts/gui.sh keyring`, plan B5 T2) and for the smoke test: GNOME Keyring,
+# and `secret-tool`, which reads the items back the way another program would. Last, so the layers above stay cached.
+RUN apt-get update && apt-get install -y --no-install-recommends gnome-keyring libsecret-tools \
+    && rm -rf /var/lib/apt/lists/*

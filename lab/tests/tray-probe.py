@@ -152,11 +152,18 @@ def click(text):
     if not wanted[0]["enabled"]:
         print(f"the entry {text!r} is disabled", file=sys.stderr)
         return 1
-    bus().call_sync(
-        registered["name"], menu, "com.canonical.dbusmenu", "Event",
-        GLib.Variant("(isvu)", (wanted[0]["id"], "clicked", GLib.Variant("i", 0), int(time.time()))), None,
-        Gio.DBusCallFlags.NONE, CALL_MS, None,
-    )
+    try:
+        bus().call_sync(
+            registered["name"], menu, "com.canonical.dbusmenu", "Event",
+            GLib.Variant("(isvu)", (wanted[0]["id"], "clicked", GLib.Variant("i", 0), int(time.time()))), None,
+            Gio.DBusCallFlags.NONE, CALL_MS, None,
+        )
+    except GLib.Error as failure:
+        # «Quit» ends the process while it handles the click: sometimes the app is gone from the bus before the reply is sent
+        # («NoReply: Message recipient disconnected from message bus without replying»). That is the answer of an app that quit, and the
+        # test that clicked asks the process whether it is gone. No other entry, and no other error, is excused.
+        if not (text.startswith("Quit") and failure.matches(Gio.dbus_error_quark(), Gio.DBusError.NO_REPLY)):
+            raise
     return 0
 
 

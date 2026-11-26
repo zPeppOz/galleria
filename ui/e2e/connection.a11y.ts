@@ -23,11 +23,6 @@ async function openWith(scenario: string): Promise<void> {
   daemon("start", scenario);
   b = await openApp();
   await waitForBody(b, "Connected to the service", "the shell never showed the link");
-  // The form of the chosen profile is mounted again about 25 ms after the bar says the link (measured with a MutationObserver: `-DIV.detail +DIV.detail`
-  // 24 ms after the first one, when the detail arrives): a test that finds «Connect» in that window clicks a button that is gone («stale element
-  // reference»). The first read of `update_view` at the start (plan B6, T5) moved the first poll of `waitForBody` into that window. Waiting for the form
-  // to be the last one is what every test below needs.
-  await settle(600);
 }
 
 afterEach(closeApp);

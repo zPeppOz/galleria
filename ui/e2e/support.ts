@@ -50,7 +50,47 @@ export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "
     await stopPrivateDriver();
     throw failure;
   }
+  survivesARender(current);
   return current;
+}
+
+// ---- An element that React renders again between the find and the action ------------------------------------------------------------
+// The window mounts a form again a few milliseconds after the state it shows (the detail of the chosen profile, `-DIV.detail +DIV.detail`
+// about 25 ms after the bar says the link): a button found a moment before is gone when it is clicked, and WebKitWebDriver says «stale
+// element reference», either from the find itself (`elements`, «Stale element found when trying to create the node handle») or from the
+// action on the id it had (`element/<id>/click`, «Node with identifier … was not found»). webdriverio refetches the element by its selector
+// when the action goes stale, and waits for it to exist (the condition of the page, not a time), but it does not do that for the find, and
+// it gives up when the refetch lands in the same render. That one case is in this place, for every test: the find and the action that
+// failed with «stale element reference», and only with it, are run once more. Any other error is the test's own and goes up untouched,
+// and nothing here lengthens a timeout. The commands that webdriverio builds out of these (`setValue` is `clearValue` and `addValue`,
+// `waitForDisplayed` asks `isDisplayed`) are not wrapped themselves, so that a failure is never run more than once.
+
+const isStale = (failure: unknown): boolean => failure instanceof Error && (failure.name === "stale element reference" || failure.message.includes("stale element reference"));
+
+/** Runs `run`; if it fails with «stale element reference» it runs once more, and whatever that does is the answer. */
+async function once<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (failure) {
+    if (!isStale(failure)) throw failure;
+    return run();
+  }
+}
+
+type Original = (...args: unknown[]) => Promise<unknown>;
+type Overwriting = { overwriteCommand: (name: string, command: (original: Original, ...args: unknown[]) => Promise<unknown>, options?: { attachToElement: boolean }) => void };
+
+const FINDS = ["$", "$$"];
+const ACTIONS = ["click", "clearValue", "addValue", "getText", "getValue", "getAttribute", "getProperty", "isEnabled", "isDisplayed"];
+
+function survivesARender(b: Browser): void {
+  const session = b as unknown as Overwriting;
+  const again = (original: Original, ...args: unknown[]) => once(() => original(...args));
+  for (const name of FINDS) {
+    session.overwriteCommand(name, again);
+    session.overwriteCommand(name, again, { attachToElement: true });
+  }
+  for (const name of ACTIONS) session.overwriteCommand(name, again, { attachToElement: true });
 }
 
 export async function closeApp(): Promise<void> {

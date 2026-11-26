@@ -91,3 +91,14 @@ pub fn restore<R: Runtime>(window: &tauri::WebviewWindow<R>, file: &UiStateFile)
     }
     let _ = window.show();
 }
+
+/// Brings the main window forward for a second launch: shown, out of the icon, in front and with the focus. A compositor
+/// may refuse the focus (Wayland does, to a window that did not ask for it): the preview is there anyway.
+pub fn raise<R: Runtime>(app: &tauri::AppHandle<R>) {
+    use tauri::Manager;
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.unminimize();
+        let _ = main.set_focus();
+    }
+}

@@ -18,6 +18,10 @@ gui_prepare_outer() {
   # The app reads and writes `state.toml` (D32) and, from B3, the profiles: both inside the temporary directory, never
   # in the home of whoever runs the test.
   export XDG_CONFIG_HOME=$tmp/config XDG_STATE_HOME=$tmp/state
+  # The single window of the app (plan B4, T5) keeps its lock and its socket in `$XDG_RUNTIME_DIR/galleria`: the run has a
+  # runtime folder of its own, `0700` like the one of a session, so the tests never touch the one of whoever runs them.
+  export XDG_RUNTIME_DIR=$tmp/run
+  mkdir -m 700 "$XDG_RUNTIME_DIR"
   bin=$tmp/bin
   mkdir -p "$bin"
 

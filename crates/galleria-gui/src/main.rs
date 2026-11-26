@@ -1,6 +1,5 @@
 #![forbid(unsafe_code)]
 
-fn main() -> anyhow::Result<()> {
-    galleria_gui::run()?;
-    Ok(())
+fn main() -> anyhow::Result<std::process::ExitCode> {
+    Ok(galleria_gui::run()?)
 }

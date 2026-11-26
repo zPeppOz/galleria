@@ -5,8 +5,9 @@
 //                          from the webview)
 //   GALLERIA_SMOKE_DRIVER_PORT  the port tauri-driver listens on
 // Nothing here asks the daemon to connect: no route, DNS or interface is touched.
-import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { execFileSync, spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it } from "vitest";
@@ -738,5 +739,125 @@ describe("the import in the real window", () => {
     await waitForBody(b, "Import a profile…", "the empty rubrica does not offer the import");
     expect(await bodyText(b), "no command to copy: the window is enough").not.toMatch(/galleria\s+import/);
     expect(await b.$$('[role="option"]')).toHaveLength(0);
+  });
+});
+
+describe("a file given to the app, and one window only (plan B4, T5)", () => {
+  const app = () => env("GALLERIA_SMOKE_APP");
+  const configDir = () => join(env("XDG_CONFIG_HOME"), "galleria");
+  /** The processes of the app now running: a second launch must not add one. */
+  const running = (): string[] => {
+    const found = spawnSync("pgrep", ["-x", "galleria-gui"], { encoding: "utf8" });
+    return found.stdout.split("\n").filter(Boolean).sort();
+  };
+  const alive = (child: ChildProcess) => child.exitCode === null && child.signalCode === null;
+  const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  it("the_app_started_with_a_file_opens_its_preview", async () => {
+    daemon("start");
+    const files = importFixtures();
+    // the file is an argument of the process, as a file manager gives it (S30)
+    const b = await openApp(false, "seeded", [files.inline]);
+    await waitForBody(b, "File: inline.ovpn", "the preview of the file of the arguments never showed");
+    // at the second step, with the name taken from the file, and nothing on the disk yet
+    expect(await b.$('input[name="import-name"]').getValue()).toBe("inline");
+    expect(readdirSync(join(configDir(), "profiles"))).toHaveLength(5);
+    expect(await bodyText(b), "the folder of the file is not in the page").not.toContain(files.inline.slice(0, files.inline.lastIndexOf("/")));
+    await b.$("button=Import").click();
+    await waitForBody(b, "Imported “inline”.", "the notice of the import never showed");
+    expect(readdirSync(join(configDir(), "profiles"))).toHaveLength(6);
+    expect(readdirSync(join(configDir(), "profiles")).map((name) => readFileSync(join(configDir(), "profiles", name), "utf8")).filter((text) => text.includes('name = "inline"'))).toHaveLength(1);
+  });
+
+  it("a_second_launch_hands_the_file_to_the_first_window", async () => {
+    daemon("start");
+    const files = importFixtures();
+    const b = await openApp();
+    await waitForBody(b, CONNECTED, "the bar never showed the active link");
+    const before = running();
+    expect(before, "one process of the app is running before the second launch").toHaveLength(1);
+    // the second launch: it has no display to open, it hands the file over and ends
+    const started = Date.now();
+    const second = spawnSync(app(), [files.office], { encoding: "utf8", timeout: 5000 });
+    expect(second.status, `the second launch ended with ${second.status}: ${second.stderr}`).toBe(0);
+    expect(Date.now() - started, "the second launch took long").toBeLessThan(5000);
+    // the first window shows the preview of the file, WireGuard with its hook removed
+    await waitForBody(b, "File: office.conf", "the first window never showed the file of the second launch");
+    expect(await bodyText(b)).toContain("PostUp");
+    expect(running(), "still one process of the app").toEqual(before);
+    expect(readdirSync(join(configDir(), "profiles")), "nothing is written before «Import»").toHaveLength(5);
+    // a second launch with no file only brings the window forward: nothing new in the window
+    const bare = spawnSync(app(), [], { encoding: "utf8", timeout: 5000 });
+    expect(bare.status, bare.stderr).toBe(0);
+    expect(running()).toEqual(before);
+    // a file that cannot be previewed is an error inside the same window
+    const notAProfile = join(env("XDG_RUNTIME_DIR"), "not-a-profile.txt");
+    writeFileSync(notAProfile, "hello\n");
+    expect(spawnSync(app(), [notAProfile], { encoding: "utf8", timeout: 5000 }).status).toBe(0);
+    await waitForBody(b, "Only .ovpn and .conf files can be imported.", "the error of the file never showed");
+    expect(running()).toEqual(before);
+  });
+
+  it("a_second_launch_without_a_runtime_dir_opens_a_second_window", async () => {
+    daemon("start");
+    const files = importFixtures();
+    // S11: without a runtime folder there is no channel; both processes start on their own and say so. They are started by
+    // hand: the driver would give them the variable of the run.
+    const bare = { ...process.env };
+    delete bare.XDG_RUNTIME_DIR;
+    const children: ChildProcess[] = [];
+    const said: string[] = [];
+    const launch = (args: string[]) => {
+      const child = spawn(app(), args, { env: bare, stdio: ["ignore", "ignore", "pipe"] });
+      child.stderr?.on("data", (chunk: Buffer) => said.push(chunk.toString()));
+      children.push(child);
+      return child;
+    };
+    try {
+      const first = launch([]);
+      await settle(4000);
+      expect(alive(first), "the first process started").toBe(true);
+      const second = launch([files.office]);
+      await settle(4000);
+      expect(alive(first) && alive(second), "both processes live: the second did not hand over and end").toBe(true);
+      expect(said.join("").match(/no single window/g) ?? [], said.join("")).toHaveLength(2);
+    } finally {
+      for (const child of children) child.kill("SIGKILL");
+      await settle(500);
+    }
+  });
+
+  it("an_ovpn_is_opened_by_the_desktop_entry", async () => {
+    daemon("start");
+    const files = importFixtures();
+    const b = await openApp();
+    await waitForBody(b, CONNECTED, "the bar never showed the active link");
+    // the file `.desktop` of packaging/linux in a data folder of its own, with the command that points to this binary
+    const data = mkdtempSync(join(tmpdir(), "galleria-xdg-data-"));
+    try {
+      const applications = join(data, "applications");
+      mkdirSync(applications);
+      const name = "io.github.zpeppoz.galleria.desktop";
+      const source = readFileSync(join(env("GALLERIA_SMOKE_REPO"), "packaging", "linux", name), "utf8");
+      expect(source).toContain("Exec=galleria-gui %f");
+      const entry = join(applications, name);
+      writeFileSync(entry, source.replace("Exec=galleria-gui %f", `Exec=${app()} %f`));
+      // what `update-desktop-database` writes (the image has no desktop-file-utils): the types of each file `.desktop`
+      writeFileSync(join(applications, "mimeinfo.cache"), `[MIME Cache]\napplication/x-openvpn-profile=${name};\n`);
+      const gioEnv = { ...process.env, XDG_DATA_HOME: data, XDG_DATA_DIRS: `${data}:/usr/local/share:/usr/share` };
+      // a .ovpn has its type, and the application is the one that is registered for it
+      const type = execFileSync("gio", ["info", "-a", "standard::content-type", files.inline], { encoding: "utf8", env: gioEnv });
+      expect(type).toContain("application/x-openvpn-profile");
+      const registered = execFileSync("gio", ["mime", "application/x-openvpn-profile"], { encoding: "utf8", env: gioEnv });
+      expect(registered, registered).toContain(name);
+      // and the launcher of GLib runs its `Exec` with the path of the file; the app is already open, so it hands the file over
+      const before = running();
+      execFileSync("gio", ["launch", entry, files.inline], { encoding: "utf8", env: gioEnv, timeout: 15000 });
+      await waitForBody(b, "File: inline.ovpn", "the file opened by the desktop entry never showed in the first window");
+      await settle(500);
+      expect(running(), "no second process of the app was left").toEqual(before);
+    } finally {
+      rmSync(data, { recursive: true, force: true });
+    }
   });
 });

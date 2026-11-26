@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Galleria
+Comment=VPN profiles for OpenVPN and WireGuard
+# One file per launch: the first window takes it, a second launch hands it over (single instance).
+Exec=galleria-gui %f
+Terminal=false
+Categories=Network;Security;
+# Only the .ovpn files are associated (D31): a .conf may be anything. The same type as `bundle.fileAssociations` in
+# crates/galleria-gui/tauri.conf.json, which tests/config.rs keeps equal.
+MimeType=application/x-openvpn-profile;

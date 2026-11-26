@@ -13,6 +13,7 @@ pub mod export;
 #[cfg(target_os = "linux")]
 pub mod export_gtk;
 pub mod import;
+pub mod instance;
 pub mod link;
 pub mod picker;
 #[cfg(target_os = "linux")]
@@ -110,6 +111,22 @@ pub fn configure_with<R: Runtime>(
             app.manage(default_picker(app.handle()));
             // And the window «Open» of «Import».
             app.manage(default_file_picker(app.handle()));
+            // What this launch is (T5): the files of its arguments are offered to the page, and the first window listens
+            // for the files that later launches hand over. The tests of level 2 have no launch.
+            if let Some(launch) = app.try_state::<Launch>() {
+                let handle = app.handle().clone();
+                events::offer_from_outside(&handle, &launch.files, import::Origin::Open);
+                if let Some(primary) = launch.take_primary() {
+                    tauri::async_runtime::spawn(primary.serve(move |files| {
+                        let handle = handle.clone();
+                        // reading the files is not quick: not on the thread of the channel
+                        tauri::async_runtime::spawn_blocking(move || {
+                            events::offer_from_outside(&handle, &files, import::Origin::Open);
+                            window::raise(&handle);
+                        });
+                    }));
+                }
+            }
             if let Some(main) = app.get_webview_window("main") {
                 window::restore(&main, &state);
             }
@@ -150,13 +167,58 @@ fn default_file_picker<R: Runtime>(_app: &tauri::AppHandle<R>) -> Arc<dyn FilePi
     Arc::new(picker::NoFilePicker)
 }
 
+/// What the launch of the process brought (plan B4, T5): the files of its arguments, and, in the first process, the channel
+/// the next launches hand their files over. It is put in the state before the build; a process without it (the tests of
+/// level 2) has no arguments and no channel.
+pub struct Launch {
+    pub files: Vec<PathBuf>,
+    primary: std::sync::Mutex<Option<instance::Primary>>,
+}
+
+impl Launch {
+    pub fn new(files: Vec<PathBuf>, primary: Option<instance::Primary>) -> Self {
+        Self {
+            files,
+            primary: std::sync::Mutex::new(primary),
+        }
+    }
+
+    fn take_primary(&self) -> Option<instance::Primary> {
+        self.primary
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+    }
+}
+
 /// Builds the Tauri application from `tauri.conf.json` and runs it until the last window closes. The daemon
 /// socket is `GALLERIA_SOCKET` when set, the default path otherwise.
+///
+/// Before anything is built, the process finds out whether it is the first (`instance::claim`): a second launch gives its
+/// files to the first window and ends here, so it does not even start WebKit. Without a runtime folder there is no channel:
+/// the app starts alone and says so on `stderr`.
 ///
 /// # Errors
 ///
 /// Returns the Tauri error when the application cannot be built or crashes while running.
-pub fn run() -> tauri::Result<()> {
+pub fn run() -> tauri::Result<std::process::ExitCode> {
     let socket = link::socket_path(std::env::var_os("GALLERIA_SOCKET"));
-    configure(tauri::Builder::default(), socket).run(tauri::generate_context!())
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let files = instance::files_in_args(std::env::args_os().skip(1), &cwd);
+    let dir = instance::runtime_dir(std::env::var_os("XDG_RUNTIME_DIR"));
+    let primary = match instance::claim(dir.as_deref(), &files) {
+        instance::Claim::Handed => return Ok(std::process::ExitCode::SUCCESS),
+        instance::Claim::Failed(why) => {
+            eprintln!("galleria-gui: {why}");
+            return Ok(std::process::ExitCode::FAILURE);
+        }
+        instance::Claim::Alone(why) => {
+            eprintln!("galleria-gui: no single window: {why}; the app starts on its own");
+            None
+        }
+        instance::Claim::Primary(primary) => Some(primary),
+    };
+    let builder = tauri::Builder::default().manage(Launch::new(files, primary));
+    configure(builder, socket).run(tauri::generate_context!())?;
+    Ok(std::process::ExitCode::SUCCESS)
 }

@@ -29,9 +29,10 @@ export const readState = (): string => (existsSync(stateFile()) ? readFileSync(s
 /**
  * Starts the app. Every test starts from an empty `state.toml` and from the seeded rubrica, so what one test chose
  * (Italian, a theme) or did to the profiles does not leak into the next; `keepState` is for the test that restarts the
- * app on purpose and keeps both. `rubrica: "empty"` starts from a store with no profile.
+ * app on purpose and keeps both. `rubrica: "empty"` starts from a store with no profile. `args` are the arguments of the
+ * process, as a file manager gives them: a file to open (S30: `tauri-driver` hands `tauri:options.args` to the app).
  */
-export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "seeded"): Promise<Browser> {
+export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "seeded", args: string[] = []): Promise<Browser> {
   if (!keepState) {
     rmSync(stateFile(), { force: true });
     seedRubrica(rubrica);
@@ -40,7 +41,7 @@ export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "
     hostname: "127.0.0.1",
     port: Number(env("GALLERIA_SMOKE_DRIVER_PORT")),
     logLevel: "error",
-    capabilities: { "tauri:options": { application: env("GALLERIA_SMOKE_APP") } } as WebdriverIO.Capabilities,
+    capabilities: { "tauri:options": { application: env("GALLERIA_SMOKE_APP"), ...(args.length > 0 ? { args } : {}) } } as WebdriverIO.Capabilities,
   });
   return current;
 }

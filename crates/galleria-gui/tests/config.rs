@@ -195,3 +195,57 @@ fn drag_drop_stays_on_and_the_asset_protocol_stays_off() {
     let csp = conf["app"]["security"]["csp"].as_str().unwrap();
     assert!(!csp.contains("asset:"), "the CSP names asset: {csp}");
 }
+
+// ---- the association of the .ovpn files (plan B4, T5, D31, Q41) ---------------------------------------------------------
+
+fn desktop_file() -> String {
+    let path = crate_file("../../packaging/linux/io.github.zpeppoz.galleria.desktop");
+    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
+}
+
+/// The value of a key of the file `.desktop` (the first one, outside of comments).
+fn desktop_key(text: &str, key: &str) -> Option<String> {
+    text.lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .find_map(|line| line.strip_prefix(&format!("{key}=")))
+        .map(|value| value.trim().to_owned())
+}
+
+#[test]
+fn only_ovpn_is_associated() {
+    let conf = tauri_conf();
+    let associations = conf["bundle"]["fileAssociations"].as_array().unwrap();
+    assert_eq!(associations.len(), 1, "{associations:?}");
+    assert_eq!(associations[0]["ext"], serde_json::json!(["ovpn"]));
+    // a `.conf` may be anything (a WireGuard profile, a daemon configuration): it is not associated (D31)
+    let text = serde_json::to_string(&conf["bundle"]).unwrap();
+    assert!(!text.contains("\"conf\""), "{text}");
+    assert!(!desktop_file().contains("wireguard"));
+}
+
+#[test]
+fn the_desktop_file_and_the_bundle_agree() {
+    let conf = tauri_conf();
+    let mime = conf["bundle"]["fileAssociations"][0]["mimeType"]
+        .as_str()
+        .unwrap();
+    let file = desktop_file();
+    assert_eq!(desktop_key(&file, "MimeType"), Some(format!("{mime};")));
+    // one file per launch, and the command is the binary of the app
+    let exec = desktop_key(&file, "Exec").unwrap();
+    assert!(exec.starts_with("galleria-gui "), "{exec}");
+    assert!(exec.split_whitespace().any(|word| word == "%f"), "{exec}");
+    assert_eq!(desktop_key(&file, "Type").as_deref(), Some("Application"));
+    // the name of the file is the identifier of the app
+    let identifier = conf["identifier"].as_str().unwrap();
+    assert!(
+        crate_file(&format!("../../packaging/linux/{identifier}.desktop")).exists(),
+        "there is no {identifier}.desktop"
+    );
+}
+
+#[test]
+fn bundle_stays_off() {
+    // the packages are phase 4: the association is declared and tried with the file `.desktop`, not installed
+    assert_eq!(tauri_conf()["bundle"]["active"], Value::Bool(false));
+}

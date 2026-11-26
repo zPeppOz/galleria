@@ -9,6 +9,10 @@ Vedi [esito della fase 1](docs/06-esito-fase1.md) e [laboratorio](lab/README.md)
 
 ![Mockup rubrica](design/mockup/rubrica-connesso.png)
 
+Un solo `galleria-gui` alla volta: avviato con un file (`galleria-gui profilo.ovpn`, o il doppio click) mentre la finestra è già aperta,
+le consegna il file e termina; il canale è un socket `0600` in `$XDG_RUNTIME_DIR/galleria` (senza quella cartella l'app parte lo stesso, per conto suo).
+Solo i `.ovpn` sono associati all'app (`packaging/linux/io.github.zpeppoz.galleria.desktop`, non installato da nessuno script: i pacchetti sono della fase 4).
+
 ## Documenti
 
 - [`docs/00-mercato-e-concorrenti.md`](docs/00-mercato-e-concorrenti.md) — concorrenti, buco reale, validazione

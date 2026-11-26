@@ -104,8 +104,9 @@ export function ConnectionProvider({ view, ownIds, onCredentialsChanged, childre
     setError(null);
     setPending(id);
     try {
-      const { replaced } = await connectOrReplace(connectProfile, id);
-      if (replaced) latest.current.toast(latest.current.t("connect.replaced", { name: replaced }), { tone: "info" });
+      // The notice goes out before the replacement is asked for, not when it is done: Rust says «Connected to …» as soon as the
+      // service does, and a notice sent after it would be heard after it (K5f).
+      await connectOrReplace(connectProfile, id, (left) => latest.current.toast(latest.current.t("connect.replaced", { name: left }), { tone: "info" }));
     } catch (failure) {
       const refused = failure as CommandError;
       // A session that is not ours is never replaced on its own: the person is asked, and nothing was connected yet.

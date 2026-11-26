@@ -11,6 +11,7 @@ G5	gui-smoke	cargo	keyring_value_with_newlines_survives
 G5	gui-smoke	cargo	keyring_locked_is_reported_within_five_seconds
 G5	gui-smoke	cargo	keyring_present_does_not_unlock
 G5	gui-smoke	cargo	keyring_absent_opens_as_none
+G5	gui-smoke	cargo	keyring_without_a_default_collection_is_no_keyring
 G6	gui-smoke	cargo	the_cli_reads_what_the_keyring_holds
 G6	gui-smoke	cargo	the_cli_without_a_keyring_reads_the_file
 G6	check	cargo	layered_reads_the_keyring_first_then_the_file

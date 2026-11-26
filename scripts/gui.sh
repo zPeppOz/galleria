@@ -16,7 +16,7 @@
 #                                 tests, then t17 on that client (the real CLI and daemon list and connect what the window imported)
 #   scripts/gui.sh socket-owner   the owner check of the single-instance socket against two real users (uid 1001 and 1002) and root, in
 #                                 the image as root (lab/tests/gui-socket-owner.sh): the unit tests run as one user and cannot hold it
-#   scripts/gui.sh keyring        the keyring store against a real GNOME Keyring (unlocked, locked, absent) and the CLI on the same
+#   scripts/gui.sh keyring        the keyring store against a real GNOME Keyring (unlocked, locked, absent, no default collection) and the CLI on the same
 #                                 keyring (lab/tests/gui-keyring.sh); ends with scripts/check-gates.py on what ran
 #   scripts/gui.sh pnpm-version   print the pnpm version pinned in package.json (for CI)
 #

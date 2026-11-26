@@ -241,10 +241,59 @@ non c’è più e registra «Impossible to read image info … Failed to recogni
 se lo stato finale arriva entro ~200–300 ms (raccogliere i cambi in `TauriSurface::show`, `crates/galleria-gui/src/tray_tauri.rs`) e rifare la prova con `icon-watch.py` + `journalctl`. Su 26.04
 il pallino verde compare ma dopo la disconnessione si vede «…» (`ubuntu/12-menu-disconnected.png`).
 
+#### F2 — correzione (card `t_479c2489`): i cambi ravvicinati si raccolgono e si applica solo l’ultimo
+
+**Che cosa**: `IconSettler` (`crates/galleria-gui/src/tray.rs`, senza tipi di Tauri) tiene l’icona che il modello vuole e la mette sul crate `tray-icon` solo quando
+è rimasta quella per `ICON_SETTLE` = **300 ms**; un cambio che torna a ciò che è già sulla barra non mette niente. `TauriSurface::show`
+(`tray_tauri.rs`) chiama `want(icon)` e riscrive subito il menu (il menu non ha il problema); l’icona la mette il timer, sul thread della finestra. Due icone messe non
+stanno mai a meno di 300 ms una dall’altra, quindi il file precedente, che il crate cancella, ha avuto 300 ms per essere letto (la lettura in ritardo è di qualche decina di ms).
+
+**Perché questa strada e non un nome di file sempre diverso**: `tray-icon` 0.25.1 (Linux, `platform_impl/gtk/mod.rs`, `set_icon`) scrive già un nome nuovo a ogni `set_icon` (`tray-icon-galleria-N.png`, con un contatore) e **cancella
+comunque il precedente come prima riga di `set_icon`, prima di scrivere il successivo** (si vede in `icon-watch.log`: `- …-4.png` e `+ …-5.png` allo stesso millisecondo): non ha un’opzione per tenerlo, e per
+non cancellarlo dovremmo scrivere noi i file e dare al crate un percorso, cioè riscrivere la parte del crate che fa l’icona. Raccogliere i cambi sta in una struttura nostra di una quarantina di righe, si prova
+senza VM (`tests/tray.rs`) e toglie anche un «Busy» che non serve a nessuno (non si vede per meno di 300 ms). Costo: l’icona segue lo stato con 300 ms di ritardo; il menu no.
+
+**Prova rossa, poi verde** (senza VM, `cargo test -p galleria-gui --test tray`, nell’immagine): con un `want` che applica subito, `two_changes_closer_than_the_wait_put_one_icon_the_last`
+(`Busy` e dopo 40 ms `Off` con l’attesa vera) dava `[Busy, Off]` invece di `[Off]`, e due delle altre tre prove nuove cadevano; con la correzione 37/37. Le altre
+(`a_change_that_comes_back_to_what_is_shown_puts_nothing`, `a_change_that_stays_is_put_after_the_wait_and_not_before`, `icons_that_are_put_are_never_closer_than_the_wait`)
+fissano il ritorno a ciò che è già mostrato, l’attesa e la distanza minima.
+
+**Prova su Ubuntu 24.04 (GNOME 46, estensione `ubuntu-appindicators`), build release dell’albero della card**, demone finto (`examples/fake-daemon --scenario plain`) e clic AT-SPI
+su Connect/Disconnect della finestra (`lab/vm/f2-run.sh`; prove in `/mnt/b/vm/evidence/b6/f2/`, copia dalla VM in `vm-out/`). Stesso giro, due binari:
+
+| | binario del giro quotidiano (`b47de8e`, `bcb3f39` per la tray) | binario con la correzione |
+|---|---|---|
+| file dell’icona (`icon-watch.log`) | al primo Connect `…-2.png` (Busy) esiste 45 ms e `…-3.png` lo segue; poi coppie da 3 ms (`…-4.png`) | **un solo file per cambio**, il Busy c’è solo se il tunnel ci mette più di 300 ms |
+| journal (`journal.txt`) | `Impossible to read image info from path …/tray-icon-galleria-2.png` + `unable to update icon: … Failed to recognize image format` | **0** «unable to update icon» in 3 giri (4 cambi a 5 s, 4 cambi a 2 s, 2 cambi a mano) |
+| barra (fotografie) | anello dopo la disconnessione (`03-control-old-final-disconnected.png`; il «…» non è comparso in questo giro, l’errore sì) | pallino verde dopo Connect (`05-fixed-connected.png`), anello dopo Disconnect (`04`, `06`) |
+
+Il controllo con il binario vecchio riproduce l’errore nello stesso giro (`journal-since-control.txt`: una sola riga di errore da quando c’è il vecchio binario, nessuna dopo il nuovo).
+**Limite onesto**: con il binario vecchio il «…» **permanente** non si è rivisto in questo giro (l’errore sì, una volta, e l’icona seguente era giusta): l’estensione perde il
+file in una corsa, non a ogni cambio. La prova che la correzione toglie la corsa è il file che esiste ≥ 300 ms e la riga di errore che non compare in 10 cambi; non è
+«il “…” non c’è più in 100 cambi». Non rifatto su 26.04 e Fedora (la card chiedeva una sola VM).
+
 ### F1 anche su 26.04, F3 non confermata
 
 F1 (nessun portachiavi predefinito con accesso automatico senza password → «The keyring did not answer») si riproduce su **26.04**; su **Fedora** il «Login» esiste ma è bloccato e il
 prodotto aspetta lo sblocco (corretto). F3 (due separatori di fila): visto su Fedora a menu «disconnesso» in una fotografia (`13c-menu.png`), un solo separatore in un’altra (`14d.png`): non determinato.
+
+#### F1 — esito (card `t_479c2489`): **non** era il comportamento di D25, corretto
+
+**Che cosa succedeva** (letto nel codice, `secrets_keyring.rs`): il servizio Secret Service c’è (GNOME Keyring parte da solo sul bus), quindi `KeyringSecretStore::open()` dava
+«c’è un portachiavi»; ma senza collezione predefinita `set` dava `Keyring("no default collection")` → `gui_keyring_failed` → «The keyring did not answer. Nothing was saved.»,
+e Import si fermava. D25 dice invece: la GUI scrive nel portachiavi **e ripiega sul file, con avviso, se il portachiavi non c’è**, e «il blocco non si ferma». Un servizio
+senza una collezione dove mettere un segreto non è un portachiavi (crearla è una finestra che chiede una password, e non va fatta da sola).
+
+**Prova rossa, poi verde, su un Secret Service vero** (nell’immagine, nuovo giro `nodefault` di `scripts/gui.sh keyring`: GNOME Keyring avviato senza password, nessuna collezione;
+`keyring_without_a_default_collection_is_no_keyring`, riga G5 in `lab/tests/gates-b5.tsv`, argomento in più al controllo di CI): prima `keyring_present()` dava `true` («a service with no
+default collection is not a keyring»), poi `false`; con l’archivio a strati la scrittura finisce nel file `0600` (`StoreKind::File`, quindi `secret_store_status` dà `file` e la finestra
+mostra l’avviso «No system keyring: the keys are saved in a file only you can read.») e si legge indietro. Gli altri tre giri (sbloccato, bloccato, assente) restano verdi.
+
+**Correzione minima**: `keyring_present()` vuole anche che esista la collezione predefinita (`get_default_collection`, una `ReadAlias` che non apre né sblocca niente). Una collezione
+predefinita **bloccata** è ancora un portachiavi (Fedora: chiede lo sblocco, nessun ripiego silenzioso, come la regola 2 di D25). Vale anche per la CLI, che usa lo stesso `open()`.
+**Limiti**: se il portachiavi viene creato dopo, dalla chiamata successiva (ogni chiamata riapre una connessione) si scrive lì e si legge da tutti e due; i segreti messi nel file non si
+migrano da soli (regola 3). Una collezione che non è la predefinita non è letta. **Non rifatto sulla VM 26.04** (la card ammetteva la prova nell’immagine): il caso è lo stesso
+che `ubuntu/06-F1-keyring-did-not-answer.png` mostra, e il giro `nodefault` lo riproduce con lo stesso GNOME Keyring dell’immagine, non con quello di Ubuntu 26.04.
 
 ### Non verificato, riepilogo
 

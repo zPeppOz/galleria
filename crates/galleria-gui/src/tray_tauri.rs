@@ -6,7 +6,10 @@
 
 use crate::{
     closing::{Closing, Intent},
-    tray::{Factory, Surface, Tray, TrayAction, TrayEntry, TrayIcon as Icon, literal},
+    tray::{
+        Factory, ICON_SETTLE, IconSettler, Surface, Tray, TrayAction, TrayEntry, TrayIcon as Icon,
+        literal,
+    },
     window::{self, WindowControl},
 };
 use std::{
@@ -44,16 +47,18 @@ fn icon_image(icon: Icon) -> Image<'static> {
 
 struct TauriSurface<R: Runtime> {
     app: AppHandle<R>,
-    tray: TrayIcon<R>,
     menu: Menu<R>,
-    icon: Option<Icon>,
+    /// The icon is not set at every change: the changes that come close together are gathered and the last one is put (F2).
+    icon: IconSettler,
 }
 
 impl<R: Runtime> Surface for TauriSurface<R> {
     fn show(&mut self, entries: &[TrayEntry], icon: Icon, generation: u64) {
-        let icon_changed = self.icon != Some(icon);
-        self.icon = Some(icon);
-        let (app, menu, tray) = (self.app.clone(), self.menu.clone(), self.tray.clone());
+        // `Busy` and then the final state 40 ms later is what every change of state does: the `tray-icon` crate deletes the PNG of
+        // the icon that is replaced, the indicator of GNOME reads it late and does not recover (F2). The menu goes at once; the
+        // icon goes when nothing has changed it for `ICON_SETTLE`.
+        self.icon.want(icon);
+        let (app, menu) = (self.app.clone(), self.menu.clone());
         let entries = entries.to_vec();
         // The thread that gets here is the one of the events, and the menu belongs to the thread of the window: the work is posted,
         // never waited for (the window may be waiting for the lock of the tray).
@@ -61,13 +66,22 @@ impl<R: Runtime> Surface for TauriSurface<R> {
             if let Err(e) = rewrite(&app, &menu, &entries, generation) {
                 eprintln!("galleria-gui: cannot write the menu of the tray: {e}");
             }
-            if icon_changed && let Err(e) = tray.set_icon(Some(icon_image(icon))) {
-                eprintln!("galleria-gui: cannot change the icon of the tray: {e}");
-            }
         });
         if let Err(e) = posted {
             eprintln!("galleria-gui: cannot post the menu of the tray: {e}");
         }
+    }
+}
+
+/// Puts the icon on the tray, on the thread of the window (`IconSettler` calls this from a timer).
+fn put_icon<R: Runtime>(app: &AppHandle<R>, tray: &TrayIcon<R>, icon: Icon) {
+    let tray = tray.clone();
+    if let Err(e) = app.run_on_main_thread(move || {
+        if let Err(e) = tray.set_icon(Some(icon_image(icon))) {
+            eprintln!("galleria-gui: cannot change the icon of the tray: {e}");
+        }
+    }) {
+        eprintln!("galleria-gui: cannot post the icon of the tray: {e}");
     }
 }
 
@@ -137,11 +151,14 @@ fn build<R: Runtime>(app: &AppHandle<R>) -> Option<Box<dyn Surface>> {
             builder = builder.temp_dir_path(dir);
         }
         let tray = builder.build(app)?;
+        let (handle, icon_tray) = (app.clone(), tray);
         Ok(TauriSurface {
             app: app.clone(),
-            tray,
             menu,
-            icon: None,
+            // the tray was made with the icon `Off`
+            icon: IconSettler::new(Icon::Off, ICON_SETTLE, move |icon| {
+                put_icon(&handle, &icon_tray, icon);
+            }),
         })
     })();
     match made {

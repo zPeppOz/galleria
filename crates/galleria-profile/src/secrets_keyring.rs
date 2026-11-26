@@ -20,15 +20,19 @@ const PROMPT_SECONDS: u64 = 60;
 const BUS_SECONDS: u64 = 2;
 const IS_LOCKED: &str = "org.freedesktop.Secret.Error.IsLocked";
 
-/// True when the session bus has the Secret Service (`org.freedesktop.secrets`), or can start it. It opens no
-/// collection and unlocks nothing. Without a session bus it answers at once.
+/// True when the session bus has a Secret Service (`org.freedesktop.secrets`, or one that can be started) **with a default
+/// collection** to keep the secrets in. A service with none (GNOME Keyring on Ubuntu 26.04 with an automatic login: nobody made
+/// a keyring yet, and making one is a window that asks for a password) is no keyring for the app: it is treated like a bus
+/// without the service, the secrets go to the file with the warning (D25, F1 of the daily round) and nothing stops on
+/// «The keyring did not answer». A default collection that is **locked** is a keyring: it asks for the unlock, as before. It
+/// opens no collection and unlocks nothing. Without a session bus it answers at once.
 pub fn keyring_present() -> bool {
     has_session_bus()
         && SecretService::connect_with_connection_timeout(
             EncryptionType::Plain,
             Duration::from_secs(BUS_SECONDS),
         )
-        .is_ok()
+        .is_ok_and(|service| service.get_default_collection().is_ok())
 }
 
 /// libdbus would try to start a bus of its own (`dbus-launch`) when it finds no address; here no address is no keyring.

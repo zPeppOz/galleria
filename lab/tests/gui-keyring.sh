@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The keyring store against a real Secret Service, in three rounds (plan B5, T2; scripts/gui.sh keyring).
+# The keyring store against a real Secret Service, in four rounds (plan B5, T2; scripts/gui.sh keyring).
 #
 # Each round has a session bus of its own (`dbus-run-session`) and a data folder of its own, so nothing of the user who runs
 # it is read or written, and runs the `#[ignore]` tests that belong to it with GALLERIA_KEYRING_CASE:
@@ -9,6 +9,9 @@
 #   locked    the same, with one item stored and then the collection locked; there is no prompter in the image, so a request
 #             to unlock fails at once, and with a timeout the tests do not depend on that
 #   absent    a bus whose configuration has no folder of services: nothing can be started, `org.freedesktop.secrets` is not there
+#   nodefault GNOME Keyring started without a password: the service answers, but there is no collection and so no default one
+#             (Ubuntu 26.04 with an automatic login and no keyring made yet, F1 of the daily round): it is no keyring for the app,
+#             which keeps its secrets in the file with the warning (D25) and does not stop on "The keyring did not answer"
 #
 # The tests fail if their case is not the one asked for, so a round cannot pass by running another. The log of each round
 # is kept in target/gates/keyring-<case>.log, and at the end scripts/check-gates.py wants every proof of the job `gui-smoke`
@@ -59,6 +62,11 @@ if [[ ${1:-} == --round ]]; then
       [[ $(collection_locked) == *true* ]] || { echo "gui-keyring: the keyring is not locked" >&2; exit 1; }
       profile_tests=(keyring_locked_is_reported_within_five_seconds keyring_present_does_not_unlock)
       cli_tests=() ;;
+    nodefault)
+      gnome-keyring-daemon --start --components=secrets > /dev/null 2>&1 \
+        || { echo "gui-keyring: GNOME Keyring did not start" >&2; exit 1; }
+      profile_tests=(keyring_without_a_default_collection_is_no_keyring)
+      cli_tests=() ;;
     absent)
       profile_tests=(keyring_absent_opens_as_none)
       cli_tests=(the_cli_without_a_keyring_reads_the_file) ;;
@@ -98,7 +106,7 @@ cargo test -p galleria-cli --test keyring --no-run || exit 1
 cargo build -p galleria-cli --bin galleria || exit 1
 
 failed=0
-for case in unlocked locked absent; do
+for case in unlocked locked absent nodefault; do
   echo "=== keyring round: $case"
   # the stdout of the round is the log the gates are read from (`test <name> ... ok` must be on a line of its own), so what the
   # bus, GNOME Keyring and cargo write on stderr goes to a file of its own, shown only when a round fails
@@ -113,4 +121,4 @@ done
 (( failed == 0 )) || exit 1
 
 scripts/check-gates.py --job gui-smoke --kind cargo \
-  --cargo-log target/gates/keyring-unlocked.log --cargo-log target/gates/keyring-locked.log --cargo-log target/gates/keyring-absent.log
+  --cargo-log target/gates/keyring-unlocked.log --cargo-log target/gates/keyring-locked.log --cargo-log target/gates/keyring-absent.log --cargo-log target/gates/keyring-nodefault.log

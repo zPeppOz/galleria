@@ -31,11 +31,14 @@ chiudi nella tray, il tunnel resta, disconnetti dal menu, riapri) eseguito da un
 da una persona alla tastiera; la matrice più larga dei casi
 manuali (file manager, finestre «Apri» e «Salva» con il mouse, dimensioni su Wayland, portachiavi bloccato) **non è stata
 verificata**. KDE, KWallet e altri desktop non sono provati; i portali (Flatpak, Snap) neppure.
-- **Tray su GNOME.** Dopo un cambio di stato la barra può mostrare «…» al posto dell'icona fino al riavvio dell'app (il
-  menu funziona): l'app cambia l'icona due volte in ~40 ms e l'estensione non si riprende. Difetto noto, **non corretto**.
+- **Tray su GNOME.** L'icona segue lo stato con 300 ms di ritardo: l'app raccoglie i cambi ravvicinati e mette solo
+  l'ultimo (prima cambiava l'icona due volte in ~40 ms, l'estensione perdeva il file e la barra restava su «…» fino al
+  riavvio; il menu non ha ritardo). **Corretto e provato su Ubuntu 24.04** (nessun errore dell'estensione in circa 10
+  cambi, il binario vecchio ne lasciava); su 26.04 e Fedora non è stato rifatto.
   Se l'estensione non risponde all'avvio (schermata bloccata, sessione che parte) l'icona compare più tardi.
-- **Senza portachiavi predefinito** (accesso automatico senza password) l'import fallisce con «The keyring did not
-  answer»: l'app non crea la collezione. Su Fedora il «Login» è bloccato e la finestra aspetta lo sblocco del sistema.
+- **Senza portachiavi predefinito** (accesso automatico senza password) l'import ripiega sul file `0600`, con l'avviso
+  fisso: un servizio senza collezione predefinita non è un portachiavi, e l'app non la crea. Provato con GNOME Keyring
+  vero nell'immagine di prova, non sulla VM 26.04. Su Fedora il «Login» è bloccato e la finestra aspetta lo sblocco del sistema.
 - **Screen reader.** Le regioni vive di WebKitGTK sono mute con Orca: gli annunci arrivano dal lato Rust (segnale ATK).
   Con Orca 46 (Ubuntu 24.04) i campi generali si leggono, ma la finestra delle credenziali non è letta all'apertura
   (titolo e «User name» muti anche con la finestra attiva); con Orca 50 e 51 sì. Il parlato è stato letto dal file di

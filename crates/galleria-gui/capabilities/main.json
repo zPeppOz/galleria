@@ -40,6 +40,7 @@
     "allow-window-show",
     "allow-unsaved-set",
     "allow-window-hide",
-    "allow-app-quit"
+    "allow-app-quit",
+    "allow-update-view"
   ]
 }

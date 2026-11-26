@@ -36,6 +36,7 @@ const COMMANDS: &[&str] = &[
     "unsaved_set",
     "window_hide",
     "app_quit",
+    "update_view",
 ];
 
 fn main() {

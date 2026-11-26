@@ -131,3 +131,13 @@ pub const EV_CLOSE_BLOCKED: &str = "galleria:close-blocked";
 pub struct CloseBlocked {
     pub intent: crate::closing::Intent,
 }
+
+/// The version check found a version newer than this one (plan B6, T4): the payload is an `UpdateView`, which has the two numbers and the
+/// address Rust built, and nothing that came from the network.
+pub const EV_UPDATE: &str = "galleria:update";
+
+pub fn emit_update<R: Runtime>(app: &AppHandle<R>, view: &crate::update::UpdateView) {
+    if let Err(e) = app.emit(EV_UPDATE, view) {
+        eprintln!("galleria-gui: cannot emit {EV_UPDATE}: {e}");
+    }
+}

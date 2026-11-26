@@ -28,6 +28,9 @@ pub mod tray;
 pub mod tray_host;
 pub mod tray_tauri;
 pub mod ui_state;
+pub mod update;
+#[cfg(target_os = "linux")]
+pub mod update_soup;
 pub mod window;
 
 use announce::Announcer;
@@ -107,7 +110,8 @@ pub fn configure_with<R: Runtime>(
             commands::window::window_show,
             commands::window::unsaved_set,
             commands::window::window_hide,
-            commands::window::app_quit
+            commands::window::app_quit,
+            commands::update::update_view
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.
@@ -144,6 +148,13 @@ pub fn configure_with<R: Runtime>(
             app.manage(Arc::new(Closing::new(move || {
                 tray.available() && tray_host::tray_is_shown()
             })));
+            // The version check (plan B6, T4): one request a day, from here, to one address. The process that has a launch is the real
+            // app: the tests of level 2 have none, and none of them asks the network. `manage` keeps the first, so a test may bring its own.
+            let updater = default_updater(&state);
+            app.manage(Arc::clone(&updater));
+            if app.try_state::<Launch>().is_some() {
+                start_update_checks(app.handle().clone(), updater);
+            }
             let sink = std::sync::Arc::new(events::TauriSink(app.handle().clone()));
             let handle = supervisor::spawn(
                 socket.clone(),
@@ -213,6 +224,49 @@ fn default_file_picker<R: Runtime>(app: &tauri::AppHandle<R>) -> Arc<dyn FilePic
 #[cfg(not(target_os = "linux"))]
 fn default_file_picker<R: Runtime>(_app: &tauri::AppHandle<R>) -> Arc<dyn FilePicker> {
     Arc::new(picker::NoFilePicker)
+}
+
+/// The first look at the clock after the app starts (P11): ten seconds, so the check never competes with the first paint.
+const FIRST_UPDATE_CHECK: std::time::Duration = std::time::Duration::from_secs(10);
+/// How often the clock is looked at afterwards. A look is not a request: the request is made when a day has passed since the last one.
+const UPDATE_LOOK: std::time::Duration = std::time::Duration::from_secs(60 * 60);
+
+/// The checker of the running app: libsoup on Linux, no answer elsewhere. `GALLERIA_UPDATE_URL` may point it at a loopback address (P13).
+fn default_updater(state: &Arc<UiStateFile>) -> Arc<update::Updater> {
+    let endpoint = update::endpoint(std::env::var("GALLERIA_UPDATE_URL").ok().as_deref());
+    if endpoint.ignored {
+        eprintln!(
+            "galleria-gui: GALLERIA_UPDATE_URL ignored: only http://127.0.0.1:<port>/… is accepted"
+        );
+    }
+    #[cfg(target_os = "linux")]
+    let fetch: Arc<dyn update::Fetch> = Arc::new(update_soup::SoupFetch::new());
+    #[cfg(not(target_os = "linux"))]
+    let fetch: Arc<dyn update::Fetch> = Arc::new(update::NoFetch);
+    let current = semver::Version::parse(env!("CARGO_PKG_VERSION"))
+        .unwrap_or_else(|_| semver::Version::new(0, 0, 0));
+    Arc::new(update::Updater::new(
+        Arc::clone(state),
+        fetch,
+        endpoint.url,
+        current,
+        Arc::new(time::OffsetDateTime::now_utc),
+    ))
+}
+
+/// The look at the clock ten seconds after the start and then every hour: a request goes out only when a day has passed since the last one
+/// (`Updater::tick`). A version found is told to the page with `galleria:update`; the page also asks at mount, so a version found while it
+/// was not listening is not lost.
+fn start_update_checks<R: Runtime>(app: tauri::AppHandle<R>, updater: Arc<update::Updater>) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(FIRST_UPDATE_CHECK).await;
+        loop {
+            if updater.tick().await.is_some() {
+                events::emit_update(&app, &updater.view());
+            }
+            tokio::time::sleep(UPDATE_LOOK).await;
+        }
+    });
 }
 
 /// What the launch of the process brought (plan B4, T5): the files of its arguments, and, in the first process, the channel

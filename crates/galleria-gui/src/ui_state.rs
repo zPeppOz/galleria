@@ -93,6 +93,43 @@ pub struct UiState {
     pub window: Option<WindowSize>,
     /// RFC 3339 per profile; written by B5 when a connection starts.
     pub last_used: BTreeMap<Uuid, String>,
+    /// The version check (plan B6, T4). Left out of the file while it is all defaults, so a file that never touched it is the one B5 wrote.
+    #[serde(skip_serializing_if = "UpdateState::is_default")]
+    pub update: UpdateState,
+}
+
+/// `[update]` of `state.toml` (P11): whether to look for a newer version, when it last asked (whatever came of it), the newest it found and
+/// the one the person asked not to be reminded of. A file without the table, or with part of it, has the defaults for the rest, so
+/// `schema_version` stays 1.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(default)]
+pub struct UpdateState {
+    /// On unless the person turns it off (D16: «disattivabile» means on by itself).
+    pub check: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_check: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dismissed: Option<String>,
+}
+
+impl Default for UpdateState {
+    fn default() -> Self {
+        Self {
+            check: true,
+            last_check: None,
+            latest: None,
+            dismissed: None,
+        }
+    }
+}
+
+impl UpdateState {
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
 }
 
 impl Default for UiState {
@@ -104,20 +141,36 @@ impl Default for UiState {
             sort: SortOrder::default(),
             window: None,
             last_used: BTreeMap::new(),
+            update: UpdateState::default(),
         }
     }
 }
 
-/// What the webview may change (spec §3.2, rule 2): not the window and not the last use, which only Rust writes.
-#[derive(Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// What the webview may change (spec §3.2, rule 2): not the window and not the last use, which only Rust writes. Of `[update]` it may turn
+/// the check on and off and say which version it does not want to hear of again; `latest` and `last_check` are Rust's.
+#[derive(Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct UiPatch {
     pub lang: Option<LangChoice>,
     pub theme: Option<ThemeChoice>,
     pub sort: Option<SortOrder>,
+    pub update_check: Option<bool>,
+    pub update_dismissed: Option<String>,
 }
 
 impl UiPatch {
+    /// A version to dismiss is a stable `semver` number and nothing else: it is compared with the ones the check finds.
+    ///
+    /// # Errors
+    ///
+    /// When `update_dismissed` is not one.
+    pub fn validate(&self) -> Result<(), &'static str> {
+        match self.update_dismissed.as_deref() {
+            Some(text) if crate::update::parse_stable(text).is_none() => Err("update_dismissed"),
+            _ => Ok(()),
+        }
+    }
+
     pub fn apply(self, state: &mut UiState) {
         if let Some(lang) = self.lang {
             state.lang = lang;
@@ -127,6 +180,12 @@ impl UiPatch {
         }
         if let Some(sort) = self.sort {
             state.sort = sort;
+        }
+        if let Some(check) = self.update_check {
+            state.update.check = check;
+        }
+        if let Some(dismissed) = self.update_dismissed {
+            state.update.dismissed = Some(dismissed);
         }
     }
 }

@@ -11,4 +11,5 @@ pub mod profiles;
 pub mod secrets;
 pub mod tray;
 pub mod ui_state;
+pub mod update;
 pub mod window;

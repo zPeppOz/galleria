@@ -6,7 +6,7 @@ use galleria_gui::{
     supervisor::RelinkPolicy,
     ui_state::{
         LangChoice, STATE_SCHEMA, SortOrder, ThemeChoice, UiPatch, UiState, UiStateFile,
-        WindowSize, state_path,
+        UpdateState, WindowSize, state_path,
     },
 };
 use rstest::rstest;
@@ -293,4 +293,167 @@ fn a_failed_write_is_an_error_with_a_code() {
         invoke(&window, "ui_state_get", json!({})).unwrap()["theme"],
         "system"
     );
+}
+
+// ---- the table `[update]` (plan B6, T4, point 9 of the review) ------------------------------------------------------------------
+
+/// What B5 knew of `state.toml`: the fields without `update`. A file of the new version must be read by it without losing the rest.
+#[derive(serde::Deserialize, Debug, PartialEq, Eq)]
+struct StateOfB5 {
+    schema_version: u32,
+    lang: LangChoice,
+    theme: ThemeChoice,
+    sort: SortOrder,
+    window: Option<WindowSize>,
+}
+
+const A_FILE_OF_B5: &str = "schema_version = 1\nlang = \"it\"\ntheme = \"dark\"\nsort = \"recent\"\n\n[window]\nwidth = 900\nheight = 700\nmaximized = false\n\n[last_used]\n";
+
+#[test]
+fn a_state_file_of_b5_reads_the_same_and_gets_the_defaults() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = file_in(&dir);
+    std::fs::create_dir_all(file.path().parent().unwrap()).unwrap();
+    std::fs::write(file.path(), A_FILE_OF_B5).unwrap();
+    let state = file.load();
+    // the schema stays 1: a file of today is read as it was, and the check is on
+    assert_eq!(state.schema_version, 1);
+    assert_eq!(
+        (state.lang, state.theme, state.sort),
+        (LangChoice::It, ThemeChoice::Dark, SortOrder::Recent)
+    );
+    assert_eq!(state.window.map(|w| w.width), Some(900));
+    assert_eq!(state.update, UpdateState::default());
+    assert!(state.update.check);
+    // written again with the defaults of the table it has no `[update]` in it: B5 would read it, and it is the file it wrote
+    file.update(|_| {}).unwrap();
+    let text = std::fs::read_to_string(file.path()).unwrap();
+    assert!(!text.contains("[update]"), "{text}");
+}
+
+#[test]
+fn the_update_table_round_trips_and_b5_reads_the_rest() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = file_in(&dir);
+    file.update(|s| {
+        s.lang = LangChoice::It;
+        s.update = UpdateState {
+            check: false,
+            last_check: Some("2026-11-26T10:00:00Z".to_owned()),
+            latest: Some("0.2.0".to_owned()),
+            dismissed: Some("0.2.0".to_owned()),
+        };
+    })
+    .unwrap();
+    let text = std::fs::read_to_string(file.path()).unwrap();
+    assert!(
+        text.contains("[update]") && text.contains("check = false"),
+        "{text}"
+    );
+    assert_eq!(file.load().update.latest.as_deref(), Some("0.2.0"));
+    assert_eq!(file.load().update.dismissed.as_deref(), Some("0.2.0"));
+    assert!(!file.load().update.check);
+    // B5 had no such table: it reads what it knew, and the rest is none of its business
+    let old: StateOfB5 = toml::from_str(&text).unwrap();
+    assert_eq!((old.schema_version, old.lang), (1, LangChoice::It));
+    // the table with only some of the keys has the defaults for the others
+    std::fs::write(file.path(), "[update]\ndismissed = \"0.3.0\"\n").unwrap();
+    let partial = file.load().update;
+    assert!(partial.check && partial.latest.is_none());
+    assert_eq!(partial.dismissed.as_deref(), Some("0.3.0"));
+}
+
+#[test]
+fn the_patch_carries_the_check_and_a_dismissed_version_and_nothing_else_of_the_table() {
+    let patch: UiPatch =
+        serde_json::from_value(json!({"update_check": false, "update_dismissed": "0.2.0"}))
+            .unwrap();
+    let mut state = UiState::default();
+    patch.apply(&mut state);
+    assert!(!state.update.check);
+    assert_eq!(state.update.dismissed.as_deref(), Some("0.2.0"));
+    // what only Rust writes is not in the patch
+    for body in [
+        json!({"update": {"check": false}}),
+        json!({"update_latest": "9.9.9"}),
+        json!({"update_last_check": "2026-11-26T10:00:00Z"}),
+    ] {
+        assert!(
+            serde_json::from_value::<UiPatch>(body.clone()).is_err(),
+            "{body} was accepted"
+        );
+    }
+}
+
+#[test]
+fn the_commands_save_the_check_and_refuse_a_dismissed_version_that_is_not_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("galleria/state.toml");
+    let (_app, window) = app(UiStateFile::new(path.clone()));
+    let set = invoke(
+        &window,
+        "ui_state_set",
+        json!({"patch": {"update_check": false}}),
+    )
+    .unwrap();
+    assert_eq!(set["update"]["check"], false);
+    assert!(!UiStateFile::new(path.clone()).load().update.check);
+    let dismissed = invoke(
+        &window,
+        "ui_state_set",
+        json!({"patch": {"update_dismissed": "0.2.0"}}),
+    )
+    .unwrap();
+    assert_eq!(dismissed["update"]["dismissed"], "0.2.0");
+    for bad in [
+        "",
+        "latest",
+        "0.2",
+        "0.2.0-rc.1",
+        "0.2.0\n[x]",
+        &"9".repeat(300),
+    ] {
+        let refused = invoke(
+            &window,
+            "ui_state_set",
+            json!({"patch": {"update_dismissed": bad}}),
+        )
+        .unwrap_err();
+        assert_eq!(refused["code"], "gui_invalid_field", "{bad:?}");
+    }
+    // nothing of the refused ones was written
+    assert_eq!(
+        UiStateFile::new(path).load().update.dismissed.as_deref(),
+        Some("0.2.0")
+    );
+}
+
+#[test]
+fn update_view_answers_what_is_known_and_the_command_asks_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = UiStateFile::new(dir.path().join("galleria/state.toml"));
+    file.update(|s| {
+        s.update.latest = Some("9.9.9".to_owned());
+        s.update.last_check = Some("2999-01-01T00:00:00Z".to_owned());
+    })
+    .unwrap();
+    let (_app, window) = app(file);
+    let view = invoke(&window, "update_view", json!({})).unwrap();
+    assert_eq!(view["current"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(view["latest"], "9.9.9");
+    assert_eq!(
+        view["url"],
+        "https://github.com/zPeppOz/galleria/releases/tag/v9.9.9"
+    );
+    assert_eq!(view["enabled"], true);
+    // turned off, the view says so and shows no version
+    invoke(
+        &window,
+        "ui_state_set",
+        json!({"patch": {"update_check": false}}),
+    )
+    .unwrap();
+    let off = invoke(&window, "update_view", json!({})).unwrap();
+    assert_eq!(off["enabled"], false);
+    assert!(off["latest"].is_null() && off["url"].is_null(), "{off}");
 }

@@ -24,6 +24,7 @@ serde.workspace = true
 serde_json.workspace = true
 # `tray-icon`: the tray of plan B6 (zero packages in Cargo.lock, measured in spikes/b6-piano).
 tauri = { version = "2.12", features = ["tray-icon"] }
+semver = "1"
 tempfile.workspace = true
 thiserror.workspace = true
 time.workspace = true
@@ -35,6 +36,8 @@ uuid.workspace = true
 # version to Cargo.lock. `glib` and `atk` are used through it (`gtk::glib`, `gtk::atk`), never as direct dependencies.
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
+# The request of the version check (Q51 (a)): the libsoup that WebKitGTK has already loaded; in Cargo.lock already, no package added.
+soup3 = "0.5"
 
 [build-dependencies]
 tauri-build = { version = "2.7", features = [] }

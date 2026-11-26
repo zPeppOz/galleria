@@ -43,3 +43,10 @@ export const logsExport = (): Promise<{ saved: boolean }> => invoke("logs_export
 
 /** Shows the window of the app when it is hidden in the tray (plan B6, P7): an action of the menu of the tray that needs the person calls it first. */
 export const windowShow = (): Promise<void> => invoke<void>("window_show");
+
+/**
+ * What the version check knows (plan B6, T4): the version that runs, and, when there is a newer one that was not dismissed, which and where to read
+ * about it. `url` is built by Rust from the number: nothing in here came from the network as it was. The call makes no request.
+ */
+export interface UpdateView { current: string; latest: string | null; url: string | null; enabled: boolean }
+export const updateView = (): Promise<UpdateView> => invoke<UpdateView>("update_view");

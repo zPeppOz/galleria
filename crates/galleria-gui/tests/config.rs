@@ -44,6 +44,7 @@ const ALLOWED: &[&str] = &[
     "allow-unsaved-set",
     "allow-window-hide",
     "allow-app-quit",
+    "allow-update-view",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

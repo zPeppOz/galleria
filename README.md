@@ -5,8 +5,8 @@ una connessione attiva alla volta, Linux e Windows (macOS in seguito).
 
 Stato: demone Linux, CLI e finestra (Tauri, solo Linux) implementati, con laboratorio Docker per WireGuard e OpenVPN.
 La fase 2 (la finestra) è chiusa in locale il 26/11/2026; **ciò che non è provato e i limiti sono scritti in
-«Chiusura della fase 2» di [`docs/08-esito-fase2.md`](docs/08-esito-fase2.md)**, e il run di CI sull'ultimo commit
-si legge dopo il push. Windows è la fase 3 (vedi [`ROADMAP.md`](ROADMAP.md)).
+«Chiusura della fase 2» di [`docs/08-esito-fase2.md`](docs/08-esito-fase2.md)**, e il run di CI dopo il push
+(45880225132, 15/15) è verde. Windows è la fase 3 (vedi [`ROADMAP.md`](ROADMAP.md)).
 Vedi [esito della fase 1](docs/06-esito-fase1.md) e [laboratorio](lab/README.md).
 
 ![Mockup rubrica](design/mockup/rubrica-connesso.png)

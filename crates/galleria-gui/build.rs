@@ -29,6 +29,8 @@ const COMMANDS: &[&str] = &[
     "announce_phrases",
     "provide_input",
     "forget_credentials",
+    "logs_get",
+    "logs_export",
 ];
 
 fn main() {

@@ -16,6 +16,7 @@ pub mod export_gtk;
 pub mod import;
 pub mod instance;
 pub mod link;
+pub mod logs;
 pub mod picker;
 #[cfg(target_os = "linux")]
 pub mod picker_gtk;
@@ -92,7 +93,9 @@ pub fn configure_with<R: Runtime>(
             commands::connection::disconnect,
             commands::connection::announce_phrases,
             commands::connection::provide_input,
-            commands::connection::forget_credentials
+            commands::connection::forget_credentials,
+            commands::logs::logs_get,
+            commands::logs::logs_export
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.

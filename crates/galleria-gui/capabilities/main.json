@@ -33,6 +33,8 @@
     "allow-disconnect",
     "allow-announce-phrases",
     "allow-provide-input",
-    "allow-forget-credentials"
+    "allow-forget-credentials",
+    "allow-logs-get",
+    "allow-logs-export"
   ]
 }

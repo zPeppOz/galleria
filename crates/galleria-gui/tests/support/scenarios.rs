@@ -18,6 +18,8 @@ pub const NAMES: &[&str] = &[
     "stats",
     "slow",
     "stuck",
+    "chatty",
+    "leaky",
 ];
 
 const TURNS: usize = 12;
@@ -98,6 +100,36 @@ fn stuck() -> Vec<FakeStep> {
     ]
 }
 
+/// A session that writes more lines than the buffer of the daemon holds (2000): the log has to be read in several pages.
+fn chatty() -> Vec<FakeStep> {
+    let mut steps: Vec<FakeStep> = (1..=2100)
+        .map(|n| {
+            FakeStep::Emit(FakeEvent::Log(LogLine {
+                level: galleria_ipc::LogLevel::Info,
+                message: format!("line {n}"),
+            }))
+        })
+        .collect();
+    steps.extend(tunnel());
+    steps
+}
+
+/// A backend that repeats the keys it was given in its own log, as a careless one would: the daemon has to redact them
+/// (the names of the profile `Homelab` of the seed carry `SEED-SECRET-`).
+fn leaky() -> Vec<FakeStep> {
+    let mut steps: Vec<FakeStep> = ["SEED-SECRET-homelab-private", "SEED-SECRET-homelab-psk"]
+        .into_iter()
+        .map(|key| {
+            FakeStep::Emit(FakeEvent::Log(LogLine {
+                level: galleria_ipc::LogLevel::Warn,
+                message: format!("handshake with key {key} done"),
+            }))
+        })
+        .collect();
+    steps.extend(tunnel());
+    steps
+}
+
 /// The scripts of a scenario, one for each connection; `None` for a name that is not one.
 pub fn scenario(name: &str) -> Option<Vec<Vec<FakeStep>>> {
     let repeat = |make: &dyn Fn() -> Vec<FakeStep>| (0..TURNS).map(|_| make()).collect();
@@ -120,6 +152,8 @@ pub fn scenario(name: &str) -> Option<Vec<Vec<FakeStep>>> {
         "stats" => repeat(&counting),
         "slow" => repeat(&slow),
         "stuck" => repeat(&stuck),
+        "chatty" => repeat(&chatty),
+        "leaky" => repeat(&leaky),
         _ => return None,
     })
 }

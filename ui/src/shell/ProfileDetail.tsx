@@ -6,6 +6,7 @@ import { Stats } from "../connection/Stats";
 import { ConfirmDialog } from "../design/ConfirmDialog";
 import { icons } from "../design/icons";
 import { InlineAlert } from "../design/InlineAlert";
+import { LogTab } from "../log/LogTab";
 import { Menu, type MenuEntry } from "../design/Menu";
 import { Tabs } from "../design/Tabs";
 import { useToast } from "../design/Toast";
@@ -344,7 +345,7 @@ function Form({ detail, groups, update, validateRaw, reload, guard, menu }: Pick
           auth: <Authentication {...props} />,
           network: <Network {...props} />,
           config: <Configuration {...props} issues={raw?.issues ?? []} />,
-          log: <p className="detail-later">{t("pane.arrives_later")}</p>,
+          log: <LogTab profileId={base.id} />,
         }}
         below={<SaveBar dirty={dirty} busy={busy} onSave={afterBar(save)} onCancel={afterBar(discard)} />}
       />
@@ -481,7 +482,6 @@ export function ProfileDetail({ profile, detail, detailError, groups, names, inU
 }
 
 function WaitingFrame({ profile, waiting, menu }: { profile: ProfileSummary; waiting: ReactNode; menu: MenuEntry[] }) {
-  const t = useT();
   const [tab, setTab] = useState<TabId>("general");
   return (
     <Frame
@@ -489,7 +489,7 @@ function WaitingFrame({ profile, waiting, menu }: { profile: ProfileSummary; wai
       tab={tab}
       onTab={setTab}
       menu={menu}
-      panels={{ general: waiting, auth: waiting, network: waiting, config: waiting, log: <p className="detail-later">{t("pane.arrives_later")}</p> }}
+      panels={{ general: waiting, auth: waiting, network: waiting, config: waiting, log: <LogTab profileId={profile.id} /> }}
     />
   );
 }

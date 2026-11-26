@@ -5,7 +5,7 @@
 //! it: the parameters are borrowed or consumed, and the error carries the answer of the daemon, which never has one.
 
 use galleria_ipc::{
-    ConnectParams, ConnectResult, ProvideInputParams,
+    ConnectParams, ConnectResult, LogsParams, LogsResult, ProvideInputParams,
     client::{Client, ClientError},
 };
 use serde_json::Value;
@@ -99,4 +99,22 @@ pub async fn provide_input(socket: &Path, params: ProvideInputParams) -> Result<
         .map_err(CallError::from_client);
     drop(params);
     outcome
+}
+
+/// One page of the log of the daemon, oldest first: the lines after `after` (all of them when `None`), at most `limit` (the cap of
+/// the daemon is 1000). The lines are the daemon's, already redacted; nothing here keeps or prints them.
+///
+/// # Errors
+///
+/// As [`connect`].
+pub async fn logs(
+    socket: &Path,
+    after: Option<u64>,
+    limit: usize,
+) -> Result<LogsResult, CallError> {
+    open(socket)
+        .await?
+        .call("logs", &LogsParams { after, limit })
+        .await
+        .map_err(CallError::from_client)
 }

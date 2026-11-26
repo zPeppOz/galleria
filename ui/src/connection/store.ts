@@ -31,6 +31,8 @@ export interface Connection {
   connectedAt: number | null;
   /** The question of the service that waits for an answer; `null` when there is none or it was answered (an answered one does not come back). */
   question: Question | null;
+  /** The session of the service that was last seen up, with the profile it was for: the log of a profile that is not connected any more is its last session. `null` until a session has been seen. */
+  lastSession: { id: string; name: string; session: number | null } | null;
   connect: (id: string) => Promise<void>;
   disconnect: () => Promise<void>;
   /** Answers the open question. What was typed goes into this one call and nowhere else: the caller empties its fields before it waits. */
@@ -49,6 +51,7 @@ export const INERT: Connection = {
   error: null,
   connectedAt: null,
   question: null,
+  lastSession: null,
   connect: async () => undefined,
   disconnect: async () => undefined,
   provide: async () => undefined,

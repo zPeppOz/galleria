@@ -546,7 +546,7 @@ describe("the shell in the real window", () => {
     for (let step = 0; step < 4; step++) await press(b, "ArrowRight");
     const log = await byText(b, "[role=tab]", "Log");
     await waitFor(b, async () => (await log.getAttribute("aria-selected")) === "true", "the arrows did not reach the «Log» tab");
-    expect(await bodyText(b)).toContain("This section arrives in a later release.");
+    expect(await bodyText(b)).toContain("No session for this profile.");
     expect(await cspViolations(b)).toEqual([]);
   });
 

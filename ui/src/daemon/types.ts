@@ -26,3 +26,6 @@ export interface AppInfo { version: string; socket_path: string; user: string; g
 
 /** The codes a session can end with (`Status.error.code`); the catalogues have a text for each (`error.<code>`). */
 export const SESSION_ERROR_CODES = ["auth_failed", "input_timeout", "server_unreachable", "tunnel_setup_failed", "net_setup_failed", "dns_unavailable", "unsupported_challenge", "backend_exited"] as const;
+
+/** A line of the log of the service, as it keeps it: redacted by the service, never translated. `ts` is the time in milliseconds since the epoch, as a text. */
+export interface LogEntry { seq: number; ts: string; level: "debug" | "info" | "warn" | "error"; source: "daemon" | "openvpn" | "wireguard" | "net"; message: string }

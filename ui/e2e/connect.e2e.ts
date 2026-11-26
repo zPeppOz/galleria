@@ -1,7 +1,7 @@
 // WebDriver smoke test of the connection (plan B5, T5 and T6): the real app in a real WebKitGTK window against the fake daemon, which
 // serves the real IPC with a fake backend that follows a scenario (`daemon-start <scenario>`, tests/support/scenarios.rs). Run by
 // lab/tests/gui-smoke.sh with the other `*.e2e.ts` files. Nothing here touches a route, a DNS or an interface: the backend is fake.
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -220,5 +220,40 @@ describe("credentials asked from the window (plan B5, T6)", () => {
     }
     // nothing was asked to be remembered: the keyring has nothing of it
     expect(keysOf(profileId("Datacenter Milano"))).not.toContain("openvpn.password");
+  });
+});
+
+describe("the log of the session (plan B5, T7)", () => {
+  const lines = (b: Browser) => b.execute(() => [...document.querySelectorAll(".log-line")].map((el) => (el.textContent ?? "").trim())) as Promise<string[]>;
+
+  it("the_log_tab_shows_the_session_and_copies_it", async () => {
+    const b = await openWith("plain");
+    // a profile that has no session shows no lines
+    await b.$("button=Log").click();
+    await waitForBody(b, "No session for this profile.", "the tab «Log» of a profile without a session said nothing");
+    await b.$("button=Connect").click();
+    await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the profile never connected");
+    await waitFor(b, async () => (await lines(b)).length > 0, "the tab «Log» never showed a line of the session");
+    expect(await bodyText(b)).toMatch(/current session/i);
+    // a list with its announcements off, and the level and the source are words
+    expect(await b.$('[role="log"]').getAttribute("aria-live")).toBe("off");
+    expect((await lines(b)).some((line) => /info\s+daemon.*connect/.test(line)), `lines: ${JSON.stringify(await lines(b))}`).toBe(true);
+    // «Copy» fills the system clipboard with what the tab shows, in the format of `galleria logs`
+    await b.$("button=Copy").click();
+    await waitForBody(b, "Log copied.", "the outcome of the copy was never said");
+    const clipboard = () => {
+      try {
+        return execFileSync("xclip", ["-o", "-selection", "clipboard"], { encoding: "utf8" });
+      } catch {
+        return "";
+      }
+    };
+    await b.waitUntil(async () => /^\d+ Info Daemon: .*connect/m.test(clipboard()), { timeout: TEN_SECONDS, interval: 250, timeoutMsg: `the clipboard did not receive the log: ${clipboard()}` });
+    expect(clipboard().endsWith("\n")).toBe(true);
+    // when the session ends the same lines are the last session
+    await b.$("button=Disconnect").click();
+    await waitFor(b, async () => (await barState(b)) === "Disconnected", "the bar never went back to «Disconnected»");
+    await waitForBody(b, /last session/i, "the tab did not become «Last session»");
+    expect((await lines(b)).length).toBeGreaterThan(0);
   });
 });

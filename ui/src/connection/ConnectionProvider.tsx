@@ -40,6 +40,14 @@ export function ConnectionProvider({ view, onCredentialsChanged, children }: { v
     return () => clearTimeout(timer);
   }, [pending, link, status]);
 
+  // The session last seen up, for the log of a profile that is not connected any more.
+  const [lastSession, setLastSession] = useState<Connection["lastSession"]>(null);
+  const liveProfile = status && status.state !== "disconnected" ? status.profile : null;
+  const liveSession = status?.session ?? null;
+  useEffect(() => {
+    if (liveProfile) setLastSession((was) => (was && was.id === liveProfile.id && was.session === liveSession ? was : { id: liveProfile.id, name: liveProfile.name, session: liveSession }));
+  }, [liveProfile?.id, liveProfile?.name, liveSession]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const session = status?.state === "connected" ? status.session : null;
   useEffect(() => {
     if (session !== null) setConnectedAt((was) => (was?.session === session ? was : { session, at: Date.now() }));
@@ -124,13 +132,14 @@ export function ConnectionProvider({ view, onCredentialsChanged, children }: { v
       error,
       connectedAt: session !== null && connectedAt?.session === session ? connectedAt.at : null,
       question,
+      lastSession,
       connect,
       disconnect,
       provide,
       forget,
       clearError,
     }),
-    [link, status, view?.backends, pending, error, connectedAt, session, question, connect, disconnect, provide, forget, clearError],
+    [link, status, view?.backends, pending, error, connectedAt, session, question, lastSession, connect, disconnect, provide, forget, clearError],
   );
   return <ConnectionContext.Provider value={value}>{children}</ConnectionContext.Provider>;
 }

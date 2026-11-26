@@ -6,6 +6,7 @@ pub mod connection;
 pub mod daemon;
 pub mod groups;
 pub mod import;
+pub mod logs;
 pub mod profiles;
 pub mod secrets;
 pub mod ui_state;

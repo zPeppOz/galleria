@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppInfo } from "./types";
+import type { AppInfo, LogEntry } from "./types";
 
 // Commands the first-run panels show for the user to copy. The app never runs them (D27).
 export const START_SERVICE = "sudo systemctl enable --now galleriad";
@@ -31,3 +31,12 @@ export const provideInput = (session: number, request: number, values: InputAnsw
 
 /** Takes the remembered user and password of a profile out of the keyring (P6). */
 export const forgetCredentials = (id: string): Promise<void> => invoke<void>("forget_credentials", { id });
+
+/** A page of the log of the service, oldest first: the lines after `after`, at most `limit` (1 to 1000). */
+export const logsGet = (after: number | null, limit: number): Promise<{ entries: LogEntry[]; last: number }> => invoke("logs_get", { after, limit });
+
+/**
+ * «Export log…»: Rust reads the whole log again, opens the window «Save» of the system and writes the file. The page gives no text and
+ * no place and is not told where it went; `saved` is `false` when the person cancelled.
+ */
+export const logsExport = (): Promise<{ saved: boolean }> => invoke("logs_export");

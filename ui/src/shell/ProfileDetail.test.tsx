@@ -125,7 +125,7 @@ describe("ProfileDetail", () => {
     await user.click(screen.getByRole("tab", { name: "Network" }));
     expect(screen.getByRole("switch", { name: "Block IPv6" })).toBeTruthy();
     await user.click(screen.getByRole("tab", { name: "Log" }));
-    expect(screen.getByRole("tabpanel").textContent).toContain("This section arrives in a later release.");
+    expect(screen.getByRole("tabpanel").textContent).toContain("No session for this profile.");
     expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
   });
 

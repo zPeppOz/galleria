@@ -9,6 +9,7 @@ use crate::{
 use galleria_gui::{
     announce::{Announcer, Urgency},
     configure_with,
+    export::SavePicker,
     rubrica::{Rubrica, SecretFactory},
     supervisor::RelinkPolicy,
     ui_state::UiStateFile,
@@ -61,6 +62,8 @@ pub struct Options {
     pub scenario: &'static str,
     pub daemon: bool,
     pub secrets: Option<SecretFactory>,
+    /// The window «Save» of the test; without one the app keeps its own (which, in a mock app, has no window to ask).
+    pub picker: Option<Arc<dyn SavePicker>>,
 }
 
 impl Default for Options {
@@ -69,6 +72,7 @@ impl Default for Options {
             scenario: "plain",
             daemon: true,
             secrets: None,
+            picker: None,
         }
     }
 }
@@ -92,10 +96,14 @@ pub fn start(options: Options) -> World {
     fs::create_dir_all(&sock_dir).unwrap();
     let spoken = Recorder::default();
     let announcer: Arc<dyn Announcer> = Arc::new(spoken.clone());
+    let mut builder = mock_builder()
+        .manage(Arc::clone(&rubrica))
+        .manage(announcer);
+    if let Some(picker) = options.picker {
+        builder = builder.manage(picker);
+    }
     let mut app = configure_with(
-        mock_builder()
-            .manage(Arc::clone(&rubrica))
-            .manage(announcer),
+        builder,
         sock_dir.join("galleriad.sock"),
         RelinkPolicy {
             delays: vec![Duration::from_millis(20)],

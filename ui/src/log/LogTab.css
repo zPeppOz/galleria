@@ -1,0 +1,17 @@
+/* The log of the session: only variables of tokens.css. The level and the source are words; the colour only backs them up. */
+.log-view { display: flex; flex-direction: column; gap: var(--sp-5); max-width: 960px; }
+.log-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-4); }
+.log-title { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-strong); }
+.log-actions { display: flex; gap: var(--sp-4); }
+.log-lines {
+  margin: 0; padding: var(--sp-4) var(--sp-5); max-height: 360px; overflow: auto;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-md);
+  font-family: var(--mono); font-size: var(--fs-sm); line-height: var(--lh-mono);
+}
+.log-line { display: flex; gap: var(--sp-4); align-items: baseline; }
+.log-time, .log-source { color: var(--muted); flex: none; }
+.log-level { flex: none; min-width: 5ch; font-weight: var(--fw-strong); }
+.log-level-warn { color: var(--warn); }
+.log-level-error { color: var(--err); }
+.log-message { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.log-empty { margin: 0; color: var(--muted); }

@@ -271,6 +271,12 @@ impl Sessions {
         true
     }
 
+    /// The socket of the daemon this session talks to: the log is read from it with a short call of its own (T7).
+    #[must_use]
+    pub fn socket(&self) -> &std::path::Path {
+        &self.socket
+    }
+
     /// Whether credentials are waiting for the session to be up. The proofs ask; nothing else does.
     #[must_use]
     pub fn has_pending(&self) -> bool {

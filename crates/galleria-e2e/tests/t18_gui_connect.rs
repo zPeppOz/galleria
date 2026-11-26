@@ -24,6 +24,8 @@ fn assert_driven_by_the_window() {
 }
 
 struct Sample {
+    /// The time of the sample, as the watch wrote it (`date +%s%3N`): what ties it to its `argv` lines.
+    ms: String,
     openvpn: usize,
     wg: usize,
 }
@@ -33,6 +35,8 @@ struct Watch {
     samples: Vec<Sample>,
     /// `argv <ms> <pid> <arguments>` of every `openvpn` seen, the arguments only.
     argv: Vec<String>,
+    /// The same lines whole, with the time of the sample they belong to: `(ms, "<pid> <arguments>")`.
+    argv_at: Vec<(String, String)>,
 }
 
 fn watch() -> Watch {
@@ -44,6 +48,7 @@ fn watch() -> Watch {
     let mut inside = false;
     let mut samples = Vec::new();
     let mut argv = Vec::new();
+    let mut argv_at = Vec::new();
     for line in text.lines() {
         if line == "residue-begin" {
             inside = true;
@@ -53,7 +58,8 @@ fn watch() -> Watch {
             residue.push_str(line);
             residue.push('\n');
         } else if let Some(rest) = line.strip_prefix("sample ") {
-            let mut fields = rest.split_whitespace().skip(1);
+            let mut fields = rest.split_whitespace();
+            let ms = fields.next().unwrap_or_default().to_owned();
             let count = |field: Option<&str>, key: &str| -> usize {
                 field
                     .and_then(|f| f.strip_prefix(key))
@@ -62,15 +68,18 @@ fn watch() -> Watch {
             };
             let openvpn = count(fields.next(), "openvpn=");
             let wg = count(fields.next(), "wg=");
-            samples.push(Sample { openvpn, wg });
+            samples.push(Sample { ms, openvpn, wg });
         } else if let Some(rest) = line.strip_prefix("argv ") {
             argv.push(rest.splitn(3, ' ').nth(2).unwrap_or_default().to_owned());
+            let (ms, process) = rest.split_once(' ').unwrap_or_default();
+            argv_at.push((ms.to_owned(), process.to_owned()));
         }
     }
     Watch {
         residue: residue.trim().to_owned(),
         samples,
         argv,
+        argv_at,
     }
 }
 
@@ -131,15 +140,25 @@ fn gui_session_never_had_two_backends() {
         "the watch of the client has {} samples: it was not running while the window worked (want at least 20)",
         seen.samples.len()
     );
-    // A coincidence of one sample (200 ms) is below what the watch can tell from a process that is starting or stopping, so only an
-    // overlap that is there in two samples in a row counts. Single coincidences were seen in some runs: the outcome document says so.
-    let bad = |s: &Sample| (s.openvpn > 0 && s.wg > 0) || s.openvpn > 1;
-    for (n, pair) in seen.samples.windows(2).enumerate() {
-        assert!(
-            !(bad(&pair[0]) && bad(&pair[1])),
-            "samples {n} and {}: two backends alive together (an `openvpn` process and glr-wg0, or two `openvpn`), D5",
-            n + 1
-        );
+    // D5, as the plan has it: not one sample with an `openvpn` process and `glr-wg0` together, nor two `openvpn` processes. The watch
+    // reads `glr-wg0` twice around the processes (see `lab/tests/gui-lab-watch.sh`), so a tunnel that is going away is not counted;
+    // what is left is a fact of one sample, and the message says which one and which processes it saw.
+    for sample in &seen.samples {
+        if (sample.openvpn > 0 && sample.wg > 0) || sample.openvpn > 1 {
+            let argv: Vec<String> = seen
+                .argv_at
+                .iter()
+                .filter(|(ms, _)| *ms == sample.ms)
+                .map(|(ms, process)| format!("argv {ms} {process}"))
+                .collect();
+            panic!(
+                "two backends alive together (an `openvpn` process and glr-wg0, or two `openvpn`), D5, in the sample `sample {} openvpn={} wg={}`; the `argv` lines of that instant:\n{}",
+                sample.ms,
+                sample.openvpn,
+                sample.wg,
+                argv.join("\n")
+            );
+        }
     }
     assert!(
         seen.samples.iter().any(|s| s.openvpn == 1),

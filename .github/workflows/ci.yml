@@ -157,3 +157,6 @@ jobs:
           toolchain=$(python3 -c 'import tomllib; print(tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
           rustup toolchain install "$toolchain" --profile minimal --component rustfmt,clippy,llvm-tools-preview
       - run: scripts/gui.sh smoke
+      # The owner check of the single-instance socket against two real users (lab/tests/gui-socket-owner.sh). It counts its checks
+      # and ends with an error if one was skipped, so it cannot be green without running.
+      - run: scripts/gui.sh socket-owner

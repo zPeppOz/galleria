@@ -13,6 +13,8 @@
 #                                 its folder of profiles in target/gui-lab/ (lab/tests/gui-lab-import.sh); the laboratory must be up
 #   scripts/gui.sh lab-g3 <26|27|79>   G3 whole, on the host: brings the laboratory up, runs `lab-import` between `lab/up.sh` and the
 #                                 tests, then t17 on that client (the real CLI and daemon list and connect what the window imported)
+#   scripts/gui.sh socket-owner   the owner check of the single-instance socket against two real users (uid 1001 and 1002) and root, in
+#                                 the image as root (lab/tests/gui-socket-owner.sh): the unit tests run as one user and cannot hold it
 #   scripts/gui.sh pnpm-version   print the pnpm version pinned in package.json (for CI)
 #
 # GUI_UID / GUI_GID set the user of the container (default: the invoking user), to try a uid the image does not know.
@@ -132,6 +134,11 @@ case "${1:-}" in
     if [[ -r lab/out/base.ovpn ]]; then run_in_image scripts/gui.sh lab-import-here
     else GUI_UID=0 GUI_GID=0 run_in_image scripts/gui.sh lab-import-here; fi ;;
   lab-import-here) lab_import_here ;;
+  socket-owner)
+    # Built as the invoking user like every other build; the run is root of the container (setpriv to two other uids).
+    run_in_image scripts/gui.sh build-here
+    GUI_UID=0 GUI_GID=0 run_in_image scripts/gui.sh socket-owner-here ;;
+  socket-owner-here) GALLERIA_SMOKE_APP="${CARGO_TARGET_DIR:-$PWD/target}/release/galleria-gui" exec lab/tests/gui-socket-owner.sh ;;
   lab-g3)
     # The WireGuard keys of the laboratory are new at every `lab/up.sh`, so the window imports after the laboratory is up and
     # before the tests: lab/run.sh runs LAB_BEFORE_TESTS at that point. Host side: it needs docker, the lab images and the image of the GUI.
@@ -139,5 +146,5 @@ case "${1:-}" in
     ensure_image
     GALLERIA_E2E_GUI_STORE=1 LAB_BEFORE_TESTS='scripts/gui.sh lab-import' exec lab/run.sh "$2" t17 ;;
   pnpm-version) pnpm_version ;;
-  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|a11y|lab-import|lab-g3 <26|27|79>|pnpm-version>' >&2; exit 2 ;;
+  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|a11y|lab-import|lab-g3 <26|27|79>|socket-owner|pnpm-version>' >&2; exit 2 ;;
 esac

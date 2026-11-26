@@ -233,6 +233,31 @@ fn a_foreign_session_gets_a_disconnect_row_with_its_name() {
 
 #[rstest]
 #[case(LinkState::Connected, State::Disconnected)]
+#[case(LinkState::Connected, State::Error)]
+#[case(LinkState::Connecting, State::Disconnected)]
+#[case(LinkState::DaemonNotRunning, State::Disconnected)]
+fn no_two_separators_in_a_row_without_favourites(#[case] link: LinkState, #[case] state: State) {
+    // F3: with no favourite and no session the two separators of the menu had nothing between them
+    let (entries, _) = build(link, &status(state, None), &[]);
+    let shown = texts(&entries);
+    assert!(
+        shown.windows(2).all(|pair| pair != ["---", "---"]),
+        "two separators in a row: {shown:?}"
+    );
+    assert_eq!(shown.iter().filter(|t| *t == "---").count(), 1, "{shown:?}");
+}
+
+#[test]
+fn the_menu_with_nothing_between_the_separators_has_one() {
+    let (entries, _) = build(LinkState::Connected, &Status::default(), &[]);
+    assert_eq!(
+        texts(&entries),
+        ["[Disconnected]", "---", "Open Galleria", "Quit"]
+    );
+}
+
+#[rstest]
+#[case(LinkState::Connected, State::Disconnected)]
 #[case(LinkState::Connected, State::Connected)]
 #[case(LinkState::Connecting, State::Disconnected)]
 #[case(LinkState::DaemonNotRunning, State::Connected)]

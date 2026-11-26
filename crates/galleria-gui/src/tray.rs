@@ -179,7 +179,10 @@ pub fn model(input: &TrayInput<'_>) -> (Vec<TrayEntry>, TrayIcon) {
             action: TrayAction::Disconnect,
         });
     }
-    entries.push(TrayEntry::Separator);
+    // The second separator only closes a group: with no favourite and no session there is nothing between the two (F3).
+    if entries.len() > 2 {
+        entries.push(TrayEntry::Separator);
+    }
     entries.push(TrayEntry::Item {
         text: labels.open.clone(),
         enabled: true,

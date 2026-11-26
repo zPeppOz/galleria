@@ -50,3 +50,67 @@ describe("AppMenu", () => {
     expect(document.documentElement.lang).toBe("it");
   });
 });
+
+describe("the switch of the version check (plan B6, T5)", () => {
+  /** The service answers the view that Rust keeps; the patches the page writes change it. */
+  function rustWithTheCheck() {
+    let enabled = true;
+    const calls: { cmd: string; args: unknown }[] = [];
+    mockIPC(
+      (cmd, args) => {
+        calls.push({ cmd, args });
+        if (cmd === "daemon_view") return makeView();
+        if (cmd === "app_info") return makeInfo({ version: "9.8.7" });
+        if (cmd === "update_view") return { current: "9.8.7", latest: enabled ? "9.9.9" : null, url: enabled ? "https://github.com/zPeppOz/galleria/releases/tag/v9.9.9" : null, enabled };
+        if (cmd === "ui_state_set") {
+          enabled = (args as { patch: { update_check?: boolean } }).patch.update_check ?? enabled;
+          return {};
+        }
+        return undefined;
+      },
+      { shouldMockEvents: true },
+    );
+    return calls;
+  }
+
+  it("the_check_can_be_turned_off_and_the_choice_is_saved", async () => {
+    const calls = rustWithTheCheck();
+    const user = userEvent.setup();
+    render(<App lang="en" />);
+    // the notice is in the window while the check is on
+    await screen.findByRole("region", { name: /is available$/ });
+    await user.click(await screen.findByRole("button", { name: "Menu" }));
+    const item = await screen.findByRole("menuitemcheckbox", { name: "Check for a newer version" });
+    // it is ticked, above «Quit» and «About Galleria»
+    expect(item.getAttribute("aria-checked")).toBe("true");
+    const names = [...document.querySelectorAll('[role^="menuitem"]')].map((entry) => entry.textContent);
+    expect(names.slice(-3)).toEqual(["Check for a newer version", "Quit", "About Galleria"]);
+    await user.click(item);
+    await waitFor(() => expect(calls.filter((c) => c.cmd === "ui_state_set").map((c) => c.args)).toEqual([{ patch: { update_check: false } }]));
+    // turning it off takes the notice away, and the menu says it is off
+    await waitFor(() => expect(screen.queryByRole("region", { name: /is available$/ })).toBeNull());
+    await user.click(screen.getByRole("button", { name: "Menu" }));
+    expect((await screen.findByRole("menuitemcheckbox", { name: "Check for a newer version" })).getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("about_says_the_latest_version_known_or_that_the_check_is_off", async () => {
+    rustWithTheCheck();
+    const user = userEvent.setup();
+    render(<App lang="en" />);
+    await screen.findByText(/App 9\.8\.7/);
+    await user.click(screen.getByRole("button", { name: "Menu" }));
+    await user.click(await screen.findByRole("menuitem", { name: "About Galleria" }));
+    let dialog = await screen.findByRole("dialog", { name: "About Galleria" });
+    expect(within(dialog).getByText("Latest known version")).toBeTruthy();
+    expect(within(dialog).getByText("9.9.9")).toBeTruthy();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // turned off: the row says so, whatever was known
+    await user.click(screen.getByRole("button", { name: "Menu" }));
+    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Check for a newer version" }));
+    await user.click(await screen.findByRole("button", { name: "Menu" }));
+    await user.click(await screen.findByRole("menuitem", { name: "About Galleria" }));
+    dialog = await screen.findByRole("dialog", { name: "About Galleria" });
+    expect(within(dialog).getByText("Check turned off")).toBeTruthy();
+  });
+});

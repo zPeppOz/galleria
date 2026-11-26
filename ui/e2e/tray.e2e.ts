@@ -6,7 +6,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { choose, closeApp, daemon, env, importFixtures, openApp, startTrayWatcher, stopTrayWatcher, appRunning, requestClose, trayClick, trayIcon, trayRegistered, trayTexts, until, waitFor, waitForBody, windowState, type Browser } from "./support";
+import { bodyText, choose, closeApp, daemon, env, importFixtures, knownUpdateState, openApp, openAppWithState, readState, startUpdateServer, type UpdateServer, startTrayWatcher, stopTrayWatcher, appRunning, requestClose, trayClick, trayIcon, trayRegistered, trayTexts, until, waitFor, waitForBody, windowState, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 
@@ -248,5 +248,74 @@ describe("closing with changes that are not saved, and a second launch (plan B6,
     await until(windowState, (shown) => shown === "true", "the second launch did not show the hidden window");
     await waitForBody(b, "File: inline.ovpn", "the preview of the file of the second launch never showed");
     expect(appRunning()).toBe(true);
+  });
+});
+
+// ---- G11: the version check (plan B6, T4 and T5) -------------------------------------------------------------------------------------------
+
+describe("the version check of the built app, against a server that counts (plan B6, T5, G11)", () => {
+  let server: UpdateServer | undefined;
+  afterEach(() => {
+    server?.stop();
+    server = undefined;
+  });
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  it("G11a_the_built_app_asks_once_and_never_when_disabled", async () => {
+    server = await startUpdateServer();
+    daemon("stop");
+    daemon("start", "plain");
+    // the app of the release, with its first look at the clock ten seconds after the start: one request, to the server that stands in for GitHub
+    let b = await openApp(false, "seeded", [], "update");
+    await until(() => server?.requests() ?? [], (requests) => requests.length >= 1, "the app never asked for the version", 25_000);
+    const [first] = server.requests();
+    expect(first.line).toBe("GET /zPeppOz/galleria/releases/latest HTTP/1.1");
+    const names = first.headers.map(([name]) => name.toLowerCase()).sort();
+    // what leaves the machine: these three and nothing else (S52); no `User-Agent`, no identifier
+    expect(names).toEqual(["accept-encoding", "connection", "host"]);
+    expect(first.headers.map(([, value]) => value).join(" ")).not.toMatch(/galleria|0\.1\.0|Mozilla|WebKit/i);
+    // the window shows the notice, with the version the server named
+    await waitFor(b, async () => (await b.$$("section")).length > 0 && (await bodyText(b)).includes("Galleria 9.9.9 is available"), "the notice never showed", 15_000);
+    expect(await b.$("body").getText()).toContain("https://github.com/zPeppOz/galleria/releases/tag/v9.9.9");
+    expect(await b.$$("a[href]")).toHaveLength(0);
+    expect(readState()).toContain('latest = "9.9.9"');
+    // the app is closed and opened again: the day has not passed, still one request
+    await closeApp();
+    b = await openApp(true, "seeded", [], "update");
+    await waitForBody(b, "Galleria 9.9.9 is available", "the notice did not come back with the window");
+    await wait(14_000);
+    expect(server.requests(), "a second start asked again within the day").toHaveLength(1);
+    await closeApp();
+    // the check is off in `state.toml`: thirty seconds, no request at all (and no notice, whatever was known)
+    const before = server.requests().length;
+    b = await openAppWithState(`[update]\ncheck = false\nlatest = "9.9.9"\n`, "update");
+    await waitForBody(b, CONNECTED, "the bar never showed the active link");
+    await wait(30_000);
+    expect(server.requests().length, "the app asked with the check turned off").toBe(before);
+    expect(await bodyText(b)).not.toContain("is available");
+  }, 150_000);
+
+  it("turning_the_check_off_removes_the_notice", async () => {
+    // a version is already known and the day has not passed: the notice is there with no request
+    server = await startUpdateServer();
+    daemon("stop");
+    daemon("start", "plain");
+    const b = await openAppWithState(knownUpdateState(), "update");
+    await waitForBody(b, "Galleria 9.9.9 is available", "the notice never showed");
+    await b.$("button=Menu").click();
+    const item = await b.waitUntil(async () => (await b.$('[role="menuitemcheckbox"]').isExisting()) && b.$('[role="menuitemcheckbox"]'), { timeout: 10_000, interval: 250, timeoutMsg: "the menu has no switch for the check" });
+    expect(await item.getText()).toBe("Check for a newer version");
+    expect(await item.getAttribute("aria-checked")).toBe("true");
+    await item.click();
+    await waitFor(b, async () => !(await bodyText(b)).includes("is available"), "the notice stayed after the check was turned off");
+    expect(readState()).toContain("check = false");
+    // the same in Italian, and the choice survives the window: it is on the disk
+    await closeApp();
+    const again = await openApp(true, "seeded", [], "update");
+    await waitForBody(again, CONNECTED, "the bar never showed the active link");
+    await again.$("button=Menu").click();
+    const back = await again.waitUntil(async () => (await again.$('[role="menuitemcheckbox"]').isExisting()) && again.$('[role="menuitemcheckbox"]'), { timeout: 10_000, interval: 250, timeoutMsg: "the menu has no switch for the check" });
+    expect(await back.getAttribute("aria-checked")).toBe("false");
+    expect(server.requests(), "turning it off asked nothing").toHaveLength(0);
   });
 });

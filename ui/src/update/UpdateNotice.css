@@ -1,0 +1,5 @@
+/* The notice of a newer version, in line at the top of the page: only variables of tokens.css. The look of the box is `.gx-alert`. */
+.update-notice { max-width: 640px; }
+.update-notice-text { margin: 0 0 var(--sp-2); }
+/* The address is text to read and to select (Q55 (a)): it wraps, and it is never a link. */
+.update-notice-url { display: block; font-family: var(--mono); overflow-wrap: anywhere; user-select: text; }

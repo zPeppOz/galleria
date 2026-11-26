@@ -7,14 +7,16 @@ import type { ThemeChoice } from "../design/theme";
 import { errorText, useT } from "../i18n";
 import { usePrefs, type LangChoice } from "../prefs";
 import { AboutDialog } from "./AboutDialog";
+import { useUpdate } from "../update/store";
 import { quitApp } from "./closing";
 
-/** The menu of the title bar: language, theme, «Quit» and «About Galleria». Language and theme are kept by the preferences. `Ctrl+Q` quits as «Quit» does. */
+/** The menu of the title bar: language, theme, the check for a newer version, «Quit» and «About Galleria». Language and theme are kept by the preferences. `Ctrl+Q` quits as «Quit» does. */
 export function AppMenu(props: { info: AppInfo | null; daemonVersion: string | null }) {
   const t = useT();
   const prefs = usePrefs();
   const toast = useToast();
   const connection = useConnection();
+  const update = useUpdate();
   const [aboutOpen, setAboutOpen] = useState(false);
   // `Ctrl+Q` is the same request as the entry of the menu: Rust decides (changes that are not saved stop it and the window asks, Q35).
   useEffect(() => {
@@ -60,6 +62,8 @@ export function AppMenu(props: { info: AppInfo | null; daemonVersion: string | n
       onChange: (value) => saved(prefs.setTheme(value as ThemeChoice)),
     },
     { kind: "separator" },
+    // The check for a newer version is on unless the person turns it off (D16); it is the only thing in the window that reaches the network.
+    { kind: "checkbox", id: "update-check", label: t("menu.update_check"), checked: update.view?.enabled ?? true, onChange: (on) => saved(update.setCheck(on)) },
     // The session belongs to the service: quitting leaves it up, and the entry says so while there is one (Q54).
     { kind: "item", id: "quit", label: isLive(connection.status) ? t("tray.quit_connected") : t("tray.quit"), onSelect: quitApp },
     { kind: "item", id: "about", label: t("menu.about"), onSelect: () => setAboutOpen(true) },

@@ -2,8 +2,8 @@
 // reader checks (`*.a11y.ts`, lab/tests/gui-a11y.sh). Nothing here asks the daemon to connect.
 import { execFile, execFileSync, spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { connect } from "node:net";
-import { appendFileSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { remote } from "webdriverio";
 
 export type Browser = Awaited<ReturnType<typeof remote>>;
@@ -33,7 +33,7 @@ export const readState = (): string => (existsSync(stateFile()) ? readFileSync(s
  * app on purpose and keeps both. `rubrica: "empty"` starts from a store with no profile. `args` are the arguments of the
  * process, as a file manager gives them: a file to open (S30: `tauri-driver` hands `tauri:options.args` to the app).
  */
-export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "seeded", args: string[] = [], keyring: "system" | "none" | "no-indicator" = "system"): Promise<Browser> {
+export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "seeded", args: string[] = [], keyring: "system" | "none" | "no-indicator" | "update" = "system"): Promise<Browser> {
   if (!keepState) {
     rmSync(stateFile(), { force: true });
     seedRubrica(rubrica);
@@ -44,7 +44,7 @@ export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "
       hostname: "127.0.0.1",
       port,
       logLevel: "error",
-      capabilities: { "tauri:options": { application: env(keyring === "none" ? "GALLERIA_SMOKE_APP_NO_KEYRING" : keyring === "no-indicator" ? "GALLERIA_SMOKE_APP_NO_INDICATOR" : "GALLERIA_SMOKE_APP"), ...(args.length > 0 ? { args } : {}) } } as WebdriverIO.Capabilities,
+      capabilities: { "tauri:options": { application: env(keyring === "none" ? "GALLERIA_SMOKE_APP_NO_KEYRING" : keyring === "no-indicator" ? "GALLERIA_SMOKE_APP_NO_INDICATOR" : keyring === "update" ? "GALLERIA_SMOKE_APP_UPDATE" : "GALLERIA_SMOKE_APP"), ...(args.length > 0 ? { args } : {}) } } as WebdriverIO.Capabilities,
     });
   } catch (failure) {
     await stopPrivateDriver();
@@ -429,3 +429,51 @@ export const requestClose = (): void => void python("GALLERIA_X11_WINDOW", ["clo
 
 /** The app is running (a process of that name exists). */
 export const appRunning = (): boolean => spawnSync("pgrep", ["-x", "galleria-gui"]).status === 0;
+
+// ---- The version check (plan B6, T5, G11): lab/tests/update-server.py --------------------------------------------------------------------------
+// The whole run points the check at a closed port on 127.0.0.1 (gui-lib.sh), so no test touches the network. The tests of G11 start the server
+// that stands in for github.com and open the app through `app-update`, a wrapper that reads the address from a file at every start.
+
+/** Starts the app with this `state.toml` in place (and the seeded rubrica), as `openApp` with `keepState`. */
+export async function openAppWithState(text: string, application: "system" | "update" = "system"): Promise<Browser> {
+  rmSync(stateFile(), { force: true });
+  seedRubrica();
+  mkdirSync(dirname(stateFile()), { recursive: true });
+  writeFileSync(stateFile(), text);
+  return openApp(true, "seeded", [], application);
+}
+
+/** A state in which a newer version is already known and the day has not passed: the notice is there at the start and no request is made. */
+export const knownUpdateState = (version = "9.9.9"): string => `[update]\nlatest = "${version}"\nlast_check = "${new Date().toISOString()}"\n`;
+
+export interface UpdateRequest { line: string; headers: [string, string][] }
+
+export interface UpdateServer {
+  /** Every request the server got so far, as it came. */
+  requests: () => UpdateRequest[];
+  /** The address the app is pointed at. */
+  url: string;
+  stop: () => void;
+}
+
+/** Starts the server of the check on a port of its own and points the next starts of `app-update` at it. */
+export async function startUpdateServer(location = "https://github.com/zPeppOz/galleria/releases/tag/v9.9.9"): Promise<UpdateServer> {
+  const dir = join(env("XDG_RUNTIME_DIR"), "update-server");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const log = join(dir, "requests.jsonl");
+  const portFile = join(dir, "port");
+  const child = spawn("python3", [env("GALLERIA_UPDATE_SERVER"), "--log", log, "--port-file", portFile, "--location", location], { stdio: "inherit" });
+  const deadline = Date.now() + TEN_SECONDS;
+  while (!existsSync(portFile)) {
+    if (Date.now() > deadline) throw new Error("the server of the version check did not start");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  const url = `http://127.0.0.1:${readFileSync(portFile, "utf8").trim()}/zPeppOz/galleria/releases/latest`;
+  writeFileSync(env("GALLERIA_SMOKE_UPDATE_URL_FILE"), url);
+  return {
+    url,
+    requests: () => (existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as UpdateRequest) : []),
+    stop: () => void child.kill("SIGTERM"),
+  };
+}

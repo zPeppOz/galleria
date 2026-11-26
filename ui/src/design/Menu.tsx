@@ -7,6 +7,8 @@ export type MenuEntry =
   /** `disabled` keeps the item where the arrows can reach it, so that its `hint` (why it is off) is read: it is not run and the menu stays open. */
   | { kind: "item"; id: string; label: string; onSelect: () => void; danger?: boolean; disabled?: boolean; hint?: string }
   | { kind: "radio"; id: string; label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void }
+  /** An entry that is ticked or not: a switch that the menu holds (`menuitemcheckbox`). It closes the menu like an item. */
+  | { kind: "checkbox"; id: string; label: string; checked: boolean; onChange: (checked: boolean) => void }
   | { kind: "separator" };
 
 /** Menu opened by a button. `label` is the accessible name of the menu itself; `trigger` is what the button shows. */
@@ -40,6 +42,16 @@ export function Menu(props: { label: string; trigger: ReactNode; entries: MenuEn
                     {entry.label}
                     {entry.hint ? <span id={hintId} className="gx-menu-hint">{entry.hint}</span> : null}
                   </BaseMenu.Item>
+                );
+              }
+              if (entry.kind === "checkbox") {
+                return (
+                  <BaseMenu.CheckboxItem key={entry.id} className="gx-menu-item gx-menu-radio" checked={entry.checked} onCheckedChange={entry.onChange} closeOnClick>
+                    <span className="gx-menu-indicator">
+                      <BaseMenu.CheckboxItemIndicator>{icons.check}</BaseMenu.CheckboxItemIndicator>
+                    </span>
+                    {entry.label}
+                  </BaseMenu.CheckboxItem>
                 );
               }
               return (

@@ -49,3 +49,8 @@ export function loadUiPrefs(limitMs: number = READ_LIMIT_MS): Promise<UiPrefs> {
 export async function saveUiPrefs(patch: Partial<UiPrefs>): Promise<void> {
   await invoke("ui_state_set", { patch });
 }
+
+/** The two things of `[update]` that the page may write (plan B6, T4): the check on or off, and the version it does not want to hear of again. */
+export async function saveUpdatePrefs(patch: { update_check?: boolean; update_dismissed?: string }): Promise<void> {
+  await invoke("ui_state_set", { patch });
+}

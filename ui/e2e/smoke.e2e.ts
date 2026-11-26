@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseColour, tintOver, toHex, type Rgb } from "../src/design/color";
-import { bodyText, closeApp, daemon, env, importFixtures, openApp, readState, TEN_SECONDS, waitForBody, type Browser } from "./support";
+import { bodyText, closeApp, daemon, env, importFixtures, knownUpdateState, openApp, openAppWithState, readState, TEN_SECONDS, waitForBody, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 const DISCONNECTED = /Disconnected|Disconnesso/;
@@ -626,6 +626,31 @@ describe("the shell in the real window", () => {
     await waitForBody(b, "Altre azioni", "the window did not switch to Italian");
     await chooseFromMenu(b, "Scuro");
     await chooseFromMenu(b, "Chiaro");
+    expect(await cspViolations(b)).toEqual([]);
+  });
+
+  // Plan B6, T5: the notice of a newer version, its «Copy link», the line of «About» and the switch in the menu draw with the CSP of the window. A
+  // version is already known and the day has not passed, so no request is made: the check is the only thing here that could reach the network.
+  it("no_csp_violation_with_the_update_notice", async () => {
+    daemon("start");
+    const b = await openAppWithState(knownUpdateState());
+    await waitForBody(b, CONNECTED, "the bar never showed the active link");
+    await watchCsp(b);
+    await waitForBody(b, "Galleria 9.9.9 is available", "the notice never showed");
+    await b.$("button=Copy link").click();
+    await waitForBody(b, "Link copied.", "the notice of the copy never showed");
+    await b.$("button=Menu").click();
+    expect(await (await byText(b, '[role="menuitemcheckbox"]', "Check for a newer version")).getAttribute("aria-checked")).toBe("true");
+    await (await byText(b, "[role=menuitem]", "About Galleria")).click();
+    await waitForBody(b, "Latest known version", "the line of the latest version never showed in About");
+    await press(b, "Escape");
+    // Italian, then the dismissal
+    await b.$("button=Menu").click();
+    await (await byText(b, '[role="menuitemradio"]', "Italiano")).click();
+    await waitForBody(b, "È disponibile Galleria 9.9.9", "the notice did not follow the language");
+    await b.$("button=Non ricordarmelo").click();
+    await waitFor(b, async () => !(await bodyText(b)).includes("È disponibile Galleria"), "the notice stayed after «Non ricordarmelo»");
+    expect(readState()).toContain('dismissed = "9.9.9"');
     expect(await cspViolations(b)).toEqual([]);
   });
 });

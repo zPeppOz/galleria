@@ -13,6 +13,7 @@ import { activate } from "../connection/ConnectButton";
 import { useConnection } from "../connection/store";
 import { ToastProvider, type Announce } from "../design/Toast";
 import { useLang, useT } from "../i18n";
+import { UpdateProvider } from "../update/store";
 import { ImportDialog } from "../import/ImportDialog";
 import type { ImportActions, Incoming } from "../import/types";
 import { arrange } from "../rubrica/arrange";
@@ -68,7 +69,9 @@ export function Shell(props: ShellProps) {
   return (
     <ToastProvider closeLabel={t("toast.close")} announce={props.announce}>
       <ConnectionProvider view={props.view} ownIds={props.rubrica.view ? props.rubrica.view.profiles.map((p) => p.id) : null} onCredentialsChanged={props.rubrica.refreshDetail}>
-        <ShellBody {...props} />
+        <UpdateProvider>
+          <ShellBody {...props} />
+        </UpdateProvider>
       </ConnectionProvider>
     </ToastProvider>
   );

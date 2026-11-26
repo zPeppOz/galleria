@@ -1075,3 +1075,41 @@ describe("focus ring", () => {
     expect(segmented.some((r) => /input:focus-visible \+ \.gx-segmented-label/.test(r.selector) && /var\(--focus-ring\)/.test(r.body))).toBe(true);
   });
 });
+
+describe("the notice of a newer version, with the keyboard only (plan B6, T5)", () => {
+  it("the_update_notice_is_reached_and_dismissed_without_a_pointer", async () => {
+    let dismissed = false;
+    const writes: unknown[] = [];
+    const newer = { current: "0.1.0", latest: "9.9.9", url: "https://github.com/zPeppOz/galleria/releases/tag/v9.9.9", enabled: true };
+    mockIPC(
+      (cmd, args) => {
+        if (cmd === "update_view") return dismissed ? { ...newer, latest: null, url: null } : newer;
+        if (cmd === "ui_state_set") {
+          writes.push((args as { patch: unknown }).patch);
+          dismissed = true;
+          return {};
+        }
+        return undefined;
+      },
+      { shouldMockEvents: true },
+    );
+    const user = userEvent.setup();
+    show();
+    await screen.findByRole("region", { name: "Galleria 9.9.9 is available" });
+    const active = () => document.activeElement as HTMLElement;
+    // it is two stops of the page, in the order of the text: «Copy link», «Don't remind me»; they come after the column of the list
+    const seen = (await tabStops(user)).map((el) => `${roleOf(el)}:${nameOf(el)}`);
+    const copy = seen.indexOf("button:Copy link");
+    expect(copy).toBeGreaterThan(seen.indexOf("button:Manage groups"));
+    expect(seen[copy + 1]).toBe("button:Don't remind me");
+    // Tab to «Don't remind me» and Enter: it goes, the version is written, and the focus is on a stop of the page, not on the body
+    active().blur();
+    for (let step = 0; step < 60 && nameOf(active()) !== "Don't remind me"; step++) await user.tab();
+    expect(nameOf(active())).toBe("Don't remind me");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.queryByRole("region", { name: /is available$/ })).toBeNull());
+    expect(writes).toEqual([{ update_dismissed: "9.9.9" }]);
+    await waitFor(() => expect(active()).not.toBe(document.body));
+    expect(roleOf(active())).not.toBe("body");
+  });
+});

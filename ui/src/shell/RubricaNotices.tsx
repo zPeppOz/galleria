@@ -3,6 +3,7 @@ import { Button } from "../design/Button";
 import { errorText, hasKey, useT } from "../i18n";
 import type { Rubrica } from "../rubrica/store";
 import type { SecretStoreKind } from "../secrets/store";
+import { UpdateNotice } from "../update/UpdateNotice";
 import { CommandRow } from "./CommandRow";
 import "./RubricaNotices.css";
 
@@ -25,6 +26,7 @@ export function RubricaNotices({ rubrica, onImport, secretStore = null }: { rubr
           </InlineAlert>
         </div>
       ) : null}
+      <UpdateNotice />
       {error ? (
         <div className="rubrica-notice">
           <InlineAlert tone="error" toneLabel={t("alert.error")} title={t("rubrica.error.title")}>

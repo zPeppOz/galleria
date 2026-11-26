@@ -81,6 +81,13 @@ SHIM
   printf '#!/usr/bin/env bash\nexport LD_PRELOAD=%s\nexec "%s" "$@" 2> %s\n' "$tmp/no-indicator.so" "${GALLERIA_SMOKE_APP:-/nonexistent}" "$tmp/no-indicator.stderr" > "$bin/app-no-indicator"
   chmod +x "$bin/app-no-indicator"
 
+  # The version check (plan B6, T5): nothing in a run reaches the network. The whole run points the check at a closed port of the machine; the
+  # tests of G11 start lab/tests/update-server.py and open the app through `app-update`, which reads the address of that server from a file at every
+  # start (the driver that starts the app was started before the test, so the environment of the test cannot reach it).
+  export GALLERIA_UPDATE_URL=http://127.0.0.1:9/zPeppOz/galleria/releases/latest
+  printf '#!/usr/bin/env bash\nexport GALLERIA_UPDATE_URL=$(cat "%s/update-url" 2>/dev/null || echo http://127.0.0.1:9/zPeppOz/galleria/releases/latest)\nexec "%s" "$@"\n' "$bin" "${GALLERIA_SMOKE_APP:-/nonexistent}" > "$bin/app-update"
+  chmod +x "$bin/app-update"
+
   # The tests start every run from a rubrica they know: this wipes the profiles and writes the seed again (`--empty`:
   # the store only). It writes inside $XDG_CONFIG_HOME of the run and refuses to run without it.
   cat > "$bin/rubrica-seed" <<SCRIPT
@@ -115,6 +122,7 @@ SCRIPT
   # The tray and the window seen from outside (plan B6): the probe that stands in for the desktop that shows the tray, and the one that
   # reads and closes the window like a window manager (ui/e2e/support.ts).
   export GALLERIA_SMOKE_APP_NO_INDICATOR=$bin/app-no-indicator GALLERIA_SMOKE_NO_INDICATOR_STDERR=$tmp/no-indicator.stderr GALLERIA_TRAY_PROBE=$repo/lab/tests/tray-probe.py GALLERIA_X11_WINDOW=$repo/lab/tests/x11-window.py
+  export GALLERIA_SMOKE_APP_UPDATE=$bin/app-update GALLERIA_SMOKE_UPDATE_URL_FILE=$bin/update-url GALLERIA_UPDATE_SERVER=$repo/lab/tests/update-server.py
 }
 
 # A keyring of the run's own for the window (plan B5, T3). GNOME Keyring is installed in the image and starts by itself on the

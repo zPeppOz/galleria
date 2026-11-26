@@ -8,8 +8,10 @@ mod support;
 #[path = "support/world.rs"]
 mod world;
 
-use galleria_gui::{announce::Urgency, rubrica::SecretFactory};
-use galleria_ipc::Secret;
+use galleria_gui::{
+    announce::Urgency, events::TauriSink, rubrica::SecretFactory, supervisor::EventSink,
+};
+use galleria_ipc::{Secret, Status};
 use galleria_profile::{FileSecretStore, ProfileStore, SecretStore, StoreError, to_connect_params};
 use serde_json::{Value, json};
 use std::{
@@ -281,7 +283,21 @@ fn state_changes_are_announced_once_each() {
     world.phrases();
     world.connect("Homelab", false).unwrap();
     world.until_state("connected", None);
-    // more events of the same state (the daemon repeats `connected` when something in it changes) are not more announcements
+    // more events of the same state (the daemon repeats `connected` when something in it changes) are not more announcements:
+    // the state the page was given is delivered three more times, as the supervisor does, and the sentence is still said once
+    let connected: Status = {
+        let events = world.events.lock().unwrap();
+        let (_, value) = events
+            .iter()
+            .rev()
+            .find(|(name, value)| name == "galleria:state" && value["state"] == "connected")
+            .expect("the page was given the state `connected`");
+        serde_json::from_value(value.clone()).unwrap()
+    };
+    let sink = TauriSink(world._app.handle().clone());
+    for _ in 0..3 {
+        sink.state(&connected);
+    }
     world.invoke("disconnect", json!({})).unwrap();
     world.until_state("disconnected", None);
     let said = spoken(&world);

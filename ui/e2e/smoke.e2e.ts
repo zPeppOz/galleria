@@ -464,6 +464,10 @@ describe("the shell in the real window", () => {
     daemon("stop");
     const b = await openApp();
     await waitForBody(b, START_THE_SERVICE, "the «Start the service» panel never appeared");
+    // the button of the connection is there and is off: without the service there is nothing to connect to (B5, T5)
+    const connect = await b.$("button=Connect");
+    expect(await connect.isExisting(), "the button «Connect» is on the page").toBe(true);
+    expect(await connect.isEnabled(), "and it is off").toBe(false);
     await renameFirstProfile(b, "Sede");
     expect(await title(b)).toBe("Sede");
     await duplicateFromTheMenu(b);

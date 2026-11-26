@@ -94,6 +94,6 @@ describe("App", () => {
       if (button.getAttribute("aria-haspopup") || button.hasAttribute("aria-pressed")) continue;
       await user.click(button);
     }
-    expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", "profiles_list", "profile_get", "import_pending", "secret_store_status", ...(calls.includes("daemon_retry") ? ["daemon_retry"] : [])]));
+    expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", "profiles_list", "profile_get", "import_pending", "secret_store_status", "announce_phrases", ...(calls.includes("daemon_retry") ? ["daemon_retry"] : [])]));
   });
 });

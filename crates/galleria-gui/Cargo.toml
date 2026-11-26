@@ -46,6 +46,8 @@ galleria-backend-wireguard = { path = "../galleria-backend-wireguard" }
 # The same for the text of an OpenVPN profile (T7): what the editor saves is what the daemon validator accepts (S24).
 galleria-backend-openvpn = { path = "../galleria-backend-openvpn" }
 galleriad = { path = "../galleriad" }
+# Only for the test that reads what the process wrote on `stderr` (`dup` and `dup2`): `fs` pulls in no crate.
+nix = { workspace = true, features = ["fs"] }
 rstest.workspace = true
 tauri = { version = "2.12", features = ["test"] }
 tokio-util.workspace = true

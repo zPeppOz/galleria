@@ -24,6 +24,9 @@ const COMMANDS: &[&str] = &[
     "import_pick_file",
     "import_pending",
     "secret_store_status",
+    "connect_profile",
+    "disconnect",
+    "announce_phrases",
 ];
 
 fn main() {

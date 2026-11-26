@@ -5,6 +5,7 @@
 pub mod announce;
 #[cfg(target_os = "linux")]
 pub mod announce_atk;
+pub mod calls;
 pub mod commands;
 pub mod edit;
 pub mod error;
@@ -19,6 +20,7 @@ pub mod picker;
 #[cfg(target_os = "linux")]
 pub mod picker_gtk;
 pub mod rubrica;
+pub mod session;
 pub mod supervisor;
 pub mod ui_state;
 pub mod window;
@@ -29,6 +31,7 @@ use export::SavePicker;
 use import::Imports;
 use picker::FilePicker;
 use rubrica::Rubrica;
+use session::Sessions;
 use std::{path::PathBuf, sync::Arc};
 use supervisor::RelinkPolicy;
 use tauri::{Manager, Runtime};
@@ -84,11 +87,28 @@ pub fn configure_with<R: Runtime>(
             commands::import::import_discard,
             commands::import::import_pick_file,
             commands::import::import_pending,
-            commands::secrets::secret_store_status
+            commands::secrets::secret_store_status,
+            commands::connection::connect_profile,
+            commands::connection::disconnect,
+            commands::connection::announce_phrases
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.
             let _in_runtime = tauri::async_runtime::handle().inner().enter();
+            // Everything the events meet on their way (the rubrica, the session, the announcer) is in the state before the
+            // supervisor starts. The tests of level 2 manage their own rubrica (in a temporary folder) and their own announcer
+            // before the build, and `manage` keeps the first one.
+            app.manage(Arc::new(Rubrica::new(
+                Rubrica::default_dir(),
+                Arc::clone(&state),
+            )));
+            app.manage(default_announcer(app.handle()));
+            let rubrica = Arc::clone(&*app.state::<Arc<Rubrica>>());
+            app.manage(Arc::new(Sessions::new(
+                socket.clone(),
+                Arc::clone(&rubrica),
+                Arc::clone(&state),
+            )));
             let sink = std::sync::Arc::new(events::TauriSink(app.handle().clone()));
             let handle = supervisor::spawn(
                 socket.clone(),
@@ -98,16 +118,8 @@ pub fn configure_with<R: Runtime>(
             );
             app.manage(handle);
             app.manage(AppInfo::new(&socket));
-            // Like the announcer: the tests of level 2 manage their own rubrica (in a temporary folder) before the build.
-            app.manage(Arc::new(Rubrica::new(
-                Rubrica::default_dir(),
-                Arc::clone(&state),
-            )));
             // The previews of the import wait over the rubrica that is in the state (the one of the test, when there is one).
-            let rubrica = Arc::clone(&*app.state::<Arc<Rubrica>>());
             app.manage(Arc::new(Imports::new(rubrica)));
-            // The tests of level 2 manage their own announcer before the build, and `manage` keeps the first one.
-            app.manage(default_announcer(app.handle()));
             // The same for the window «Save» of «Export»: the tests of level 2 cannot drive a native window and manage theirs.
             app.manage(default_picker(app.handle()));
             // And the window «Open» of «Import».

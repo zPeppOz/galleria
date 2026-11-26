@@ -775,11 +775,15 @@ fn delete_works_with_no_daemon_at_all() {
 
 // ---- no path from the webview ----------------------------------------------------------------------------------------
 
-/// The text between the parentheses of `pub fn <name>(`, up to the `)` that closes the list (not up to the first `) ->`:
-/// a command with no return type has none). `None` when the text has no such function, or the list never closes.
+/// The text between the parentheses of `pub fn <name>(` (or `pub async fn <name>(`: the commands that call the daemon are
+/// async), up to the `)` that closes the list (not up to the first `) ->`: a command with no return type has none). `None`
+/// when the text has no such function, or the list never closes.
 fn params_of<'a>(source: &'a str, name: &str) -> Option<&'a str> {
-    let head = format!("pub fn {name}(");
-    let start = source.find(&head)? + head.len();
+    let heads = [format!("pub fn {name}("), format!("pub async fn {name}(")];
+    let (at, head) = heads
+        .iter()
+        .find_map(|head| source.find(head.as_str()).map(|at| (at, head)))?;
+    let start = at + head.len();
     let mut depth = 1;
     for (at, c) in source[start..].char_indices() {
         match c {

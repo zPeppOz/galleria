@@ -28,6 +28,9 @@
     "allow-import-discard",
     "allow-import-pick-file",
     "allow-import-pending",
-    "allow-secret-store-status"
+    "allow-secret-store-status",
+    "allow-connect-profile",
+    "allow-disconnect",
+    "allow-announce-phrases"
   ]
 }

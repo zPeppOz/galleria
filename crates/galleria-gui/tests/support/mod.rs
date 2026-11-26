@@ -23,6 +23,8 @@ use std::{
 use tokio::net::{UnixListener, UnixStream};
 use tokio_util::sync::CancellationToken;
 
+pub mod scenarios;
+
 pub fn params(replace: bool) -> ConnectParams {
     serde_json::from_value(serde_json::json!({"profile":{"id":"test","name":"Test VPN"},"replace":replace,"backend":{"protocol":"wireguard","private_key":"synthetic","addresses":[],"dns":[],"search_domains":[],"mtu":null,"peers":[]},"options":{"ipv6_block":true,"ignore_pushed_routes":false,"reconnect":{"enabled":true}}})).unwrap()
 }
@@ -88,6 +90,10 @@ pub struct Harness {
     pub live: Arc<AtomicUsize>,
     pub spawns: Arc<AtomicUsize>,
     pub dirs: Arc<Mutex<Vec<PathBuf>>>,
+    /// What each `connect` carried for the backend and the options, as JSON with the secrets in clear: what the daemon was given.
+    pub connects: Arc<Mutex<Vec<serde_json::Value>>>,
+    /// What each `provide_input` carried to the backend, as JSON with the secrets in clear.
+    pub inputs: Arc<Mutex<Vec<serde_json::Value>>>,
     pub tmp: tempfile::TempDir,
 }
 impl Harness {
@@ -97,13 +103,21 @@ impl Harness {
         let live = Arc::new(AtomicUsize::new(0));
         let spawns = Arc::new(AtomicUsize::new(0));
         let dirs = Arc::new(Mutex::new(Vec::new()));
+        let connects = Arc::new(Mutex::new(Vec::new()));
+        let inputs = Arc::new(Mutex::new(Vec::new()));
         let queue = Mutex::new(VecDeque::from(scripts));
         let l = live.clone();
         let s = spawns.clone();
         let d = dirs.clone();
         let n = net.clone();
-        let factory: BackendFactory = Arc::new(move |_, _| {
+        let c = connects.clone();
+        let i = inputs.clone();
+        let factory: BackendFactory = Arc::new(move |backend, options| {
             s.fetch_add(1, Ordering::SeqCst);
+            c.lock().unwrap().push(serde_json::json!({
+                "backend": serde_json::to_value(backend).unwrap(),
+                "options": serde_json::to_value(options).unwrap(),
+            }));
             Ok(Box::new(Observed {
                 fake: FakeBackend::new(
                     queue.lock().unwrap().pop_front().unwrap_or_default(),
@@ -112,6 +126,7 @@ impl Harness {
                 dirs: d.clone(),
                 net: n.clone(),
                 live: l.clone(),
+                inputs: i.clone(),
             }))
         });
         let handle = spawn_manager(
@@ -126,6 +141,8 @@ impl Harness {
             live,
             spawns,
             dirs,
+            connects,
+            inputs,
             tmp,
         }
     }
@@ -135,6 +152,7 @@ struct Observed {
     fake: FakeBackend,
     dirs: Arc<Mutex<Vec<PathBuf>>>,
     net: Arc<Net>,
+    inputs: Arc<Mutex<Vec<serde_json::Value>>>,
 }
 impl Backend for Observed {
     fn protocol(&self) -> Protocol {
@@ -158,11 +176,18 @@ impl Backend for Observed {
         let handle = Box::new(self.fake).spawn(ctx);
         let (commands, mut rx) = tokio::sync::mpsc::channel(16);
         let net = self.net;
+        let inputs = self.inputs;
         let task = tokio::spawn(async move {
             let mut inner = handle.task;
             loop {
                 tokio::select! {
-                 command=rx.recv()=>{if let Some(command)=command {if matches!(command,BackendCommand::Stop){net.log.lock().unwrap().push("stop".into());}let _=handle.commands.send(command).await;}}
+                 command=rx.recv()=>{
+                    if let Some(command)=command {
+                        if matches!(command,BackendCommand::Stop){net.log.lock().unwrap().push("stop".into());}
+                        if let BackendCommand::ProvideInput(values)=&command{inputs.lock().unwrap().push(serde_json::to_value(values).unwrap());}
+                        let _=handle.commands.send(command).await;
+                    }
+                 }
                  _=&mut inner=>{net.log.lock().unwrap().push("exit".into());break;}
                 }
             }

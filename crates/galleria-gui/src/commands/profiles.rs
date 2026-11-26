@@ -48,6 +48,7 @@ impl From<RubricaError> for CmdError {
             RubricaError::GroupExists => ("gui_group_exists", None),
             RubricaError::GroupNotFound => ("gui_group_not_found", None),
             RubricaError::InUse => ("gui_profile_in_use", None),
+            RubricaError::SecretMissing => ("gui_secret_missing", None),
             // The place, so that the window can say where it failed; never the text.
             RubricaError::Export(error) => {
                 ("gui_export_failed", Some(json!({ "path": error.path() })))

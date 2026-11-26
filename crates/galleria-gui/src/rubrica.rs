@@ -171,9 +171,14 @@ pub enum RubricaError {
     /// The file of «Export» could not be written (the place is in the error, never the text).
     #[error("{0}")]
     Export(#[from] ExportError),
+    /// A key the profile names is not in the archive of the secrets (taken out of the keyring by hand, say): the profile has
+    /// to be imported again.
+    #[error("The profile is missing a key")]
+    SecretMissing,
 }
 
 mod actions;
+mod connect;
 mod groups;
 mod imported;
 

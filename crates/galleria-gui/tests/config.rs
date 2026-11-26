@@ -32,6 +32,9 @@ const ALLOWED: &[&str] = &[
     "allow-import-pick-file",
     "allow-import-pending",
     "allow-secret-store-status",
+    "allow-connect-profile",
+    "allow-disconnect",
+    "allow-announce-phrases",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

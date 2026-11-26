@@ -31,6 +31,8 @@ pub const GUI_CODES: &[&str] = &[
     "gui_export_failed",
     "gui_keyring_locked",
     "gui_keyring_failed",
+    "gui_secret_missing",
+    "gui_daemon_unreachable",
     "import_syntax",
     "import_missing_file",
     "import_outside_folder",

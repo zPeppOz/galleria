@@ -2,6 +2,7 @@
 
 pub mod announce;
 pub mod app;
+pub mod connection;
 pub mod daemon;
 pub mod groups;
 pub mod import;

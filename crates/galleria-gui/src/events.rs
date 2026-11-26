@@ -1,8 +1,10 @@
 //! Forwarding of the daemon events to the webview (spec §4.3).
 
 use crate::{
+    announce::Announcer,
     import::{Imports, Origin},
     link::DaemonView,
+    session::Sessions,
     supervisor::EventSink,
 };
 use galleria_ipc::{LogEntry, Stats, Status};
@@ -35,6 +37,14 @@ impl<R: Runtime> EventSink for TauriSink<R> {
         self.emit(EV_LINK, view);
     }
     fn state(&self, status: &Status) {
+        // What follows the state is Rust's own (the last use of the profile, the sentence for the screen reader) and comes
+        // before the page hears of it, so a page that reads the rubrica on `connected` already sees the last use.
+        if let Some(sessions) = self.0.try_state::<Arc<Sessions>>()
+            && let Some((text, urgency)) = sessions.on_state(status)
+            && let Some(announcer) = self.0.try_state::<Arc<dyn Announcer>>()
+        {
+            announcer.announce(&text, urgency);
+        }
         self.emit(EV_STATE, status);
     }
     fn stats(&self, stats: &Stats) {

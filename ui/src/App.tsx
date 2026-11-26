@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { announce, usePhrasesForRust } from "./app/announce";
+import { useTrayLabelsForRust } from "./app/tray";
 import type { SortOrder } from "./app/uiState";
 import { useDaemon } from "./daemon/store";
 import type { ThemeChoice } from "./design/theme";
@@ -13,6 +14,7 @@ import { Shell } from "./shell/Shell";
 function Screen({ initialSort }: { initialSort: SortOrder }) {
   const { view, info, retry } = useDaemon();
   usePhrasesForRust();
+  useTrayLabelsForRust();
   const lang = useLang();
   const [sort, setSort] = useState<SortOrder>(initialSort);
   // The profile that takes the place of one that goes away is the next in the order the list shows.

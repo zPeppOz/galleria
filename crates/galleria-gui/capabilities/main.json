@@ -35,6 +35,7 @@
     "allow-provide-input",
     "allow-forget-credentials",
     "allow-logs-get",
-    "allow-logs-export"
+    "allow-logs-export",
+    "allow-tray-labels"
   ]
 }

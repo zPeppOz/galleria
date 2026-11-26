@@ -9,4 +9,5 @@ pub mod import;
 pub mod logs;
 pub mod profiles;
 pub mod secrets;
+pub mod tray;
 pub mod ui_state;

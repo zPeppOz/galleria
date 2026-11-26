@@ -31,6 +31,7 @@ const COMMANDS: &[&str] = &[
     "forget_credentials",
     "logs_get",
     "logs_export",
+    "tray_labels",
 ];
 
 fn main() {

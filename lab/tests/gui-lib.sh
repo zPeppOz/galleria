@@ -64,6 +64,23 @@ SCRIPT
   printf '#!/usr/bin/env bash\nexport DBUS_SESSION_BUS_ADDRESS=unix:path=%s/no-bus\nexec "%s" "$@"\n' "$tmp" "${GALLERIA_SMOKE_APP:-/nonexistent}" > "$bin/app-no-keyring"
   chmod +x "$bin/app-no-keyring"
 
+  # The app on a desktop without the library of the indicator (plan B6, T1, point 2 of the review): a shim that makes `dlopen` fail for the
+  # two libraries of the tray, preloaded by a wrapper like the one above. The libraries stay in the image; the app does not find them.
+  cat > "$tmp/no-indicator.c" <<'SHIM'
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <string.h>
+void *dlopen(const char *file, int flags) {
+  static void *(*real)(const char *, int);
+  if (!real) real = (void *(*)(const char *, int))dlsym(RTLD_NEXT, "dlopen");
+  if (file && strstr(file, "appindicator")) return NULL;
+  return real(file, flags);
+}
+SHIM
+  gcc -shared -fPIC -o "$tmp/no-indicator.so" "$tmp/no-indicator.c" -ldl
+  printf '#!/usr/bin/env bash\nexport LD_PRELOAD=%s\nexec "%s" "$@" 2> %s\n' "$tmp/no-indicator.so" "${GALLERIA_SMOKE_APP:-/nonexistent}" "$tmp/no-indicator.stderr" > "$bin/app-no-indicator"
+  chmod +x "$bin/app-no-indicator"
+
   # The tests start every run from a rubrica they know: this wipes the profiles and writes the seed again (`--empty`:
   # the store only). It writes inside $XDG_CONFIG_HOME of the run and refuses to run without it.
   cat > "$bin/rubrica-seed" <<SCRIPT
@@ -95,6 +112,9 @@ SCRIPT
   trap gui_cleanup EXIT
 
   export GALLERIA_SOCKET=$tmp/galleriad.sock GALLERIA_SMOKE_BIN=$bin GALLERIA_SMOKE_REPO=$repo GALLERIA_SMOKE_APP_NO_KEYRING=$bin/app-no-keyring
+  # The tray and the window seen from outside (plan B6): the probe that stands in for the desktop that shows the tray, and the one that
+  # reads and closes the window like a window manager (ui/e2e/support.ts).
+  export GALLERIA_SMOKE_APP_NO_INDICATOR=$bin/app-no-indicator GALLERIA_SMOKE_NO_INDICATOR_STDERR=$tmp/no-indicator.stderr GALLERIA_TRAY_PROBE=$repo/lab/tests/tray-probe.py GALLERIA_X11_WINDOW=$repo/lab/tests/x11-window.py
 }
 
 # A keyring of the run's own for the window (plan B5, T3). GNOME Keyring is installed in the image and starts by itself on the

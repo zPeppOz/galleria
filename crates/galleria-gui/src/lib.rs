@@ -23,6 +23,8 @@ pub mod picker_gtk;
 pub mod rubrica;
 pub mod session;
 pub mod supervisor;
+pub mod tray;
+pub mod tray_tauri;
 pub mod ui_state;
 pub mod window;
 
@@ -36,6 +38,7 @@ use session::Sessions;
 use std::{path::PathBuf, sync::Arc};
 use supervisor::RelinkPolicy;
 use tauri::{Manager, Runtime};
+use tray::Tray;
 use ui_state::UiStateFile;
 use window::WindowSaver;
 
@@ -95,7 +98,8 @@ pub fn configure_with<R: Runtime>(
             commands::connection::provide_input,
             commands::connection::forget_credentials,
             commands::logs::logs_get,
-            commands::logs::logs_export
+            commands::logs::logs_export,
+            commands::tray::tray_labels
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.
@@ -114,6 +118,15 @@ pub fn configure_with<R: Runtime>(
                 Arc::clone(&rubrica),
                 Arc::clone(&state),
             )));
+            // The tray (plan B6): made when the page gives its texts, written again when the state, the link or the favourites change.
+            // It is in the state before the supervisor starts: the first link event already goes through it.
+            let tray = Arc::new(Tray::new(tray_tauri::factory(app.handle().clone())));
+            tray.set_favourites(tray_tauri::favourites_of(&rubrica));
+            rubrica.on_change({
+                let tray = Arc::clone(&tray);
+                move |rubrica| tray.set_favourites(tray_tauri::favourites_of(rubrica))
+            });
+            app.manage(tray);
             let sink = std::sync::Arc::new(events::TauriSink(app.handle().clone()));
             let handle = supervisor::spawn(
                 socket.clone(),

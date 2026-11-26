@@ -226,7 +226,11 @@ pub struct Rubrica {
     state: Arc<UiStateFile>,
     secrets: SecretFactory,
     kind: StoreProbe,
+    /// Told after a write that can change what the tray lists (a profile changed or deleted).
+    changed: std::sync::Mutex<Option<ChangeHook>>,
 }
+
+type ChangeHook = Arc<dyn Fn(&Rubrica) + Send + Sync>;
 
 impl Rubrica {
     /// The rubrica of the app: the keyring and the file as one archive (B5).
@@ -263,6 +267,26 @@ impl Rubrica {
             state,
             secrets,
             kind,
+            changed: std::sync::Mutex::new(None),
+        }
+    }
+
+    /// What is told when a profile was changed or deleted: the tray lists the favourites (plan B6, T1).
+    pub fn on_change(&self, hook: impl Fn(&Rubrica) + Send + Sync + 'static) {
+        *self
+            .changed
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::new(hook));
+    }
+
+    pub(crate) fn notify(&self) {
+        let hook = self
+            .changed
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(hook) = hook {
+            hook(self);
         }
     }
 
@@ -391,6 +415,7 @@ impl Rubrica {
             profile.modified = now;
         }
         store.save(&profile).map_err(|e| self.fail(e))?;
+        self.notify();
         let state = self.state.load();
         Ok(detail(
             &profile,

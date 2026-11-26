@@ -4,8 +4,11 @@ use crate::{
     announce::Announcer,
     import::{Imports, Origin},
     link::DaemonView,
+    rubrica::Rubrica,
     session::Sessions,
     supervisor::EventSink,
+    tray::Tray,
+    tray_tauri::favourites_of,
 };
 use galleria_ipc::{LogEntry, Stats, Status};
 use std::{path::PathBuf, sync::Arc};
@@ -34,6 +37,14 @@ impl<R: Runtime> TauriSink<R> {
 
 impl<R: Runtime> EventSink for TauriSink<R> {
     fn link(&self, view: &DaemonView) {
+        // The menu of the tray follows the link (nothing can be connected without it) and reads the favourites again: a profile
+        // that the CLI marked since is in the menu from the next link on.
+        if let Some(tray) = self.0.try_state::<Arc<Tray>>() {
+            if let Some(rubrica) = self.0.try_state::<Arc<Rubrica>>() {
+                tray.set_favourites(favourites_of(&rubrica));
+            }
+            tray.set_link(view);
+        }
         self.emit(EV_LINK, view);
     }
     fn state(&self, status: &Status) {
@@ -44,6 +55,9 @@ impl<R: Runtime> EventSink for TauriSink<R> {
             && let Some(announcer) = self.0.try_state::<Arc<dyn Announcer>>()
         {
             announcer.announce(&text, urgency);
+        }
+        if let Some(tray) = self.0.try_state::<Arc<Tray>>() {
+            tray.set_status(status);
         }
         self.emit(EV_STATE, status);
     }

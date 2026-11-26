@@ -505,7 +505,12 @@ durante le correzioni di B5, testo in `docs/08-esito-fase2.md`, sezione «B5».
 
 Q50–Q57 (indirizzo e client della richiesta delle versioni, chi esegue le azioni della tray, la chiusura senza tray,
 «Esci» con una sessione attiva, il link dell'avviso, la passata a orecchio, dove si misura l'avvio a freddo): testo e
-raccomandazione nel piano di B6, `docs/superpowers/plans/2026-11-26-fase2-b6-tray-chiusura.md`. **Da decidere.**
+raccomandazione nel piano di B6, `docs/superpowers/plans/2026-11-26-fase2-b6-tray-chiusura.md`. **Approvate (a)**, tutte come
+raccomandate, da Aitano il 26/11/2026 su delega di Peppe: Q50 la versione si legge dal `Location` di `releases/latest`, senza
+seguire il rinvio; Q51 la richiesta è fatta con `soup3` (ripiego `reqwest` se S52 fallisce); Q52 le azioni del menu le esegue la
+pagina; Q53 senza tray la «X» esce e la VPN resta; Q54 «Esci (la VPN resta attiva)»; Q55 il link è testo, con «Copia link»; Q56
+la passata a orecchio la fa un agente dal file di debug di Orca, la lista per l'ascolto in cuffia non blocca; Q57 l'avvio a freddo
+si misura in una VM Ubuntu sul server di casa, in `/mnt/b/vm`.
 
 ## 19. Cosa non ho verificato
 

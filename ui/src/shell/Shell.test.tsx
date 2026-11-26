@@ -309,7 +309,7 @@ describe("Shell", () => {
     for (const tab of screen.getAllByRole("tab")) await user.click(tab);
     await user.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(calls).toContain("daemon_retry"));
-    expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", "daemon_retry", "profiles_list", "profile_get", "import_pending", "secret_store_status", "announce_phrases"]));
+    expect(new Set(calls)).toEqual(new Set(["daemon_view", "app_info", "daemon_retry", "profiles_list", "profile_get", "import_pending", "secret_store_status", "announce_phrases", "tray_labels"]));
     expect(calls.filter((c) => c === "profile_get").length).toBeGreaterThanOrEqual(2);
   });
 });

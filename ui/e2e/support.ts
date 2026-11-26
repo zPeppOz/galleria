@@ -33,7 +33,7 @@ export const readState = (): string => (existsSync(stateFile()) ? readFileSync(s
  * app on purpose and keeps both. `rubrica: "empty"` starts from a store with no profile. `args` are the arguments of the
  * process, as a file manager gives them: a file to open (S30: `tauri-driver` hands `tauri:options.args` to the app).
  */
-export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "seeded", args: string[] = [], keyring: "system" | "none" = "system"): Promise<Browser> {
+export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "seeded", args: string[] = [], keyring: "system" | "none" | "no-indicator" = "system"): Promise<Browser> {
   if (!keepState) {
     rmSync(stateFile(), { force: true });
     seedRubrica(rubrica);
@@ -44,7 +44,7 @@ export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "
       hostname: "127.0.0.1",
       port,
       logLevel: "error",
-      capabilities: { "tauri:options": { application: env(keyring === "none" ? "GALLERIA_SMOKE_APP_NO_KEYRING" : "GALLERIA_SMOKE_APP"), ...(args.length > 0 ? { args } : {}) } } as WebdriverIO.Capabilities,
+      capabilities: { "tauri:options": { application: env(keyring === "none" ? "GALLERIA_SMOKE_APP_NO_KEYRING" : keyring === "no-indicator" ? "GALLERIA_SMOKE_APP_NO_INDICATOR" : "GALLERIA_SMOKE_APP"), ...(args.length > 0 ? { args } : {}) } } as WebdriverIO.Capabilities,
     });
   } catch (failure) {
     await stopPrivateDriver();
@@ -356,3 +356,76 @@ export const keyringLookup = (id: string, key: string): string => spawnSync("sec
 
 /** Every item of the keyring of a profile, with its secret, as text. */
 export const keyringItems = (id: string): string => `${spawnSync("secret-tool", ["search", "--all", "service", "galleria", "profile", id], { encoding: "utf8" }).stdout}`;
+
+// ---- The tray and the window seen from outside (plan B6): lab/tests/tray-probe.py, lab/tests/x11-window.py ---------------------------
+// The tray is an AppIndicator: the desktop draws it, and under Xvfb there is no desktop. The probe stands in for the one that shows the
+// tray (the `StatusNotifierWatcher`) and reads and clicks the menu from the session bus; the other script reads whether the window is
+// shown and sends it the request of closing that a window manager would. A test that wants a tray starts the watcher; the others have
+// none, so for them a closed window is a quit (Q53) like it was before B6.
+
+export interface TrayEntryView { id: number; text: string; enabled: boolean }
+
+const python = (script: string, args: string[], options: { allowFailure?: boolean } = {}): string => {
+  const done = spawnSync("python3", [env(script), ...args], { encoding: "utf8" });
+  if (done.status !== 0 && !options.allowFailure) throw new Error(`${script} ${args.join(" ")} (${done.status}): ${done.stdout}${done.stderr}`);
+  return `${done.stdout}`.trim();
+};
+
+let watcher: ChildProcess | undefined;
+
+/** The folder where the probe keeps what it saw: the same for the watcher and for the commands (they are separate processes). */
+const probeDir = (): string => join(env("XDG_RUNTIME_DIR"), "tray-probe");
+
+/** Starts the watcher: from now on an app that makes a tray finds someone who shows it. Waits until it owns its name on the bus. */
+export async function startTrayWatcher(): Promise<void> {
+  stopTrayWatcher();
+  process.env.TRAY_PROBE_DIR = probeDir();
+  watcher = spawn("python3", [env("GALLERIA_TRAY_PROBE"), "watch"], { stdio: "ignore" });
+  const deadline = Date.now() + TEN_SECONDS;
+  while (!existsSync(join(probeDir(), "items.json"))) {
+    if (Date.now() > deadline) throw new Error("the tray watcher did not start");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  // `items.json` is written before the name is asked for: one more moment, so that the app that comes next finds the name taken
+  await new Promise((resolve) => setTimeout(resolve, 300));
+}
+
+export function stopTrayWatcher(): void {
+  watcher?.kill("SIGKILL");
+  watcher = undefined;
+  rmSync(probeDir(), { recursive: true, force: true });
+}
+
+/** The entries of the menu of the tray as the desktop would draw it (separators left out). */
+export const trayMenu = (): TrayEntryView[] => JSON.parse(python("GALLERIA_TRAY_PROBE", ["layout"])) as TrayEntryView[];
+export const trayTexts = (): string[] => trayMenu().map((entry) => entry.text);
+export const trayClick = (text: string): void => void python("GALLERIA_TRAY_PROBE", ["click", text]);
+export const trayIcon = (): string => python("GALLERIA_TRAY_PROBE", ["icon"]);
+export const trayRegistered = (seconds = 10): boolean => spawnSync("python3", [env("GALLERIA_TRAY_PROBE"), "wait-item", String(seconds)]).status === 0;
+
+/** Waits until `read()` gives what `check` accepts; says what it saw last when it never does. */
+export async function until<T>(read: () => T, check: (value: T) => boolean, what: string, timeout = TEN_SECONDS): Promise<T> {
+  const deadline = Date.now() + timeout;
+  let last: T | undefined;
+  let failure: unknown;
+  for (;;) {
+    try {
+      last = read();
+      failure = undefined;
+      if (check(last)) return last;
+    } catch (error) {
+      failure = error;
+    }
+    if (Date.now() > deadline) throw new Error(`${what}; last seen: ${failure ? String(failure) : JSON.stringify(last)}`);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+}
+
+/** `true` when the window is shown, `false` when it is hidden, `none` when there is no window. */
+export const windowState = (): string => python("GALLERIA_X11_WINDOW", ["mapped"]);
+
+/** The request of closing that the «X» of a title bar would send. */
+export const requestClose = (): void => void python("GALLERIA_X11_WINDOW", ["close"]);
+
+/** The app is running (a process of that name exists). */
+export const appRunning = (): boolean => spawnSync("pgrep", ["-x", "galleria-gui"]).status === 0;

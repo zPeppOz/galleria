@@ -39,6 +39,7 @@ const ALLOWED: &[&str] = &[
     "allow-forget-credentials",
     "allow-logs-get",
     "allow-logs-export",
+    "allow-tray-labels",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

@@ -106,6 +106,7 @@ impl Rubrica {
             .map_err(|e| self.fail(e))?;
         store.delete(&id).map_err(|e| self.fail(e))?;
         let _ = self.state.forget(id);
+        self.notify();
         Ok(())
     }
 }

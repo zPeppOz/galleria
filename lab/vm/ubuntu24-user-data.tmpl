@@ -1,0 +1,85 @@
+#cloud-config
+# Ubuntu 24.04 desktop (plan B6, T8): the cloud image plus ubuntu-desktop-minimal, with GNOME 46 on Wayland, the AppIndicator
+# extension, Orca 46 and the libraries the app loads. Like ubuntu-user-data.tmpl (26.04), plus: the screen never locks, the
+# accessibility toolkit is on for everyone, the first-run welcome is off.
+hostname: galleria-ubuntu24
+manage_etc_hosts: true
+users:
+  - name: lab
+    gecos: Galleria lab
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - @SSH_PUBKEY@
+ssh_pwauth: false
+package_update: true
+package_upgrade: false
+packages:
+  - ubuntu-desktop-minimal
+  - gnome-shell-extension-appindicator
+  - network-manager
+  - openvpn
+  - wireguard-tools
+  - tcpdump
+  - oathtool
+  - curl
+  - python3
+  - iputils-ping
+  - iproute2
+  - rsync
+  - docker.io
+  - systemd-resolved
+  - orca
+  - gnome-keyring
+  - libsecret-tools
+  - at-spi2-core
+  - gir1.2-atspi-2.0
+  - python3-gi
+  - libwebkit2gtk-4.1-0
+  - libayatana-appindicator3-1
+  - xdg-utils
+write_files:
+  - path: /etc/netplan/01-network-manager-all.yaml
+    permissions: '0600'
+    content: |
+      network:
+        version: 2
+        renderer: NetworkManager
+  - path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+    content: |
+      network: {config: disabled}
+  - path: /etc/dconf/profile/user
+    content: |
+      user-db:user
+      system-db:local
+  - path: /etc/dconf/db/local.d/00-galleria
+    content: |
+      [org/gnome/desktop/session]
+      idle-delay=uint32 0
+      [org/gnome/desktop/screensaver]
+      lock-enabled=false
+      [org/gnome/desktop/lockdown]
+      disable-lock-screen=true
+      [org/gnome/desktop/interface]
+      toolkit-accessibility=true
+  - path: /usr/local/sbin/galleria-gdm-autologin
+    permissions: '0755'
+    content: |
+      #!/bin/sh
+      mkdir -p /etc/gdm3
+      printf '[daemon]\nAutomaticLoginEnable=true\nAutomaticLogin=lab\n' > /etc/gdm3/custom.conf
+runcmd:
+  - [ /usr/local/sbin/galleria-gdm-autologin ]
+  - [ dconf, update ]
+  - [ install, -d, -o, lab, -g, lab, /home/lab/.config ]
+  - [ sh, -c, "echo yes > /home/lab/.config/gnome-initial-setup-done; chown lab:lab /home/lab/.config/gnome-initial-setup-done" ]
+  - [ rm, -f, /etc/netplan/50-cloud-init.yaml ]
+  - [ systemctl, set-default, graphical.target ]
+  - [ sh, -c, "echo PROVISION_DONE > /var/lib/galleria-provision" ]
+power_state:
+  mode: reboot
+  message: provisioning done, rebooting onto NetworkManager
+  timeout: 30
+  condition: true

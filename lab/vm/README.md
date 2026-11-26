@@ -73,3 +73,50 @@ Passi: copiare `galleria-gui`, `fake-daemon`, `atspi-dump.py` e gli script in `~
 `orca-spike-vm.sh orca`, `orca-spike-vm.sh app` e `orca-spike-run.py <vm> all`. GNOME blocca lo schermo dopo 5 minuti:
 `gsettings set org.gnome.desktop.session idle-delay 0` e `…screensaver lock-enabled false`. Su Fedora, al primo accesso,
 chiudere la panoramica (`Esc`) prima di avviare l'app, altrimenti non ha il fuoco.
+
+## B6: tre desktop, compresa Ubuntu 24.04
+
+`ubuntu24` è il terzo nome di `vmctl.sh`: SSH 2203, VNC `:3` (passare
+`DISPLAY_OPT=vnc=127.0.0.1:3`). Gli altri due restano 2201/`:1` e 2202/`:2`.
+Qemu ha una tavoletta USB per il puntatore su Wayland. Sempre KVM, 4 vCPU, 4 GiB,
+UEFI, dischi e semi **solo in `/mnt/b/vm`**. Alla fine `vmctl.sh stop <vm>`.
+
+La 24.04 nasce come le altre: immagine ufficiale
+`https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img`,
+`SHA256SUMS` e `SHA256SUMS.gpg`, firma con `/usr/share/keyrings/ubuntu-cloudimage-keyring.gpg`
+(`gpgv`), hash con `sha256sum -c` sulla sola riga dell'immagine. La prova è in
+`/mnt/b/vm/evidence/b6/ubuntu24/image-signature.txt`. Il disco `disks/ubuntu24.qcow2`
+è 40 GiB virtuali; seme da `ubuntu24-user-data.tmpl` con `@SSH_PUBKEY@` sostituita
+con la chiave **pubblica** del laboratorio. Il desktop si installa con cloud-init:
+`ubuntu-desktop-minimal`, Orca, AppIndicator e WebKitGTK, autologin di `lab` senza password.
+`cloud-init status --long` deve dire `done`: la sola comparsa di SSH non è la fine.
+Il primo giro ha richiesto circa 25 minuti (compreso il Firefox snap del metapacchetto).
+
+Dall'host, con la VM accesa:
+
+```bash
+scripts/gui.sh build
+# se non già costruiti dai gate:
+scripts/gui.sh run cargo build -p galleria-gui --examples
+# galleria e galleriad sono quelli di lab/out/bin, compilati nel laboratorio
+lab/vm/gui-vm.sh ubuntu24 install
+lab/vm/gui-vm.sh ubuntu24 versions
+lab/vm/gui-vm.sh ubuntu24 daemon fake day
+lab/vm/gui-vm.sh ubuntu24 app GALLERIA_SOCKET=/home/lab/spike/run/galleriad.sock
+```
+
+`GUI_TARGET` e `LAB_OUT` consentono di riusare un build precedente **dello stesso commit**;
+non c'è un ripiego silenzioso a un altro worktree. Nel T8 il GUI è il build del gruppo C,
+`bcb3f39`, identico al codice di questa card: hash in `evidence/b6/binaries-bcb3f39.sha256`.
+`install` aggiorna `/usr/local/bin/galleria-gui`, il `.desktop` dell'utente, icona, database
+MIME e gli script in `~/spike`; `app` avvia direttamente il binario con un'unità utente e
+`stderr` in `~/spike/app.log` (**non prova l'avvio dal menu**, che è M1).
+`daemon real` usa `packaging/linux/install.sh`; `vm-lab.sh prepare/up` resta il laboratorio
+per il tunnel vero. Dopo aver aggiunto `lab` al gruppo `galleria` serve una nuova sessione
+(anche il gestore systemd dell'utente deve avere il gruppo): non allargare i permessi del socket.
+
+Per le versioni, il `XDG_SESSION_TYPE` di SSH è `tty`: non è il desktop. `versions` stampa
+anche `loginctl` di ogni sessione; quella locale deve essere `wayland`. Su Fedora un avvio
+lento ha lasciato il greeter su tty1 con la sessione di `lab` già su tty2: `Ctrl+Alt+F2`
+dal monitor qemu ha mostrato il desktop. Questa è una particolarità della VM, non una prova
+di login con password. Numeri, fotografie e limiti sono in `docs/08-esito-fase2.md`, gruppo D.

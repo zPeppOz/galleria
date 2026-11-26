@@ -540,8 +540,8 @@ describe("the shell in the real window", () => {
     await press(b, "Home");
     await waitFor(b, async () => (await title(b)) === "Ufficio Napoli", "Home in the list did not choose the first profile");
 
-    // «Manage groups», the star, «More actions», then the tab strip: the arrows open the tabs, down to «Log»
-    for (let step = 0; step < 4; step++) await press(b, "Tab");
+    // «Manage groups», the star, «Connect» (B5), «More actions», then the tab strip: the arrows open the tabs, down to «Log»
+    for (let step = 0; step < 5; step++) await press(b, "Tab");
     expect(await activeRole(b)).toBe("tab");
     for (let step = 0; step < 4; step++) await press(b, "ArrowRight");
     const log = await byText(b, "[role=tab]", "Log");

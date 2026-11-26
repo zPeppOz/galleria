@@ -155,7 +155,8 @@ describe("credentials asked from the window (plan B5, T6)", () => {
     expect(names, "the profile file names the credentials and has none of them").not.toContain(PASSWORD);
     // the tab «Authentication» says they are saved, and offers to forget them
     await b.$("button=Authentication").click();
-    await waitForBody(b, "Credentials saved in the keyring", "the tab never said the credentials are saved");
+    // the headings of the tabs are drawn in capitals
+    await waitForBody(b, /credentials saved in the keyring/i, "the tab never said the credentials are saved");
     // the second connection does not ask
     await b.$("button=Disconnect").click();
     await waitFor(b, async () => (await barState(b)) === "Disconnected", "the bar never went back to «Disconnected»");
@@ -166,7 +167,7 @@ describe("credentials asked from the window (plan B5, T6)", () => {
     await b.$("button=Forget").click();
     await waitFor(b, async () => keyring(id, "openvpn.password").stdout === "", "the password is still in the keyring after «Forget»");
     expect(keyring(id, "openvpn.username").stdout).toBe("");
-    await waitFor(b, async () => !(await bodyText(b)).includes("Credentials saved in the keyring"), "the tab still says the credentials are saved");
+    await waitFor(b, async () => !/credentials saved in the keyring/i.test(await bodyText(b)), "the tab still says the credentials are saved");
   });
 
   it("the_otp_is_asked_every_time_and_never_saved", async () => {

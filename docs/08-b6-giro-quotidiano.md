@@ -45,7 +45,9 @@ Ubuntu 26.04 e Fedora 45: eseguiti nella card `t_6670f193`, vedi [08-b6-desktop-
   prima passata, riga `crates/galleria-profile/src/secrets_keyring.rs` `set`: «no default collection»). Non è un portachiavi bloccato:
   il prodotto non crea la collezione. Su un desktop con accesso a password il portachiavi «login» c'è già e il caso non si presenta.
   Per proseguire la collezione è stata creata dal prompt di GNOME (`06-keyring-prompt.png`; `lab/vm/keyring-create.py`; password vuota →
-  «Store passwords unencrypted?»). **Da decidere**: messaggio più chiaro o creazione della collezione; non toccato il codice.
+  «Store passwords unencrypted?»). ~~Da decidere: messaggio più chiaro o creazione della collezione; non toccato il codice.~~
+  **Chiusa nella card `t_479c2489`**: senza collezione predefinita il portachiavi non conta, i segreti vanno nel file con l’avviso (D25), senza fermare Import
+  (`08-b6-desktop-pass.md`, «F1 — esito»).
 - **F2 — icona della tray dopo la disconnessione.** Dopo qualunque ritorno allo stato «spento» (dal menu o dal pulsante della finestra)
   la barra di GNOME 46 mostra «…» (tre puntini) al posto dell'anello; il file scritto in `/run/user/1000/galleria/tray-icon-galleria-N.png`
   è invece l'anello giusto (`tray-icon-galleria-5.png`, `tray-icon-probe.txt`: `IconName` cambia nome a ogni cambio). Un nuovo avvio

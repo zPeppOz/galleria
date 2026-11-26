@@ -488,7 +488,17 @@ associazione dei `.ovpn`): testo e raccomandazione nel piano di B4,
 
 Q42–Q47 (laboratorio di B5, annunci di stato dal lato Rust, crate per Secret Service, credenziali ricordate nella CLI e
 in `secret_refs`, password ricordata rifiutata): testo e raccomandazione nel piano di B5,
-`docs/superpowers/plans/2026-11-26-fase2-b5-connessione.md`. **Da decidere**: finché non lo sono vale la raccomandazione.
+`docs/superpowers/plans/2026-11-26-fase2-b5-connessione.md`. **Approvate** da Aitano il 26/11/2026 su delega di Peppe, tutte
+come raccomandate:
+
+| # | Questione | Esito |
+|---|---|---|
+| Q42 | Come la finestra parla con il demone vero dei client | **Approvata (b)**: un ponte di prova sul lato host, con `docker exec -i -u <utente>`, un ponte per utente |
+| Q43 | Testo tradotto degli annunci di stato | **Approvata (a)**: la pagina consegna le frasi a Rust (`announce_phrases`) |
+| Q44 | Crate per Secret Service | **Approvata (a)**: `dbus-secret-service` 4.2.0 con `vendored`, sessione non cifrata |
+| Q45 | La CLI e le credenziali ricordate | **Approvata (a)**: la CLI legge dai due archivi solo le chiavi |
+| Q46 | Dove si scrive che un profilo ha credenziali ricordate | **Approvata (a)**: i nomi stanno in `secret_refs` |
+| Q47 | Password ricordata rifiutata dal server | **Approvata (a)**: l'errore offre «Dimentica le credenziali salvate» |
 
 ## 19. Cosa non ho verificato
 

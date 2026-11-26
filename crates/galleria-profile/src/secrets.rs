@@ -13,6 +13,8 @@ use zeroize::Zeroizing;
 pub trait SecretStore {
     fn get(&self, id: &Uuid, key: &str) -> Result<Option<Secret>, StoreError>;
     fn set(&self, id: &Uuid, key: &str, value: &Secret) -> Result<(), StoreError>;
+    /// Removes one key; a key that is not there is not an error.
+    fn delete(&self, id: &Uuid, key: &str) -> Result<(), StoreError>;
     fn delete_all(&self, id: &Uuid) -> Result<(), StoreError>;
 }
 pub struct FileSecretStore {
@@ -46,6 +48,20 @@ impl SecretStore for FileSecretStore {
     fn set(&self, id: &Uuid, key: &str, value: &Secret) -> Result<(), StoreError> {
         let mut values = self.load(id)?;
         values.insert(key.into(), value.clone());
+        let text = Zeroizing::new(
+            toml::to_string(&values)
+                .map_err(|_| StoreError::Invalid("Cannot encode secrets".into()))?,
+        );
+        atomic(&self.dir.join(format!("{id}.toml")), &text)
+    }
+    fn delete(&self, id: &Uuid, key: &str) -> Result<(), StoreError> {
+        let mut values = self.load(id)?;
+        if values.remove(key).is_none() {
+            return Ok(());
+        }
+        if values.is_empty() {
+            return self.delete_all(id);
+        }
         let text = Zeroizing::new(
             toml::to_string(&values)
                 .map_err(|_| StoreError::Invalid("Cannot encode secrets".into()))?,

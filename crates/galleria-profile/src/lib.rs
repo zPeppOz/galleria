@@ -6,6 +6,9 @@ mod import_wg;
 mod model;
 mod raw;
 mod secrets;
+#[cfg(target_os = "linux")]
+mod secrets_keyring;
+mod secrets_layered;
 mod settings;
 mod store;
 pub use export::*;
@@ -19,6 +22,9 @@ pub use import_wg::*;
 pub use model::*;
 pub use raw::*;
 pub use secrets::*;
+#[cfg(target_os = "linux")]
+pub use secrets_keyring::*;
+pub use secrets_layered::*;
 pub use settings::*;
 pub use store::*;
 /// The parser of the OpenVPN text, for the window to read the remotes of a configuration with the same rules as the

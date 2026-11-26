@@ -24,6 +24,12 @@ pub enum StoreError {
     InsecurePermissions { path: PathBuf, mode: u32 },
     #[error("Wrong owner of {path}; restore ownership to the current user")]
     WrongOwner { path: PathBuf },
+    /// The keyring is there but locked, or the unlocking was refused. Not the same as «no keyring».
+    #[error("The keyring is locked")]
+    KeyringLocked,
+    /// Any other error of the keyring service. The text never holds a value.
+    #[error("Keyring failed: {0}")]
+    Keyring(String),
 }
 pub(crate) fn check(path: &Path, meta: &fs::Metadata) -> Result<(), StoreError> {
     if meta.file_type().is_symlink() {

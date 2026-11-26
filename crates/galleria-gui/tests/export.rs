@@ -188,6 +188,9 @@ impl SecretStore for Failing {
         *left -= 1;
         self.inner.set(id, key, value)
     }
+    fn delete(&self, id: &Uuid, key: &str) -> Result<(), StoreError> {
+        self.inner.delete(id, key)
+    }
     fn delete_all(&self, id: &Uuid) -> Result<(), StoreError> {
         self.wiped.lock().unwrap().push(*id);
         self.inner.delete_all(id)

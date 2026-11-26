@@ -765,6 +765,9 @@ impl SecretStore for OnlyAKey {
     ) -> Result<(), galleria_profile::StoreError> {
         Ok(())
     }
+    fn delete(&self, _: &Uuid, _: &str) -> Result<(), galleria_profile::StoreError> {
+        Ok(())
+    }
     fn delete_all(&self, _: &Uuid) -> Result<(), galleria_profile::StoreError> {
         Ok(())
     }

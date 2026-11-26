@@ -28,6 +28,14 @@ describe("ConfirmDialog", () => {
     await waitFor(() => expect(document.activeElement).toBe(cancel));
   });
 
+  it("focus_starts_on_cancel_when_asked_without_danger", async () => {
+    show({ cancelFirst: true });
+    const cancel = await screen.findByRole("button", { name: "Cancel" });
+    await waitFor(() => expect(document.activeElement).toBe(cancel));
+    // the confirm button keeps the look of a plain action
+    expect(screen.getByRole("button", { name: "Delete" }).className).toContain("gx-button-primary");
+  });
+
   it("focus_starts_on_confirm_when_not_danger", async () => {
     show();
     const confirm = await screen.findByRole("button", { name: "Delete" });

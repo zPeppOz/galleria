@@ -1,7 +1,9 @@
+import { emit } from "@tauri-apps/api/event";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ConnectionContext, INERT, type Connection } from "../connection/store";
+import { backend } from "../test/connection";
 import { ToastProvider } from "../design/Toast";
 import { I18n } from "../i18n";
 import type { CmdError, ProfileActions, ProfileDetail as Detail, ProfilePatch, ProfileSummary, RawCheck } from "../rubrica/types";
@@ -531,6 +533,36 @@ describe("ProfileDetail, editing", () => {
     await user.click(await screen.findByRole("button", { name: "Discard" }));
     await waitFor(() => expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Homelab"));
     expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  // Plan B6, T3, G10f: a close or a quit that Rust stopped opens the same question, with the focus on the choice that does nothing.
+  it("a_blocked_close_opens_the_question_with_the_focus_on_cancel_and_discard_hides", async () => {
+    const user = userEvent.setup();
+    const calls = backend((call) => (call.cmd === "window_hide" ? { done: true } : undefined));
+    renderShell();
+    await typeInto(user, "Name", "Sede");
+    await act(async () => emit("galleria:close-blocked", { intent: "hide" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Save your changes?" });
+    await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" })));
+    // «Cancel» leaves the window and the draft as they are
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("Sede");
+    expect(calls.some((c) => c.cmd === "window_hide")).toBe(false);
+    // «Discard» asks Rust again, by the same decision, to hide
+    await act(async () => emit("galleria:close-blocked", { intent: "hide" }));
+    await user.click(await screen.findByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(calls.some((c) => c.cmd === "window_hide")).toBe(true));
+  });
+
+  // The question of leaving a profile is the person's own choice: it keeps the focus on «Save», as B3 made it.
+  it("leaving_a_profile_keeps_the_focus_on_save", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await typeInto(user, "Name", "Sede");
+    await user.click(screen.getByRole("option", { name: /Homelab/ }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Save your changes?" });
+    await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Save" })));
   });
 
   it("leaving_with_save_writes_first_and_moves_when_it_worked", async () => {

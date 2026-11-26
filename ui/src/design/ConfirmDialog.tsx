@@ -15,20 +15,22 @@ export function ConfirmDialog(props: {
   confirmLabel: string;
   cancelLabel: string;
   danger?: boolean;
+  /** The focus starts on «Cancel» although the action is not dangerous: the question came to the person, they did not ask it. */
+  cancelFirst?: boolean;
   /** A third choice between the two (Cancel, «Discard», Confirm): a button of the default look. */
   alternateLabel?: string;
   onAlternate?: () => void;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const { open, title, body, confirmLabel, cancelLabel, danger, alternateLabel, onAlternate, onConfirm, onCancel } = props;
+  const { open, title, body, confirmLabel, cancelLabel, danger, cancelFirst, alternateLabel, onAlternate, onConfirm, onCancel } = props;
   const cancel = useRef<HTMLButtonElement | null>(null);
   const confirm = useRef<HTMLButtonElement | null>(null);
   return (
     <AlertDialog.Root open={open} onOpenChange={(next) => { if (!next) onCancel(); }}>
       <AlertDialog.Portal>
         <AlertDialog.Backdrop className="gx-backdrop" />
-        <AlertDialog.Popup className="gx-dialog" initialFocus={danger ? cancel : confirm}>
+        <AlertDialog.Popup className="gx-dialog" initialFocus={danger || cancelFirst ? cancel : confirm}>
           <AlertDialog.Title className="gx-dialog-title">{title}</AlertDialog.Title>
           <AlertDialog.Description className="gx-dialog-description">{body}</AlertDialog.Description>
           <div className="gx-dialog-footer">

@@ -293,6 +293,8 @@ function ShellBody(props: ShellProps) {
         ) : null}
         <ConfirmDialog
           open={leaving !== null || closing !== null}
+          // a profile left by choice keeps the focus on «Save»; a close or a quit that stopped the person starts on «Cancel»
+          cancelFirst={closing !== null}
           title={t("leave.title")}
           body={t("leave.body", { name: selected?.name ?? "" })}
           confirmLabel={t("leave.save")}

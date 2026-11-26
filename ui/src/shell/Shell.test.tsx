@@ -394,10 +394,10 @@ describe("Shell: search, favourites, sort order and the session", () => {
     expect(screen.getAllByRole("option").filter((o) => o.querySelector(".profile-state"))).toHaveLength(1);
   });
 
-  it("no_state_is_shown_for_a_foreign_session", () => {
-    // a session of a profile that is not in the rubrica (started by someone else, D21): no row says anything
+  it("no_state_is_shown_on_the_list_for_a_foreign_session", () => {
+    // a session of a profile that is not in the rubrica (started by someone else, D21): no row of the list says anything, it has a row of its own
     show(makeView({ status: makeStatus({ state: "connected", profile: { id: "not-in-the-rubrica", name: "Other" }, protocol: "wireguard" }) }));
-    expect(document.querySelector(".profile-state")).toBeNull();
+    expect(screen.getByRole("listbox").querySelector(".profile-state")).toBeNull();
     expect(options()).toHaveLength(5);
   });
 

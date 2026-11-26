@@ -16,6 +16,9 @@ export interface Question {
   expiresAt: number;
 }
 
+/** A question about a session that is not of this rubrica, waiting for the answer (D21): ending it, or replacing it with the profile `target`. `name` is the name of that session. */
+export interface Confirmation { kind: "disconnect" | "replace"; name: string; target?: string }
+
 /** What the page knows of the connection and can do about it. The state is the flow of events (spec §3.3), never the answer of a call. */
 export interface Connection {
   /** The link to the service; `null` before the first answer. */
@@ -33,6 +36,14 @@ export interface Connection {
   question: Question | null;
   /** The session of the service that was last seen up, with the profile it was for: the log of a profile that is not connected any more is its last session. `null` until a session has been seen. */
   lastSession: { id: string; name: string; session: number | null } | null;
+  /** The session of the service when it is not one of a profile of the rubrica (started by the CLI of another rubrica, or of a profile that was deleted since): `null` when there is none, or while the rubrica has not been read. */
+  foreign: Status | null;
+  /** The question about a foreign session that waits for an answer; nothing is done before it is answered. */
+  confirmation: Confirmation | null;
+  /** Asks whether to end the foreign session. */
+  askToDisconnect: () => void;
+  /** The answer: `true` does what was asked (ends it, or replaces it), `false` drops the question and does nothing. */
+  answerConfirmation: (yes: boolean) => Promise<void>;
   connect: (id: string) => Promise<void>;
   disconnect: () => Promise<void>;
   /** Answers the open question. What was typed goes into this one call and nowhere else: the caller empties its fields before it waits. */
@@ -52,6 +63,10 @@ export const INERT: Connection = {
   connectedAt: null,
   question: null,
   lastSession: null,
+  foreign: null,
+  confirmation: null,
+  askToDisconnect: () => undefined,
+  answerConfirmation: async () => undefined,
   connect: async () => undefined,
   disconnect: async () => undefined,
   provide: async () => undefined,

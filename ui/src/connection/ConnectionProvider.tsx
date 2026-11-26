@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { connectProfile, disconnectSession, forgetCredentials, provideInput, type CommandError, type InputAnswer } from "../daemon/commands";
-import type { DaemonView } from "../daemon/types";
+import type { DaemonView, Status } from "../daemon/types";
 import { useToast } from "../design/Toast";
 import { useT } from "../i18n";
-import { ConnectionContext, connectOrReplace, type Connection, type Question } from "./store";
+import { ConnectionContext, connectOrReplace, type Confirmation, type Connection, type Question } from "./store";
 
 /** How long a button stays busy waiting for the first event of a connection that was accepted. */
 const PENDING_MS = 10_000;
@@ -16,7 +16,7 @@ const PENDING_MS = 10_000;
  * `onCredentialsChanged` says that what Rust remembers of the profile may have changed (a connection that was asked to remember
  * its credentials is up; the credentials were forgotten).
  */
-export function ConnectionProvider({ view, onCredentialsChanged, children }: { view: DaemonView | null; onCredentialsChanged?: () => void; children: ReactNode }) {
+export function ConnectionProvider({ view, ownIds, onCredentialsChanged, children }: { view: DaemonView | null; ownIds?: string[] | null; onCredentialsChanged?: () => void; children: ReactNode }) {
   const t = useT();
   const toast = useToast();
   const [pending, setPending] = useState<string | null>(null);
@@ -47,6 +47,20 @@ export function ConnectionProvider({ view, onCredentialsChanged, children }: { v
   useEffect(() => {
     if (liveProfile) setLastSession((was) => (was && was.id === liveProfile.id && was.session === liveSession ? was : { id: liveProfile.id, name: liveProfile.name, session: liveSession }));
   }, [liveProfile?.id, liveProfile?.name, liveSession]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A session whose profile the rubrica does not have is someone else's (D21): the CLI of another rubrica started it, or its profile was
+  // deleted since. The rubrica that has not been read says nothing about it, so the row waits for it. The ids are compared by value,
+  // so that a rubrica read again with the same profiles does not make the whole window draw again.
+  const own = ownIds ? ownIds.join("\u0000") : null;
+  const foreign = useMemo<Status | null>(() => {
+    if (own === null || !status || status.state === "disconnected" || !status.profile) return null;
+    return own.split("\u0000").includes(status.profile.id) ? null : status;
+  }, [own, status]);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  // The question is about a session; when that one is gone (it ended, or the profile came into the rubrica) there is nothing to answer.
+  useEffect(() => {
+    if (confirmation?.kind === "disconnect" && foreign === null) setConfirmation(null);
+  }, [confirmation, foreign]);
 
   const session = status?.state === "connected" ? status.session : null;
   useEffect(() => {
@@ -82,8 +96,16 @@ export function ConnectionProvider({ view, onCredentialsChanged, children }: { v
       const { replaced } = await connectOrReplace(connectProfile, id);
       if (replaced) latest.current.toast(latest.current.t("connect.replaced", { name: replaced }), { tone: "info" });
     } catch (failure) {
+      const refused = failure as CommandError;
+      // A session that is not ours is never replaced on its own: the person is asked, and nothing was connected yet.
+      if (refused.code === "already_active" && refused.data?.foreign === true) {
+        const profile = refused.data.profile as { name?: string } | undefined;
+        setPending(null);
+        setConfirmation({ kind: "replace", name: profile?.name ?? "", target: id });
+        return;
+      }
       setPending(null);
-      setError({ id, error: failure as CommandError });
+      setError({ id, error: refused });
     }
   }, []);
 
@@ -121,6 +143,39 @@ export function ConnectionProvider({ view, onCredentialsChanged, children }: { v
     }
     latest.current.onCredentialsChanged?.();
   }, []);
+  const askToDisconnect = useCallback(() => {
+    const now = current.current;
+    if (now?.profile && now.state !== "disconnected") setConfirmation({ kind: "disconnect", name: now.profile.name });
+  }, []);
+  // The answer to the question about a session that is not ours. «No» does nothing; «yes» ends it, or ends it and connects the profile.
+  const asking = useRef<Confirmation | null>(null);
+  asking.current = confirmation;
+  const answerConfirmation = useCallback(
+    async (yes: boolean) => {
+      const question = asking.current;
+      setConfirmation(null);
+      if (!question || !yes) return;
+      setError(null);
+      if (question.kind === "disconnect") {
+        try {
+          await disconnectSession();
+        } catch (failure) {
+          setError({ id: current.current?.profile?.id ?? "", error: failure as CommandError });
+        }
+        return;
+      }
+      const target = question.target ?? "";
+      setPending(target);
+      try {
+        await connectProfile(target, true);
+        latest.current.toast(latest.current.t("connect.replaced", { name: question.name }), { tone: "info" });
+      } catch (failure) {
+        setPending(null);
+        setError({ id: target, error: failure as CommandError });
+      }
+    },
+    [],
+  );
   const clearError = useCallback(() => setError(null), []);
 
   const value = useMemo<Connection>(
@@ -133,13 +188,17 @@ export function ConnectionProvider({ view, onCredentialsChanged, children }: { v
       connectedAt: session !== null && connectedAt?.session === session ? connectedAt.at : null,
       question,
       lastSession,
+      foreign,
+      confirmation,
+      askToDisconnect,
+      answerConfirmation,
       connect,
       disconnect,
       provide,
       forget,
       clearError,
     }),
-    [link, status, view?.backends, pending, error, connectedAt, session, question, lastSession, connect, disconnect, provide, forget, clearError],
+    [link, status, view?.backends, pending, error, connectedAt, session, question, lastSession, foreign, confirmation, askToDisconnect, answerConfirmation, connect, disconnect, provide, forget, clearError],
   );
   return <ConnectionContext.Provider value={value}>{children}</ConnectionContext.Provider>;
 }

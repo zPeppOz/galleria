@@ -26,17 +26,17 @@ export function backend(answer: (call: Call) => unknown = () => undefined): Call
 export const WIREGUARD_WITH_HANDSHAKE: BackendInfo = { protocol: "wireguard", available: true, version: null, unavailable_reason: null, capabilities: { handshake: true, interactive_auth: false, server_pushed_config: false } };
 export const OPENVPN: BackendInfo = { protocol: "openvpn", available: true, version: "2.7.0", unavailable_reason: null, capabilities: { handshake: false, interactive_auth: true, server_pushed_config: true } };
 
-/** A part of the window under the notices and the real connection, fed by the view the test gives (and changes with `rerender`). */
-export function renderConnected(ui: ReactNode, view: DaemonView = makeView(), lang: Lang = "en") {
-  const tree = (current: DaemonView) => (
+/** A part of the window under the notices and the real connection, fed by the view the test gives (and changes with `rerender`). `ownIds` are the profiles of the rubrica, when the test cares which session is foreign. */
+export function renderConnected(ui: ReactNode, view: DaemonView = makeView(), lang: Lang = "en", ownIds?: string[]) {
+  const tree = (current: DaemonView, own: string[] | undefined) => (
     <I18n lang={lang}>
       <ToastProvider closeLabel="Dismiss the notice">
-        <ConnectionProvider view={current}>
+        <ConnectionProvider view={current} ownIds={own}>
           <main>{ui}</main>
         </ConnectionProvider>
       </ToastProvider>
     </I18n>
   );
-  const result = render(tree(view));
-  return { ...result, show: (next: DaemonView) => result.rerender(tree(next)) };
+  const result = render(tree(view, ownIds));
+  return { ...result, show: (next: DaemonView, nextOwn: string[] | undefined = ownIds) => result.rerender(tree(next, nextOwn)) };
 }

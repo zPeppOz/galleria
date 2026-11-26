@@ -2,7 +2,8 @@
 // serves the real IPC with a fake backend that follows a scenario (`daemon-start <scenario>`, tests/support/scenarios.rs). Run by
 // lab/tests/gui-smoke.sh with the other `*.e2e.ts` files. Nothing here touches a route, a DNS or an interface: the backend is fake.
 import { execFileSync, spawnSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { bodyText, closeApp, daemon, env, openApp, TEN_SECONDS, waitForBody, type Browser } from "./support";
@@ -255,5 +256,64 @@ describe("the log of the session (plan B5, T7)", () => {
     await waitFor(b, async () => (await barState(b)) === "Disconnected", "the bar never went back to «Disconnected»");
     await waitForBody(b, /last session/i, "the tab did not become «Last session»");
     expect((await lines(b)).length).toBeGreaterThan(0);
+  });
+});
+
+describe("a session of someone else (plan B5, T8)", () => {
+  const FOREIGN = "Altra rubrica";
+  const GROUP = '[role="group"][aria-label="Session started outside this rubrica"]';
+  const dialogs = (b: Browser) => b.$$('[role="alertdialog"]');
+
+  /** A second rubrica (another `XDG_CONFIG_HOME`) with one profile, connected with the `galleria` of the phase 1 against the fake daemon: the window does not know the profile. */
+  function connectFromAnotherRubrica(): (...args: string[]) => string {
+    const home = mkdtempSync(join(tmpdir(), "galleria-other-"));
+    const file = join(home, "other.conf");
+    writeFileSync(
+      file,
+      "[Interface]\nPrivateKey = OTHER-RUBRICA-PRIVATE\nAddress = 10.7.0.2/32\nDNS = 10.0.0.1\n\n[Peer]\nPublicKey = U0VFRC1QVUJMSUMtdnBzLi4uLi4uLi4uLi4uLi4uLi4=\nEndpoint = other.example:51820\nAllowedIPs = 0.0.0.0/0\n",
+    );
+    const cli = (...args: string[]) => execFileSync(env("GALLERIA_SMOKE_CLI"), ["--socket", env("GALLERIA_SOCKET"), ...args], { encoding: "utf8", env: { ...process.env, XDG_CONFIG_HOME: home } });
+    cli("import", file, "--name", FOREIGN);
+    cli("connect", FOREIGN);
+    return cli;
+  }
+
+  it("a_session_started_by_the_cli_of_another_rubrica_is_foreign", async () => {
+    const b = await openWith("plain");
+    connectFromAnotherRubrica();
+    await waitFor(b, async () => await b.$(GROUP).isExisting(), "the list never showed the fixed row of the session of someone else");
+    const text = await b.$(GROUP).getText();
+    expect(text).toContain(FOREIGN);
+    expect(text).toMatch(/started outside this rubrica/i);
+    expect(text).toMatch(/connected/i);
+    // outside the list: the five profiles are the five of the rubrica
+    expect(await rowNames(b)).toHaveLength(5);
+    expect(await rowNames(b)).not.toContain(FOREIGN);
+    await waitFor(b, async () => (await b.$(".status-bar-session").isExisting()) && (await b.$(".status-bar-session").getText()).includes(`Active connection: «${FOREIGN}» — started outside this rubrica`), "the bar never said whose the session is");
+    // choosing it shows the detail of a session, and not a profile
+    await b.$(`${GROUP} button[aria-describedby]`).click();
+    await waitFor(b, async () => (await b.$("h1").getText()) === FOREIGN, "the detail never showed the session of someone else");
+    expect(await b.$$('[role="tab"]')).toHaveLength(1);
+    expect(await b.$("button=More actions").isExisting()).toBe(false);
+  });
+
+  it("closing_a_foreign_session_asks_first", async () => {
+    const b = await openWith("plain");
+    const cli = connectFromAnotherRubrica();
+    await waitFor(b, async () => await b.$(GROUP).isExisting(), "the list never showed the fixed row of the session of someone else");
+    await b.$(`${GROUP} button[aria-label^="Disconnect"]`).click();
+    await waitFor(b, async () => (await dialogs(b)).length === 1, "the confirmation never showed");
+    expect(await (await dialogs(b))[0].getText()).toMatch(/Another user of this computer may be using it/);
+    // the focus is on the safe answer, and «Cancel» does nothing
+    expect(await b.execute(() => document.activeElement?.textContent)).toBe("Cancel");
+    await b.$('[role="alertdialog"] button=Cancel').click();
+    await waitFor(b, async () => (await dialogs(b)).length === 0, "the confirmation never closed");
+    expect(cli("status").trim(), "«Cancel» ended the session").toBe("connected");
+    // the answer ends it
+    await b.$(`${GROUP} button[aria-label^="Disconnect"]`).click();
+    await waitFor(b, async () => (await dialogs(b)).length === 1, "the confirmation never showed the second time");
+    await b.$('[role="alertdialog"] button=Disconnect').click();
+    await waitFor(b, async () => cli("status").trim() === "disconnected", "the session of someone else was never ended");
+    await waitFor(b, async () => !(await b.$(GROUP).isExisting()), "the row stayed after the session ended");
   });
 });

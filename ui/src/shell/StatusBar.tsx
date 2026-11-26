@@ -1,4 +1,4 @@
-import { isLive } from "../connection/store";
+import { isLive, useConnection } from "../connection/store";
 import type { AppInfo, DaemonView } from "../daemon/types";
 import { useT } from "../i18n";
 import "./StatusBar.css";
@@ -9,6 +9,7 @@ import "./StatusBar.css";
  */
 export function StatusBar({ view, info }: { view: DaemonView | null; info: AppInfo | null }) {
   const t = useT();
+  const { foreign } = useConnection();
   const link = view?.link ?? "connecting";
   const status = view?.status;
   const state = status?.state;
@@ -17,7 +18,11 @@ export function StatusBar({ view, info }: { view: DaemonView | null; info: AppIn
   return (
     <footer className="status-bar" aria-live="polite">
       <span className="status-bar-state">{state ? t(`state.${state}`) : t("bar.no_state")}</span>
-      {session ? <span className="status-bar-session">{address ? t("bar.session_ip", { name: session, ip: address }) : t("bar.session", { name: session })}</span> : null}
+      {foreign?.profile ? (
+        <span className="status-bar-session">{t("bar.foreign", { name: foreign.profile.name })}</span>
+      ) : session ? (
+        <span className="status-bar-session">{address ? t("bar.session_ip", { name: session, ip: address }) : t("bar.session", { name: session })}</span>
+      ) : null}
       <span className="status-bar-link">{link === "connected" ? t("bar.connected", { version: view?.daemon_version ?? "?" }) : t(`bar.${link}`)}</span>
       {info ? <span className="status-bar-app">{t("bar.app", { version: info.version })}</span> : null}
     </footer>

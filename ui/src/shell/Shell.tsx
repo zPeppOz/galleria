@@ -5,6 +5,8 @@ import { Button } from "../design/Button";
 import { ConfirmDialog } from "../design/ConfirmDialog";
 import { ConnectionProvider } from "../connection/ConnectionProvider";
 import { CredentialsDialog } from "../connection/CredentialsDialog";
+import { ForeignDetail, ForeignRow } from "../connection/ForeignRow";
+import { ReplaceConfirm } from "../connection/ReplaceConfirm";
 import { activate } from "../connection/ConnectButton";
 import { useConnection } from "../connection/store";
 import { ToastProvider, type Announce } from "../design/Toast";
@@ -50,6 +52,9 @@ export interface ShellProps {
   onSortChange: (sort: SortOrder) => void;
 }
 
+/** The id the shell gives the row of the session of someone else when it asks the list to move away from a profile. */
+const FOREIGN = "\u0000foreign";
+
 /** Whether the profile of the session has credentials remembered, from the names the profile lists (never the values). */
 function savedCredentials(detail: { id: string; secret_refs: string[] } | null, profile: string | undefined): boolean {
   return detail !== null && detail.id === profile && ["openvpn.username", "openvpn.password"].every((name) => detail.secret_refs.includes(name));
@@ -60,7 +65,7 @@ export function Shell(props: ShellProps) {
   const t = useT();
   return (
     <ToastProvider closeLabel={t("toast.close")} announce={props.announce}>
-      <ConnectionProvider view={props.view} onCredentialsChanged={props.rubrica.refreshDetail}>
+      <ConnectionProvider view={props.view} ownIds={props.rubrica.view ? props.rubrica.view.profiles.map((p) => p.id) : null} onCredentialsChanged={props.rubrica.refreshDetail}>
         <ShellBody {...props} />
       </ConnectionProvider>
     </ToastProvider>
@@ -89,6 +94,11 @@ function ShellBody(props: ShellProps) {
   const guard = useRef<Guard | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
+  // The detail shows the session of someone else instead of the chosen profile (D21); it goes back to the profile when the session is gone.
+  const [foreignChosen, setForeignChosen] = useState(false);
+  useEffect(() => {
+    if (connection.foreign === null) setForeignChosen(false);
+  }, [connection.foreign]);
   // A profile was deleted: the focus goes to the row that takes its place (or to the text of the empty rubrica) as soon as
   // the rubrica has been read again and the selection has moved.
   const [deleted, setDeleted] = useState<string | null>(null);
@@ -126,8 +136,17 @@ function ShellBody(props: ShellProps) {
     return () => clearTimeout(timer);
   }, [imported, rubrica.selectedId]);
   const choose = (id: string) => {
-    if (id !== rubrica.selectedId && guard.current?.dirty) setLeaving(id);
-    else rubrica.select(id);
+    if (id !== (foreignChosen ? FOREIGN : rubrica.selectedId) && guard.current?.dirty) setLeaving(id);
+    else go(id);
+  };
+  // The session of someone else is a row of its own, and choosing it takes the detail away from the profile.
+  const go = (target: string) => {
+    if (target === FOREIGN) {
+      setForeignChosen(true);
+    } else {
+      setForeignChosen(false);
+      rubrica.select(target);
+    }
   };
   const leave = async (how: "save" | "discard") => {
     const target = leaving;
@@ -135,9 +154,9 @@ function ShellBody(props: ShellProps) {
     if (target === null) return;
     if (how === "discard") {
       guard.current?.discard();
-      rubrica.select(target);
+      go(target);
     } else if (await guard.current?.save()) {
-      rubrica.select(target);
+      go(target);
     } else {
       // The save was refused: the dialog gave the focus back to the list, and the field with the error takes it again.
       setTimeout(() => guard.current?.focusError(), 0);
@@ -195,13 +214,14 @@ function ShellBody(props: ShellProps) {
       <TopBar info={info} daemonVersion={view?.daemon_version ?? null} onImport={() => setImporting(true)} />
       <div className="shell-body">
         <aside className="shell-aside" aria-label={t("shell.profiles")}>
+          <ForeignRow selected={foreignChosen && connection.foreign !== null} onSelect={() => choose(FOREIGN)} />
           {profiles && profiles.length > 0 ? (
             <>
               <div className="shell-tools">
                 <SearchBox value={query} onChange={setQuery} count={arranged.total} onArrowDown={() => list.current?.focus()} />
                 <SortControl value={sort} onChange={onSortChange} />
               </div>
-              <ProfileList label={t("list.label")} groups={groups} selectedId={selected?.id ?? ""} onSelect={choose} onActivate={(id) => activate(connection, id)} empty={t("search.no_match")} focusRef={list} />
+              <ProfileList label={t("list.label")} groups={groups} selectedId={foreignChosen && connection.foreign !== null ? "" : (selected?.id ?? "")} onSelect={choose} onActivate={(id) => activate(connection, id)} empty={t("search.no_match")} focusRef={list} />
             </>
           ) : (
             <p className="shell-aside-empty" ref={emptyText} tabIndex={-1}>{rubrica.loaded ? t("list.empty") : t("rubrica.loading")}</p>
@@ -215,7 +235,9 @@ function ShellBody(props: ShellProps) {
         <main className="shell-main">
           <ServiceArea view={view} info={info} onRetry={onRetry} savedCredentials={savedCredentials(rubrica.detail, view?.status?.profile?.id)} />
           <RubricaNotices rubrica={rubrica} onImport={() => setImporting(true)} secretStore={secretStore} />
-          {selected ? (
+          {foreignChosen && connection.foreign !== null ? (
+            <ForeignDetail />
+          ) : selected ? (
             <ProfileDetail
               profile={selected}
               detail={rubrica.detail}
@@ -237,6 +259,7 @@ function ShellBody(props: ShellProps) {
       <StatusBar view={view} info={info} />
       <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
       <CredentialsDialog />
+      <ReplaceConfirm />
       <ImportDialog open={importing} onClose={closeImport} actions={importer} onImported={wasImported} incoming={incoming} secretStore={secretStore} />
       {dropHover ? (
         <div className="shell-drop" aria-hidden="true">

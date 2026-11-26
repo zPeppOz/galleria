@@ -262,6 +262,39 @@ describe("keyboard on the whole shell", () => {
     expect(calls.length).toBe(before);
   });
 
+  it("a_foreign_session_is_closed_without_a_pointer", async () => {
+    // the row of a session of someone else: Enter chooses it, Tab reaches «Disconnect», Enter asks, the focus is on the safe answer
+    const calls: { cmd: string; args: unknown }[] = [];
+    mockIPC((cmd, args) => void calls.push({ cmd, args }), { shouldMockEvents: true });
+    const user = userEvent.setup();
+    renderShell(makeView({ status: makeStatus({ state: "connected", session: 7, profile: { id: "outside-id", name: "VPN Cliente" }, protocol: "openvpn" }) }));
+    const active = () => document.activeElement as HTMLElement;
+    screen.getByRole("button", { name: /^VPN Cliente/ }).focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("VPN Cliente");
+    await user.tab();
+    expect(nameOf(active())).toBe("Disconnect «VPN Cliente»");
+    await user.keyboard("{Enter}");
+    await screen.findByRole("alertdialog", { name: "Disconnect «VPN Cliente»?" });
+    await waitFor(() => expect(nameOf(active())).toBe("Cancel"));
+    expect(calls.some((c) => c.cmd === "disconnect")).toBe(false);
+    // Escape is «Cancel»: nothing is sent and the focus comes back to the row, not to the body
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(calls.some((c) => c.cmd === "disconnect")).toBe(false);
+    expect(active()).not.toBe(document.body);
+    // the second time the answer is the second button
+    await user.keyboard("{Enter}");
+    await screen.findByRole("alertdialog");
+    await waitFor(() => expect(nameOf(active())).toBe("Cancel"));
+    await user.tab();
+    expect(nameOf(active())).toBe("Disconnect");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(calls.filter((c) => c.cmd === "disconnect")).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(active()).not.toBe(document.body);
+  });
+
   it("a_full_tour_needs_no_pointer", async () => {
     const user = userEvent.setup();
     show();

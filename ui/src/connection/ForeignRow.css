@@ -1,0 +1,15 @@
+/* The fixed row of a session that was started outside the rubrica: only variables of tokens.css. It looks like a row of the list; the
+   dot, the state and the note are words, and the colour only backs them up. */
+.foreign-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--sp-4);
+  margin: var(--sp-4); padding: var(--sp-2) var(--sp-4) var(--sp-2) var(--sp-2);
+  border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--panel);
+}
+.foreign-row-main {
+  display: grid; grid-template-columns: var(--sp-4) minmax(0, 1fr) auto; align-items: center; gap: var(--sp-5);
+  min-height: var(--h-row); padding: var(--sp-4) var(--sp-5); border: 0; border-radius: var(--r-sm);
+  background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer;
+}
+.foreign-row-main[aria-current="true"] { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--accent); }
+.foreign-row-main:hover { background: var(--panel-2); }
+.foreign-row-text { display: flex; flex-direction: column; min-width: 0; }

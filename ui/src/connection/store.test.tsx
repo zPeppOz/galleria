@@ -6,6 +6,7 @@ import { backend, renderConnected, type Call } from "../test/connection";
 import { makeStatus, makeView } from "../test/fixtures";
 import { CommandNotice } from "./CommandNotice";
 import { ConnectButton } from "./ConnectButton";
+import { ReplaceConfirm } from "./ReplaceConfirm";
 import { connectOrReplace } from "./store";
 
 const alreadyActive = (foreign: boolean, name = "Homelab"): CommandError => ({ code: "already_active", message: "A session is already active", data: { profile: { id: "homelab", name }, foreign } });
@@ -66,7 +67,7 @@ describe("the connection of the window", () => {
     expect(within(toasts()).getAllByText(/./)).toHaveLength(1);
   });
 
-  it("a_foreign_session_is_shown_as_an_error_in_line_for_now", async () => {
+  it("a_foreign_session_is_asked_about_and_not_shown_as_an_error", async () => {
     const user = userEvent.setup();
     const calls = backend((call: Call) => {
       if (call.cmd === "connect_profile") throw alreadyActive(true, "Altro utente");
@@ -76,13 +77,15 @@ describe("the connection of the window", () => {
       <>
         <ConnectButton profile={{ id: "office", name: "Ufficio Napoli" }} />
         <CommandNotice profileId="office" />
+        <ReplaceConfirm />
       </>,
       makeView({ status: makeStatus({ state: "connected", session: 3, profile: { id: "other", name: "Altro utente" } }) }),
     );
     await user.click(screen.getByRole("button", { name: "Connect" }));
-    await waitFor(() => expect(document.querySelector("[data-notice=command]")).not.toBeNull());
+    expect(await screen.findByRole("alertdialog", { name: "Replace «Altro utente»?" })).toBeTruthy();
+    // one call, and no replacement until the answer; it is a question and not a failure
     expect(calls.filter((c) => c.cmd === "connect_profile")).toHaveLength(1);
-    expect(document.querySelector("[data-notice=command]")?.textContent).toContain("A VPN is already active");
+    expect(document.querySelector("[data-notice=command]")).toBeNull();
   });
 
   it("a_command_error_takes_the_focus_and_keeps_the_state", async () => {

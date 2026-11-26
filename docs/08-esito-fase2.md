@@ -4,6 +4,183 @@ Registro dei punti [S] verificati e dei criteri chiusi, aggiornato a ogni task. 
 `docs/superpowers/specs/2026-11-25-fase2-gui-design.md`. Un esito scritto qui vale solo per ciò che è stato eseguito:
 quello che non lo è stato sta in «Non verificato».
 
+## Chiusura della fase 2
+
+**Fase 2 chiusa in locale il 26/11/2026 (card `t_8bc8316d`, gruppo E di B6), con riserve dette qui.** Non vuol dire «tutto provato»: (1) **il run di CI sull'ultimo commit non c'è**, perché il push è di Aitano; l'ultimo run letto sull'albero di B6 è rosso su un job (sotto) e quella causa è corretta solo nei commit locali; (2) «Non verificato» **non è vuoto**; (3) la matrice manuale M1–M12 ha **0 casi su 36 verificati per intero**: per decisione di Aitano del 26/11 (note sulle card `t_a16d68aa` e `t_8bc8316d`) la fase si chiude sul giro quotidiano e sui limiti dichiarati, e le altre celle restano «non verificato»; (4) tre difetti trovati sui desktop non sono corretti (F1, F2, F3). **Se il run dopo il push è rosso, la fase si riapre.** Dei sei punti di «Quando la fase 2 è chiusa» (piano B6) il 3 è parziale (tabella sotto), il 5 vale per la decisione di Aitano appena citata, il 1 e il 2 aspettano il push e la review del gruppo E.
+
+### G1–G13, prova per prova
+
+Due run di CI sono stati letti oggi **dai log**, non dai segni verdi: **R7 = 45792336118**, head `7e017c9` (l'ultimo commit di B5 con le correzioni: **15/15 job verdi**; `gui` «5 proofs», `gui-smoke` 50/50 e «10 proofs», `lab-connect` ×3 «21 proofs», `lab-g3` ×3 verdi) e **R6 = 45851556847**, head `bcb3f39` (fine del gruppo C: **14/15**, tutti verdi tranne `gui-smoke`, 64/65 prove, rosso per «stale element reference» in `rubrica_works_with_the_daemon_stopped`; `check` «7 proofs», `gui` «9 proofs», `lab-connect` ×3 «23 proofs»). La correzione dello «stale» (card `t_db85d179`) è nei commit locali e **non ha un run**. Per G10 e G11 il run è R6; per G1–G9 è R7 (B6 non li tocca: lo prova `git diff origin/main -- <crate vietati>`, vuoto). **In nessuna riga c'è un run verde sull'ultimo commit: «aspetta il push».** Colonna «Locale»: giro finale del gruppo E (sotto, «Giro finale del gruppo E»).
+
+| G | Prova (nome nel manifesto o nel test) | Job · run letto | Locale (albero finale) | Cosa manca |
+|---|---|---|---|---|
+| **G1** | `daemon_restart_relinks_without_user_action` (Rust); `shows_the_real_daemon_state`, `relinks_after_a_daemon_restart` (fumo) | `gui`, `gui-smoke` · R7 verde (le due prove di fumo ✓ nel log); R6: le due ✓ anche nel `gui-smoke` rosso | fumo 65/65 | run sul commit finale |
+| **G2** | `classify`, `daemon_closing_right_after_accept_is_permission_denied` (`tests/link.rs`); `first_run_without_daemon` | `gui`, `gui-smoke` · R7 verde, `first_run_without_daemon` ✓ | `check` 484/0 | permesso negato e protocollo incompatibile **solo a livello 1 e 2**; run sul commit finale |
+| **G3** | `nothing_is_written_before_import`, `the_malicious_profile_shows_the_d19_text_and_runs_nothing` (fumo); `t17`: `gui_imported_malicious_profile_runs_no_script` e altre tre (`lab-g3`) | `gui-smoke`, `lab-g3` ×3 · R7 verde ×3 (nel log del 26: `PWNED files: ""`) | fumo 65/65; `lab-g3` non rilanciato (B6 non lo tocca) | run sul commit finale |
+| **G4** | `G4a`–`G4e`, `gui_session_never_had_two_backends`, `the_observer_of_the_backends_leaves_out_only_the_probe_and_the_exiting`, `gui_session_left_no_residue` | `lab-connect` ×3 · R7: «21 proofs» su 26, 27 e 79; R6: «23 proofs» ×3 | `lab-connect 26`: «23 proofs» (112 s) | 27 e 79 solo in CI (OpenVPN 2.7 + DCO sotto Docker rootless); run sul commit finale |
+| **G5** | `keyring_*` (8, passo `keyring` di `gui-smoke`); `G5a`–`G5e` (`lab-connect`) | `gui-smoke`, `lab-connect` · R7: «10 proofs of gui-smoke» (8 di G5 + 2 di G6), `lab-connect` verde | `keyring` «10 proofs» (**1 giro rosso su 5**, sotto) | **limite**: «Ricorda» contro un portachiavi bloccato che chiede lo sblocco non è provato (visto solo l'import con la chiave WireGuard su Fedora, dove il «Login» è bloccato e GNOME chiede lo sblocco); KWallet non provato |
+| **G6** | `layered_*` e `the_cli_without_a_session_bus_reads_the_file_and_stays_quiet` (`check`); `the_cli_reads_what_the_keyring_holds`, `the_cli_without_a_keyring_reads_the_file` (`gui-smoke`); `G6a`, `G6b` | `check`, `gui-smoke`, `lab-connect` · R6: `check` «7 proofs» ✓; R7 `lab-connect` verde | `check-gates --job check`: «7 proofs»; `keyring` «10 proofs» | run sul commit finale |
+| **G7** | `no_command_returns_a_secret`, `no_event_carries_a_secret`, `the_export_never_carries_a_known_secret` (`gui`); `G7a`, `gui_session_left_no_secret_in_journal_or_argv` (`lab-connect`) | `gui`, `lab-connect` · R6: `gui` «9 proofs» ✓ (le tre dentro), `lab-connect` «23 proofs» ✓ | `check` 484/0 | run sul commit finale |
+| **G8** | `every_daemon_error_code_has_text_in_both_catalogues`, `every_session_error_code_…`, `every_gui_code_…` (`tests/catalogs.rs`); `language_switches_without_a_restart` | `gui`, `gui-smoke` · R7: le tre prove `ok`, il cambio di lingua ✓ | `check` 484/0, fumo 65/65 | run sul commit finale |
+| **G9** | `a_session_outside_the_rubrica_is_foreign`, `disconnecting_a_foreign_session_is_not_automatic` (`gui`); `G9a`–`G9c`, `gui_session_was_driven_by_two_users` (`lab-connect`) | `gui`, `lab-connect` · R7 verdi (parte dei «21 proofs») | `lab-connect 26` «23 proofs» | run sul commit finale |
+| **G10** automatica | `G10a`–`G10f`, `the_whole_day_in_one_window` (`gui-smoke`, la app costruita come per il rilascio, il menu letto e cliccato dal bus); `G10g_the_tunnel_survives_the_closed_window`, `gui_closed_window_kept_the_tunnel` (`lab-connect`, tunnel WireGuard vero) | `gui-smoke` · R6: **rosso**, ma `G10a`–`G10f` e `the_whole_day_in_one_window` ✓ nel log (la prova rossa è un'altra: lo «stale»); `lab-connect` ×3 · R6: `G10g` ✓ (14 s), «23 proofs» ×3 | fumo 65/65 con «8 proofs» del manifesto; `lab-connect 26` 23 | **il job `gui-smoke` non ha un run verde con il passo `check-gates` di B6**: R6 si è fermato prima; la correzione è locale |
+| **G10** manuale (la forma che la spec chiede) | giro quotidiano **di un agente** (non di una persona), tunnel WireGuard vero: import · connetti · chiudi nella tray · il tunnel resta (ping) · disconnetti dal menu della tray · la chiave nel portachiavi e non nei file · riapri. **24.04: 7/7**; **Fedora 45: 7/7** (con F2); **26.04**: passi 2–6 verificati, il passo 1 solo dopo aver creato il portachiavi (F1), il passo 7 con il riavvio dal menu applicazioni ma **«Open Galleria» dalla tray non verificato**. Dettagli, 7 passi per VM: [Giro quotidiano sulle tre VM](08-b6-desktop-pass.md). Prove in `/mnt/b/vm/evidence/b6/{daily,daily2}/` | — (nessun job, come dice la spec) | — | **matrice M1–M12: 0/36 interi** («non verificato», decisione di Aitano); Ricorda utente/password di OpenVPN nelle VM non verificato; le prove sono un solo giro per VM; i pulsanti si premono via AT-SPI perché il puntatore VNC non consegna clic |
+| **G11** | `update_asks_once_and_sends_no_identifier`, `update_disabled_asks_nothing`, `update_asks_at_most_once_a_day`, `update_never_follows_a_redirect` (`gui`); `G11a_the_built_app_asks_once_and_never_when_disabled` (`gui-smoke`) | `gui` · R6: «9 proofs» ✓, le quattro `ok`; `gui-smoke` · R6: `G11a` ✓ (56 s) nel job rosso | `check-gates --job gui` ok; fumo: `G11a` ✓ | una richiesta **vera** a GitHub, a mano, con `update-probe`: `302`, `Location: https://github.com/zPeppOz/galleria/releases` (il repository non ha release), le intestazioni di GitHub **dedotte**, non misurate; run sul commit finale |
+| **G12** | Vitest con axe e tastiera (`gui`, 710 prove); `scripts/gui.sh a11y`, Orca vero nell'immagine (locale, Q22) con `K5a`–`K5f`, `K6a`–`K6c`; parlato di Orca sui tre desktop dal file di debug | `gui` · R7 Vitest 678/678 verde (R6: il job `gui` verde); `a11y` **non è un job** (Q22) | Vitest 710/710; **`a11y` 51/51** (un giro, 259 s); prima: 51/51 ×2 sul gruppo C, 51/51 ×2 dopo la correzione dello «stale» | **passata a orecchio non fatta** (nessun ascolto umano; Q56 la rende non bloccante: lista di venti minuti, [`b6-ascolto-20-minuti.md`](b6-ascolto-20-minuti.md)); i **quattro giri nuovi con Orca per VM** (rubrica, import, connessione, tray) **non fatti**; Orca 46 sulla finestra delle credenziali muto (Q49 (a), R2); su Fedora il giro dei campi è inconclusivo dal secondo Tab |
+| **G13** | `lab/vm/startup-time.sh`, `GALLERIA_STARTUP_TRACE=1` (manuale, nessun job, non blocca) | — | **24.04: 512 · 517 · 537 ms; 26.04: 4307 · 420 · 408 ms** fino alla prima chiamata della pagina (`ui_state_get`, prima del montaggio di React) | **non è il primo fotogramma né l'uso**; è una VM sul PC di Peppe (4 vCPU, 4 GiB, disco meccanico), non il PC; il 4307 ms non è tolto; Fedora non misurata; cache svuotate nel solo ospite. Cinque misure su sei sono sotto 1 s, ma **«sotto 1 s» non è dimostrato** alla lettera |
+
+### Limiti dichiarati
+
+Un elenco solo, raccolto dalle sei sezioni (B1–B6). Ogni voce è un limite che **resta**, non un «da rivedere».
+
+- **Orca e WebKitGTK.** Le regioni vive di WebKitGTK sono mute, `role="alert"` compreso (`S6b`, spike `t_b81c3909`): gli annunci non bloccanti partono da Rust come segnale ATK (Q27) e si leggono nel file di debug di Orca; la conferma e gli errori che chiedono risposta spostano il fuoco.
+- **Orca 46 (Ubuntu 24.04, e l'immagine).** La finestra delle credenziali non è letta all'apertura (titolo e «User name» muti): `K5c` è la **prova del buco noto** (Q49 (a)). Su GNOME vero 24.04 con Orca 46.1 il silenzio resta anche con il frame attivo (un tentativo); la causa «Orca scarta l'evento» è un'ipotesi dal debug, non provata. Con Orca 50.3 (26.04) e 51.1 (Fedora) la finestra è letta. I campi generali di 24.04 sì.
+- **Altri lettori di schermo** (NVDA, e Orca su KDE): non provati. **Nessun ascolto umano** di niente: il «parlato» è il testo che Orca scrive nel suo debug.
+- **KDE, KWallet e le altre distribuzioni.** Solo GNOME su Wayland, nelle tre VM. KWallet non è provato (S38, R9). La tray senza l'estensione AppIndicator o senza `libayatana-appindicator3`/`libappindicator3` non c'è: l'app parte lo stesso (S48, provata nell'immagine) e la «X» esce (Q53, `G10e`); con l'estensione spenta in una VM **non provato**.
+- **Il portale del desktop** (Flatpak, Snap): fuori dalla fase 2, nessun pacchetto (R4).
+- **Wayland.** Il compositore può negare il primo piano (R6); si salvano dimensione e «massimizzata», non la posizione (Q34), e la dimensione su Wayland **non è verificata** (R11).
+- **Le copie di una credenziale che non sono nostre** (B5): la stringa del campo vive finché il motore JavaScript non la raccoglie e WebKit e Tauri ne tengono una copia; non si azzerano.
+- **OpenVPN 2.7 in locale** sotto Docker rootless: il DCO è negato (EPERM): le prove di OpenVPN 2.7 sono il job, su 27 e 79, non il locale.
+- **`Ctrl+L` nelle finestre di GTK via AT-SPI** non funziona (S27): il campo del percorso si fa comparire scrivendo `/`. È un limite della prova, non dell'app.
+- **Tray su GNOME: la «…» (F2).** Vedi «Difetti trovati e non corretti».
+- **S56 su Fedora.** Il timeout «Unable to connect to the Notification Watcher» visto in T9 dopo avvii successivi **non si è riprodotto in 17 avvii**, né con sessione bloccata, né con VT in secondo piano, né con `gnome-shell` fermato: la causa non è stata trovata e nulla indica il nostro codice. Limite d'ambiente (deciso nella card `t_6670f193`): se all'avvio l'estensione non risponde, l'icona compare più tardi. Passi per riprovare in [Passata desktop B6](08-b6-desktop-pass.md).
+- **Un solo giro per VM** per ogni passo del giro quotidiano; il portachiavi creato per aggirare F1 è non cifrato.
+- **Una prova instabile**: il fumo ha dato 1 giro rosso su 20 per un «stale element reference» (corretto nel supporto delle prove, non nell'app, `t_db85d179`; 20 verdi sono evidenza, non prova) e 1 su 20 per un `NoReply` di D-Bus sul click di «Quit»; `a11y` è instabile dal B5 e ha dato 51/51 in tutti e cinque i giri di B6 (due del gruppo C, due di `t_db85d179`, uno di questo gruppo), ma la causa dell'instabilità di B5 (`R5d` in timeout) non è mai stata trovata.
+
+### Difetti trovati e non corretti
+
+Trovati dalla passata sui desktop; il codice di prodotto **non è stato toccato** da quelle card. Non sono limiti d'ambiente: sono lavoro aperto.
+
+| # | Difetto | Dove | Cosa serve |
+|---|---|---|---|
+| **F1** | Senza portachiavi predefinito (accesso automatico senza password: Ubuntu 24.04 e 26.04 della prova) l'import fallisce con «The keyring did not answer» (`secrets_keyring.rs`, `set`: no default collection); il prodotto non crea la collezione. Su Fedora il «Login» esiste ed è bloccato e il prodotto aspetta lo sblocco (corretto) | `crates/galleria-profile/src/secrets_keyring.rs` (un crate che B6 non poteva toccare) | decidere: un messaggio che dice cosa fare, o creare la collezione (D25 e Q20 vanno rilette) |
+| **F2** | L'icona della tray resta «…» dopo ogni cambio di stato su GNOME 46, 50 e 51. Causa **trovata e riprodotta** sulle tre: l'app passa da `On` a `Busy` e allo stato finale in 30–40 ms; il crate `tray-icon` cancella il PNG precedente prima di scrivere il successivo (`tray-icon-galleria-4.png` esiste 37 ms); l'estensione AppIndicator lo legge in ritardo, fallisce («Failed to recognize image format») e **non si riprende** con l'icona finale. Il file su disco è giusto; un riavvio dell'app mostra l'anello | `crates/galleria-gui/src/tray_tauri.rs`, `TauriSurface::show` | correzione minima proposta: raccogliere i cambi di icona e non applicare `Busy` se lo stato finale arriva entro ~200–300 ms; poi rifare la prova con `lab/vm/icon-watch.py` e `journalctl` |
+| **F3** | Due separatori di fila nel menu senza preferiti: visto in una fotografia su Fedora, un solo separatore in un'altra. **Non determinato** | `src/tray.rs` | rifare la prova; estetico |
+
+### Non verificato
+
+Ciò che resta senza prova e che non è un limite voluto (se la lista non fosse vuota, lo direbbe la prima riga: **non è vuota**):
+
+- **Il run di CI** sull'ultimo commit: nessun push. R6 è rosso su `gui-smoke`; la correzione dello «stale» e tutto il gruppo D (compresa la traccia di avvio `GALLERIA_STARTUP_TRACE`) non hanno un run.
+- **La matrice M1–M12 sulle tre VM** (0/36 interi): avvio dal menu delle applicazioni, menu della tray con il mouse, preferito con il demone vero, uscita con il tunnel su, esporta con permessi `0600`, doppio click e trascinamento da Nautilus, dimensioni e secondo avvio, portachiavi bloccato e sblocco. Il giro quotidiano ne copre il cammino felice, non queste celle.
+- **R7**, `Gtk-CRITICAL … WIDGET_REALIZED_FOR_EVENT` della finestra «Apri» con una persona alla tastiera.
+- **Il giro con Orca** (T10) sul menu della tray e sui quattro percorsi nuovi, per ogni VM; **Q49** da frame attivo su 26.04 e su Fedora; la **passata a orecchio**.
+- **«Open Galleria» dalla tray su 26.04**; «Ricorda» utente e password di OpenVPN sulle tre VM; il giro con l'estensione AppIndicator spenta.
+- **`G10g` su 27 e 79 in locale** e `lab-dco`/`lab-g3` non rilanciati qui (B6 non li tocca; sono in R6/R7).
+- **La richiesta delle versioni con TLS sulle tre distribuzioni** (S52): provata nell'immagine con una richiesta vera a GitHub; sulle VM la richiesta non è stata osservata.
+- **Una release vera**: il repository non ne ha, quindi l'avviso con una versione più nuova è provato solo contro il server finto (`G11a`, «9.9.9»).
+- **G13 sul primo fotogramma**, su Fedora e sul PC di Peppe.
+
+### Scostamenti dalla spec
+
+- **Q36**: istanza unica con codice nostro (blocco su file, socket Unix `0600` in `$XDG_RUNTIME_DIR/galleria`, `SO_PEERCRED`), senza plugin (B4).
+- **Q34**: si salvano dimensione e «massimizzata», non la posizione (B3).
+- **I comandi di B6 (P1)**: sei comandi nuovi, e le impostazioni passano da `ui_state_set` al posto di `settings_get`/`settings_set`/`update_check` della §4.2.
+- **`announce_phrases`** (Q43): un comando che la §4.2 non aveva; la pagina consegna le frasi tradotte a Rust.
+- **La richiesta delle versioni senza API** (Q50): il numero si legge dal `Location` di `releases/latest`, non dal JSON dell'API; se GitHub cambia la forma del rinvio l'avviso smette di comparire senza errori.
+- **G13** misura fino alla prima richiesta della pagina (P14), non il primo fotogramma.
+- **Qualche gate non ha un job per scelta della spec**: G10 manuale e G13.
+
+### Numeri
+
+| Cosa | Valore |
+|---|---|
+| Prove per livello, albero finale | livello 1: Vitest **710/710** (59 file); livello 2: `cargo test -p galleria-gui` **484/0**; livello 3: fumo **65/65** (3 file, 8 prove del manifesto) e `a11y` **51/51** (6 file); portachiavi vero 10 prove; `lab-connect 26`: 23 prove; fase 1: **598 passate, 0 fallite, 102 `ignored`** (quelle che chiedono il laboratorio) |
+| Job di CI (`ci.yml`) | 15 (`check`, `coverage`, `lab`×3, `lab-dco`×2, `lab-g3`×3, `gui`, `gui-smoke`, `lab-connect`×3); nessuno con `continue-on-error` salvo `coverage` (informativo) |
+| Manifesti dei gate | `lab/tests/gates-b5.tsv` e `gates-b6.tsv`, letti da `check-gates.py`: `check` 7 prove, `gui` 9, `gui-smoke` 18 (10 del portachiavi + 8), `lab-connect` 23 |
+| Comandi Tauri | 36 (30 di B5 + 6 di B6) |
+| Fase 1 non toccata | `git diff origin/main -- crates/galleria-ipc crates/galleriad 'crates/galleria-backend*' crates/galleria-net crates/galleria-ovpn crates/galleria-profile crates/galleria-cli` vuoto; `Cargo.lock`: 2 righe (`semver`, `soup3`) |
+| Ore | non registrate: le stime del piano sono 16 (A) + 9 (B) + 10 (C) + 14 (D) + 6 (E) = 55 h; le spese non si sanno |
+
+### Decisioni
+
+D19–D32 (`docs/07-proposte-fase2.md`, approvate da Aitano su delega di Peppe il 25/11/2026) e Q12–Q57 (spec §18; Q50–Q57 e il testo nel piano di B6; Q48 e Q49 nell'esito di B5). Una riga ciascuna: esito, dove sta il testo.
+
+| # | Esito |
+|---|---|
+| D19 | applicata: script dei profili mai eseguiti, nemmeno con conferma; testo in anteprima (G3: `the_malicious_profile_shows_the_d19_text_and_runs_nothing`, `lab-g3`) |
+| D20 | applicata: nessun file di log; la scheda Log ha il buffer da 2000 righe e «Esporta log…» `0600` (B5) |
+| D21 | applicata: sessione estranea mostrata, chiusa solo con conferma (G9) |
+| D22 | applicata: traduzioni per codice nel frontend, cataloghi `en` e `it` (G8) |
+| D23, D24 | applicate: nomi delle fasi e testo di `docs/01` precisato (Q1, Q2, Q4, Q9) |
+| D25 | applicata: portachiavi con ripiego sul file `0600`; bloccato è un errore (B5, G5, G6); **F1** apre il caso «nessuna collezione» |
+| D26 | applicata: campi veri per WireGuard, sola lettura più tre interruttori per OpenVPN (B3) |
+| D27 | applicata: i quattro stati del primo avvio, nessun privilegio (G2) |
+| D28 | applicata: il cambio di connessione sostituisce senza conferma tra profili propri (G4) |
+| D29 | applicata: crate `galleria-gui`, `ui/`, permessi minimi (36 comandi, `capabilities/main.json`), CSP invariata |
+| D30 | applicata: design system nuovo sopra Base UI (B2) |
+| D31 | applicata: niente QR WireGuard né associazione dei `.conf`; solo i `.ovpn` (B4) |
+| D32 | applicata: «ultimo uso» in `state.toml` (B3) |
+| Q12 | (a) `@base-ui/react` 1.9.0; verde con lo screen reader (B2) |
+| Q13 | (a) app costruita come per il rilascio, pilotata con `tauri-driver` (B1) |
+| Q14 | (a) `--workspace --exclude galleria-gui` per i comandi della fase 1 (B1) |
+| Q15 | (a) build e prove nell'immagine Docker, nessun `sudo` sull'host (B1) |
+| Q16 | (a) un `hello` per azione, nessuna modifica alla fase 1 (B1) |
+| Q17 | (a) il demone finto è un esempio del crate (`fake-daemon`), mai in un build normale (B1) |
+| Q18 | `io.github.zpeppoz.galleria` (B1; è il nome del `.desktop`) |
+| Q19 | pnpm, Node nel `.nvmrc` (B1) |
+| Q20 | applicata: bloccato = errore; vale il portachiavi; nessuna migrazione automatica (B5) |
+| Q21 | applicata: «AUR solo con trazione» in `docs/01` |
+| Q22 | (a) prova locale con Orca nell'immagine, non in CI; la passata a orecchio in B6 → **solo dal file di debug** (Q56); nessun ascolto |
+| Q23 | approvata: correzioni ai token del mockup (B2) |
+| Q24 | (a) barra del sistema più una barra nostra (B2) |
+| Q25 | (a) lingua e tema in memoria in B2, in `state.toml` da B3 |
+| Q26 | (a) la vista del demone è una fascia in cima al dettaglio (B2) |
+| Q27 | (1) segnale ATK dal lato Rust per i non bloccanti; (3) fuoco spostato per le conferme (B3 in poi; `K5a`, `K6a`) |
+| Q28 | (b) Orca 46 nella passata di B6: campi generali letti; credenziali no, limite scritto (R2) |
+| Q29 | (a) solo aggiunte in `galleria-profile` (B3) |
+| Q30 | (a) `groups = [...]` e `Profile.group` (B3) |
+| Q31 | (a) esporta in un file nativo `0600` (B3) |
+| Q32 | (a) OpenVPN si salva solo senza problemi; WireGuard in sola lettura nell'editor (B3) |
+| Q33 | (a) «Salva/Annulla» per i campi di testo, subito per interruttori e stella (B3) |
+| Q34 | (a) dimensione e «massimizzata», non la posizione (scostamento dalla §6) |
+| Q35 | applicata in B6 (T3): la guardia della chiusura; `G10f`, `closing_*` |
+| Q36 | (b) istanza unica nostra, `SO_PEERCRED` (scostamento dichiarato) |
+| Q37 | (a) il fumo di G3 gira nell'immagine, i profili passano ai client (B4) |
+| Q38 | (a) `tauri://drag-drop` resta, la pagina non lo ascolta; una prova lo tiene fermo (B4) |
+| Q39 | (a) il formato si ricava dal contenuto (B4) |
+| Q40 | (a) un file per gesto (B4) |
+| Q41 | (a) `bundle.fileAssociations` e un `.desktop` nostro, uguali per prova (B4) |
+| Q42 | (b) un ponte per utente sul lato host (B5, `gui-daemon-relay.py`) |
+| Q43 | (a) la pagina consegna le frasi a Rust (`announce_phrases`; scostamento dalla §4.2) |
+| Q44 | (a) `dbus-secret-service` 4.2.0 con `vendored`, sessione `Plain` (B5) |
+| Q45 | (a) la CLI legge dai due archivi, scrive solo nel file (B5) |
+| Q46 | (a) i nomi delle chiavi ricordate in `secret_refs` (B5) |
+| Q47 | (a) la password rifiutata offre «Dimentica le credenziali salvate» (B5, `G5e`) |
+| Q48 | decisa da Aitano in B5: l'osservatore esclude solo `openvpn --version` e un `[openvpn]` in uscita con `glr-ovpn0` assente (`ovpn_if`) |
+| Q49 | decisa da Aitano in B5: (a), nessun annuncio nuovo da Rust; resta il buco di Orca 46 |
+| Q50 | (a) il numero si legge dal `Location` di `releases/latest`, senza seguire il rinvio (G11) |
+| Q51 | (a) `soup3`; nessun ripiego su `reqwest` (S52 sciolta) |
+| Q52 | (a) le azioni del menu le esegue la pagina (S49 sciolta) |
+| Q53 | (a) senza tray la «X» esce e la VPN resta (`G10e`) |
+| Q54 | (a) «Esci (la VPN resta attiva)», senza domande (`G10d`) |
+| Q55 | (a) l'indirizzo è testo, con «Copia link» (`UpdateNotice`, `K6c`) |
+| Q56 | (a) la passata la fa un agente dal file di debug di Orca, la lista di venti minuti **non blocca**; **fatta in parte** (sopra) |
+| Q57 | (a) l'avvio a freddo si misura in una VM Ubuntu del PC di Peppe: **fatto su due VM**, la frase «è una VM» sta in G13 |
+
+### Per la fase 3
+
+Non è lavoro di B6: è ciò che chi apre la fase 3 non deve ricavare dal codice. La finestra, in fase 2, è scritta e provata **solo su Linux**; la roadmap ha già le voci del demone e ora ha anche quelle della finestra.
+
+| Pezzo della finestra | Com'è oggi (Linux) · dove | Cosa serve su Windows |
+|---|---|---|
+| Collegamento al demone | socket Unix; `crates/galleria-gui/src/link.rs` classifica gli errori di D27; i testi dicono `systemctl` e `usermod` | named pipe (D18); classificazione e testi del primo avvio rifatti per servizio e ACL |
+| Archivio dei segreti | `KeyringSecretStore` è `cfg(linux)`: Secret Service (`galleria-profile/src/secrets_keyring.rs`); ripiego sul file `0600` | un archivio per Windows (Credential Manager o DPAPI) dietro lo stesso tratto `SecretStore`; D25 va estesa; **F1** va deciso prima |
+| Istanza unica | `flock`, socket Unix, `SO_PEERCRED` (Q36; `instance.rs`) | un mutex con nome e una pipe, con lo stesso controllo dell'utente |
+| Annunci | segnale ATK (`announce_atk.rs`); fuori da Linux `NoAnnouncer` | da provare: se WebView2 fa dire le regioni vive a Narratore e NVDA l'annuncio da Rust non serve; altrimenti UIA |
+| Finestre «Apri» e «Salva» | GTK da Rust (`picker_gtk.rs`, `export_gtk.rs`); fuori da Linux sono un annullo | le finestre di Windows, sempre da Rust (spec §3.2, regola 3) |
+| Tray | solo menu (Tauri su Linux; `tray.rs` puro, `tray_tauri.rs`); **F2** aperto | i click sull'icona arrivano: click sinistro apre la finestra; il modello del menu si riusa |
+| «C'è chi mostra la tray?» | `tray_host.rs`, bus di sessione | su Windows c'è sempre |
+| Chiusura | `closing.rs` decide con `tray_shown` | la stessa decisione, con `tray_shown` sempre vero |
+| Versione nuova | avviso con l'indirizzo (D16, `update.rs`) | updater di Tauri con l'MSI firmato (D16); l'avviso resta il ripiego |
+| Richiesta delle versioni | libsoup (`update_soup.rs`, `cfg(linux)`) | un secondo `Fetch` (WinHTTP o un crate): qui il vincolo «nessun crate nuovo» non vale più |
+| Percorsi | XDG (`state.toml`, rubrica, cartella d'esecuzione) | `%APPDATA%`, `%LOCALAPPDATA%` |
+| Associazione dei `.ovpn` | file `.desktop` (`packaging/linux/`) | nell'MSI |
+| Prove | immagine Docker, Xvfb, `WebKitWebDriver`, Orca, laboratorio Docker, VM in `lab/vm/` | runner Windows, `msedgedriver`, un laboratorio (`spikes/windows-lab` è il punto di partenza) |
+| Aspetto | `oklch()` provato su WebKitGTK | da riprovare su WebView2 |
+
+Restano fuori anche dalla fase 3, per la fase 4 o dopo la v0.1: pacchetti `.deb` e `.rpm` con le dipendenze (WebKitGTK, libreria dell'indicatore) e repository; AppImage o Flatpak (dove torna il portale, R4); KWallet e KDE provati; kill switch, connessione automatica, avvio con il sistema; QR di WireGuard; la CLI che usa le credenziali ricordate (Q45); la migrazione dal file al portachiavi (Q20). **Da chiudere prima della v0.1 su Linux** (lavoro aperto della fase 2): F1, F2, F3, la matrice M1–M12, la passata a orecchio e il run di CI sul push finale.
+
 ## B1 · Fondamenta
 
 Piano: `docs/superpowers/plans/2026-11-25-fase2-b1-fondamenta.md`. Ambiente di build e prove: immagine
@@ -1708,4 +1885,84 @@ Dopo il gruppo C, il run di CI 45851556847 su `bcb3f39` ha dato 14 job su 15: `g
 | la stessa, ogni 20 ms | **11 su 1200** (tutti dal find, `elements`: il messaggio di CI) | **1 su 1200** (azione, dopo la riprova) |
 
 - **Dichiarato.** La sonda di stress non è nel repository (è statistica e a 3 ms un render batte comunque due tentativi: un render di React nella finestra è un evento solo, ~25 ms, non una tempesta). Il «prima» del fumo è 1 giro su 20 nel mio ambiente, non il 100%: il difetto è raro, quindi 20 giri verdi sono un'evidenza, non una prova. Il run di CI non l'ho fatto (il push lo fa Aitano).
+
+### Gruppo E · Chiusura (card `t_8bc8316d`)
+
+Parte da `b47de8e` (ff-only dal ramo di `t_6670f193`, che porta `2aa9b37` di `t_a16d68aa` e i tre commit di `t_3f67b587`) e dal merge del ramo di `t_db85d179` (stale element nel supporto delle prove, `17243ca`…`6f9d9cc`). L'unico conflitto era in questo file, nelle due appendici del gruppo D e dello «stale»: **tenute tutte e due**. `origin/main` è a `7e017c9`, antenato del ramo: niente da integrare. La sintesi che si legge da sola è «Chiusura della fase 2» in testa al file (G1–G13, limiti, non verificato, difetti, decisioni, fase 3); qui ci sono i criteri F1–F9, i punti [S] e le riserve.
+
+#### Giro finale del gruppo E (albero finale, un giro di ogni comando; Docker rootless, nessun push)
+
+Fatto sull'albero con il merge, **prima** di scrivere i documenti (poi cambiano solo README, spec, esito e `ROADMAP.md`). Un solo giro, non i giri ripetuti del piano (tre di fumo, due di Orca): i ripetuti sono del gruppo C e di `t_db85d179`.
+
+| Comando | Esito |
+|---|---|
+| host: `cargo fmt --all --check`, `clippy --workspace --exclude galleria-gui --all-targets -D warnings`, `cargo test --workspace --exclude galleria-gui`, `cargo deny check`, `scripts/check-boundaries.sh`, `scripts/tests/check-gates.sh` | verdi; **598 passati, 0 falliti**, 102 `ignored` (quelli che chiedono il laboratorio) |
+| `scripts/check-gates.py --job check` | «7 proofs of check ran and passed» |
+| `scripts/gui.sh check` | Vitest **710/710** (59 file), `cargo test -p galleria-gui` **484 passati, 0 falliti**, clippy, typecheck e build verdi |
+| `scripts/gui.sh keyring` | **1 giro rosso su 5**: il primo, in un container appena avviato e con il `target/` copiato da un altro albero, «gui-keyring: the keyring is not unlocked» dopo `gnome-keyring-daemon --unlock` (3 s, prima di qualunque prova); poi 4 giri su 4 «10 proofs of gui-smoke ran and passed». **Causa non trovata**; la prova non è cambiata e non è stata nascosta con un riprovare; se compare in CI è questo |
+| `scripts/gui.sh smoke` | **65/65** (3 file, 200 s), «check-gates: 8 proofs of gui-smoke ran and passed», nessuno «stale element» |
+| `scripts/gui.sh a11y` | **51/51** (6 file, 259 s), un giro |
+| `LAB_BUILD=host scripts/gui.sh lab-connect 26` | «17 proofs» (finestra) e **«23 proofs of lab-connect ran and passed»** (112 s) |
+| fase 1 | `git diff origin/main -- <crate vietati>` vuoto; `Cargo.lock` +2 righe (`semver`, `soup3`) |
+| `ROADMAP.md` per il parser di `~/.hermes/plugins/progetti` | **6 fasi** (vedi T12) |
+
+Non rieseguiti qui: `lab` e `lab-g3` (B6 non li tocca), `lab-connect 27` e `79` (il DCO sotto Docker rootless: sono il job), il `coverage`.
+
+#### F1–F9, criteri di uscita di B6
+
+| # | Criterio | Esito e prova |
+|---|---|---|
+| F1 | G10 automatica | **Verde in locale**; in CI R6: `G10a`–`G10f` ✓ in un `gui-smoke` rosso per un'altra prova, `G10g` e `gui_closed_window_kept_the_tunnel` ✓ sui tre client (23 prove). Il job `gui-smoke` completo e il suo `check-gates` aspettano il push |
+| F2 | G10 manuale, tre VM | **Parziale, dichiarato**: giro quotidiano 7/7 su 24.04 e Fedora, 26.04 con due caveat; **M1–M12: 0/36** (decisione di Aitano del 26/11) |
+| F3 | G11 | **Verde in locale**; R6: `gui` «9 proofs», `G11a` ✓; una richiesta vera a GitHub fatta a mano (302) |
+| F4 | Q35 | **Verde**: `closing_*` (`gui`), `G10f` (R6 ✓) |
+| F5 | G13 | **Fatto in parte**: tre misure su 24.04 e tre su 26.04; Fedora no; non blocca |
+| F6 | G12, il resto | **Parziale**: `K6a`–`K6c` verdi (51/51), parlato dal debug su tre desktop; Orca 46 credenziali: limite (R2); **ascolto umano e quattro giri nuovi per VM: non fatti** |
+| F7 | Riserve R1–R13 | **Una riga ciascuna, sotto**: nessuna «da rivedere»; R7 e R10 (matrice) restano «non verificato» |
+| F8 | La fase 1 non se ne accorge | **Verde**: diff vuoto; `lab`, `lab-dco`, `lab-g3` verdi in R6/R7 (non rilanciati qui) |
+| F9 | G1–G13 con prova e job | **Tabella in testa al file**; nessuna riga ha un run verde sull'ultimo commit |
+
+#### Punti [S] di B6, S46–S60
+
+| # | Esito |
+|---|---|
+| S46 | **Sciolta.** Il menu di Tauri si legge e si clicca dal bus come quello della sonda (`G10a`; R6 ✓) |
+| S47 | **Sciolta.** Riscrivere il menu si vede sul bus senza registrare di nuovo l'indicatore (T1) |
+| S48 | **Sciolta nell'immagine** (`the_app_starts_without_the_indicator_library`); sulle VM la libreria c'è, non provato senza |
+| S49 | **Sciolta.** A finestra nascosta la pagina riceve gli eventi (`G10b` a finestra nascosta, `credentials_asked_after_a_menu_connect_bring_the_window_back`) |
+| S50 | **Sciolta in positivo** (`K6a`, locale): Orca dice «Connected to …» a finestra nascosta |
+| S51 | **Vera con l'estensione** (immagine con la sonda, e sulle tre VM l'icona si registra e il menu si apre); il «falso senza» è provato solo nell'immagine (`tray_is_shown_is_false_without_a_bus_and_without_an_owner`); **l'estensione spenta in una VM non è provata** |
+| S52 | **Sciolta nell'immagine**: tre intestazioni esatte, TLS con una richiesta vera a GitHub, nessun ripiego su `reqwest`. **Sulle tre VM la richiesta non è stata osservata** |
+| S53 | **Sciolta** sotto Xvfb (`G10c`) e **sui tre desktop in Wayland** nel giro quotidiano (la finestra si chiude nella tray, il processo vive, la riapertura la ritrova: 24.04 e Fedora «Open Galleria» dalla tray; 26.04 con il riavvio dal menu applicazioni, **«Open Galleria» dalla tray no**) |
+| S54 | **Vera con la tastiera**: il menu della tray si raggiunge con i tasti di qemu (`sendkey`) sulle tre VM; **il mouse non si è provato** (il puntatore VNC non consegna clic) |
+| S55 | **Vera**: l'immagine cloud di Ubuntu 24.04.5 con cloud-init dà GNOME 46 con autologin (T8) |
+| S56 | **Vera per l'avvio e la libreria** (il binario parte sulle tre; Fedora carica `libappindicator3.so.1.0.0`) e **per il menu** (funziona su Fedora). **Il timeout intermittente del Notification Watcher visto in T9 non si è riprodotto in 17 avvii**: causa non trovata, nulla indica il nostro codice; **limite d'ambiente**, riapribile se riappare |
+| S57 | **Vera per i campi generali**, **falsa per la finestra delle credenziali** su Ubuntu 24.04: limite scritto per 24.04 (R2) |
+| S58 | **Vera su 24.04** (la finestra «Apri» è nell'albero del processo, non in un portale: `M7-native`, via AT-SPI); **su 26.04 e Fedora** il giro quotidiano ha scelto il file in una finestra «Apri», ma **non si è guardato di chi fosse il processo** |
+| S59 | **Sciolta senza il ripiego** (`G10g`, i segni dall'osservatore del client; R6 ✓ sui tre client) |
+| S60 | **Sciolta**: `x11-window.py` manda `WM_DELETE_WINDOW` e legge se la finestra è mappata, senza gestore di finestre |
+
+#### Riserve ereditate, R1–R13
+
+| # | Esito | Prova o limite |
+|---|---|---|
+| R1 | **Chiusa** | `closing_*` (`gui`), `G10f` (R6 ✓), tastiera in Vitest |
+| R2 | **Limite scritto** | Orca 46 legge i campi generali; la finestra delle credenziali muta, anche con il frame attivo (un tentativo): Q49 (a) |
+| R3 | **Parziale, limite** | parlato dal debug su tre desktop; nessun ascolto umano; lista di venti minuti non bloccante (Q56) |
+| R4 | **Limite scritto** | chooser GTK su Wayland osservato su 24.04 (`M7-native`); il portale è fuori dalla fase 2; Apri/Salva con il mouse sulle altre due non verificati |
+| R5 | **Limite scritto** | «associazione provata con `gio launch`»; il doppio click e il trascinamento da Nautilus non sono provati |
+| R6 | **Limite scritto** | su Wayland il compositore può negare il fuoco; «Open Galleria» riapre la finestra (24.04 e Fedora; 26.04 no) |
+| R7 | **Non verificata** | nessuna persona alla tastiera; un'apertura via AT-SPI senza l'avviso non chiude la riserva |
+| R8 | **Limite scritto** | su Fedora il «Login» è bloccato e GNOME chiede lo sblocco (visto con l'import); «Ricorda» contro il bloccato non provato |
+| R9 | **Limite dichiarato** | KWallet non si prova (KDE best effort), già nel README |
+| R10 | **Chiusa per il giro quotidiano; il resto non verificato** | la finestra intera gira sulle tre VM nel giro; la matrice M1–M12 no |
+| R11 | **Non verificata** | dimensione su Wayland (M11); la posizione non si salva (Q34) |
+| R12 | **Chiusa**, sotto | S42, S43, S44 letti uno per uno |
+| R13 | **Aperta** | `a11y` 51/51 in cinque giri di B6; la causa del vecchio timeout di `R5d` non trovata |
+
+**S42, S43, S44 (R12), letti sul codice e sulle prove:** **S42** vero: il backend WireGuard campiona a 1 s (`session.rs`, `interval_at(start + 1 s, 1 s)`) e il backend OpenVPN chiede `bytecount 1` e scarta un campione se è passato meno di 1 s dall'ultimo; `last_handshake` si mostra (`G4a`: i byte crescono tra due letture a 3 s, «Last handshake» ha un valore; verde in CI su 26, 27 e 79). **S43** vero: WebDriver scrive nei campi `password` (`#credentials-password`, `setValue`/`getValue`) e dopo l'invio nessun campo, attributo, HTML o testo della pagina contiene la password (`connect.e2e.ts`, due momenti). **S44** vero: l'annuncio ATK passa dal thread principale (`announce_atk.rs`, `run_on_main_thread`), `state_changes_are_announced_once_each` e `K5a`.
+
+#### Non verificato (B6)
+
+Come in «Chiusura della fase 2», «Non verificato»: il run di CI sull'ultimo commit; M1–M12; R7; i giri con Orca sul menu della tray e sui quattro percorsi per VM; Q49 da frame attivo su 26.04 e Fedora; «Open Galleria» dalla tray su 26.04; «Ricorda» OpenVPN nelle VM; l'estensione spenta; il TLS della richiesta sulle VM; una release vera; G13 sul primo fotogramma e su Fedora.
 

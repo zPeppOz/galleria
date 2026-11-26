@@ -60,10 +60,12 @@ export function ProfileList(props: {
   groups: ListGroup[];
   selectedId: string;
   onSelect: (id: string) => void;
+  /** `Enter` on the row that is already the chosen one does what the main button of that profile does (connect, disconnect…). */
+  onActivate?: (id: string) => void;
   empty?: string;
   focusRef?: Ref<{ focus: () => void }>;
 }) {
-  const { label, groups, selectedId, onSelect, empty, focusRef } = props;
+  const { label, groups, selectedId, onSelect, onActivate, empty, focusRef } = props;
   const elements = useRef(new Map<string, HTMLDivElement>());
   const flat = groups.flatMap((group) => group.profiles);
   const tabStop = flat.some((p) => p.id === selectedId) ? selectedId : flat[0]?.id;
@@ -85,7 +87,8 @@ export function ProfileList(props: {
     // the focus over is not the chosen one yet (found by the keyboard tour of B3)
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      onSelect(from);
+      if (event.key === "Enter" && from === selectedId && onActivate) onActivate(from);
+      else onSelect(from);
       return;
     }
     if (event.key === "ArrowDown") target = flat[Math.min(current + 1, flat.length - 1)];

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { Button } from "../design/Button";
+import { CommandNotice } from "../connection/CommandNotice";
+import { ConnectButton } from "../connection/ConnectButton";
+import { Stats } from "../connection/Stats";
 import { ConfirmDialog } from "../design/ConfirmDialog";
 import { icons } from "../design/icons";
 import { InlineAlert } from "../design/InlineAlert";
@@ -54,30 +57,14 @@ export interface DetailProps {
   guard?: MutableRefObject<Guard | null>;
 }
 
-function Empty() {
-  const t = useT();
-  return (
-    <>
-      <span aria-hidden="true">—</span>
-      <span className="visually-hidden">{t("strip.empty")}</span>
-    </>
-  );
-}
-
 /**
- * Header, «More actions», status strip and the five tabs. The strip is empty (the live state is B5). The panels, the star and
- * the entries of the menu come from the caller: the form, or «reading».
+ * Header, «More actions», status strip and the five tabs. The strip is the live state of the session of this profile (the
+ * numbers are not a live region). The panels, the star and the entries of the menu come from the caller: the form, or «reading».
  */
 function Frame(props: { profile: ProfileSummary; panels: Record<TabId, ReactNode>; tab: TabId; onTab: (tab: TabId) => void; menu: MenuEntry[]; star?: { pressed: boolean; onToggle: () => void }; above?: ReactNode; below?: ReactNode }) {
   const { profile, panels, tab, onTab, menu, star, above, below } = props;
   const t = useT();
   const entries = menu;
-  const cells: [string, string][] = [
-    ["strip.state", t("strip.state")],
-    ["strip.ip", t("strip.ip")],
-    ["strip.traffic", t("strip.traffic")],
-    profile.protocol === "wireguard" ? ["strip.handshake", t("strip.handshake")] : ["strip.duration", t("strip.duration")],
-  ];
   return (
     <>
       <div className="detail-head">
@@ -92,6 +79,7 @@ function Frame(props: { profile: ProfileSummary; panels: Record<TabId, ReactNode
           ) : null}
         </div>
         <div className="detail-actions">
+          <ConnectButton profile={profile} />
           <Menu label={t("detail.more")} trigger={<>{icons.more}{t("detail.more")}</>} entries={entries} />
         </div>
         <p className="detail-meta">
@@ -100,14 +88,7 @@ function Frame(props: { profile: ProfileSummary; panels: Record<TabId, ReactNode
           {profile.server ? <span className="detail-server">{profile.server}</span> : null}
         </p>
       </div>
-      <dl className="detail-strip">
-        {cells.map(([key, label]) => (
-          <div key={key} className="detail-strip-cell">
-            <dt>{label}</dt>
-            <dd><Empty /></dd>
-          </div>
-        ))}
-      </dl>
+      <Stats profile={profile} />
       {above}
       <Tabs
         label={t("tabs.label")}
@@ -478,6 +459,7 @@ export function ProfileDetail({ profile, detail, detailError, groups, names, inU
     return (
       <>
         {keyringNoticeElement}
+        <CommandNotice profileId={profile.id} />
         <Form key={detail.id} detail={detail} groups={groups} update={update} validateRaw={validateRaw} reload={reload} guard={guard} menu={menu} />
         {dialogs}
       </>
@@ -490,6 +472,7 @@ export function ProfileDetail({ profile, detail, detailError, groups, names, inU
   );
   return (
     <div className="detail">
+      <CommandNotice profileId={profile.id} />
       <WaitingFrame profile={profile} waiting={waiting} menu={menu} />
       {dialogs}
     </div>

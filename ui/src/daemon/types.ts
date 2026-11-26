@@ -6,11 +6,15 @@ export type Protocol = "wireguard" | "openvpn";
 
 export interface NetInfo { interface: string; dns_servers: string[]; search_domains: string[]; routes: string[]; full_tunnel: boolean; ipv6_block: "none" | "unreachable" }
 export interface SessionError { code: string; message: string }
+export type InputKind = "credentials" | "otp" | "key_passphrase";
+/** What the daemon asks the user for (`needs_input`): the kind says which field, `prompt` is the server's own text, `echo` whether it may be shown. */
+export interface InputRequest { request: number; kind: InputKind; prompt: string; echo: boolean; expires_in_secs: number }
+export interface Stats { rx_bytes: number; tx_bytes: number; last_handshake: string | null }
 export interface Status {
   state: VpnState; session: number | null; profile: { id: string; name: string } | null; protocol: Protocol | null;
   since: string | null; attempt: number; detail: string | null; local_addresses: string[]; remote: string | null;
-  net: NetInfo | null; stats: { rx_bytes: number; tx_bytes: number; last_handshake: string | null } | null;
-  input_request: unknown; error: SessionError | null;
+  net: NetInfo | null; stats: Stats | null;
+  input_request: InputRequest | null; error: SessionError | null;
 }
 export interface BackendInfo {
   protocol: Protocol; available: boolean; version: string | null; unavailable_reason: string | null;

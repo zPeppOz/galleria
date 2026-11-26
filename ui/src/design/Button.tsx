@@ -9,6 +9,8 @@ type Common = {
   /** Working: the button keeps the focus and says so (`aria-busy`), and a click does nothing until it is over. */
   busy?: boolean;
   onClick?: () => void;
+  /** The id of the text that says why the button is off, or what it does beyond its name. */
+  "aria-describedby"?: string;
 };
 /** A button with no text needs an accessible name: the type forbids one without `aria-label`. */
 export type ButtonProps = Common & ({ children: ReactNode; "aria-label"?: string } | { children?: undefined; "aria-label": string });
@@ -22,6 +24,7 @@ export function Button(props: ButtonProps) {
       disabled={disabled}
       aria-busy={busy ? true : undefined}
       aria-label={props["aria-label"]}
+      aria-describedby={props["aria-describedby"]}
       onClick={() => {
         if (!disabled && !busy) onClick?.();
       }}

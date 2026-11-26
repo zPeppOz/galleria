@@ -1,8 +1,9 @@
 import type { AppInfo, DaemonView } from "../daemon/types";
 import { InlineAlert } from "../design/InlineAlert";
 import { useT } from "../i18n";
+import { StatusPanel } from "../connection/StatusPanel";
 import { FirstRun } from "../screens/FirstRun";
-import { BackendWarnings, StatusView } from "../screens/StatusView";
+import { BackendWarnings } from "../screens/BackendWarnings";
 import "./ServiceArea.css";
 
 /**
@@ -21,10 +22,13 @@ export function ServiceArea({ view, info, onRetry }: { view: DaemonView | null; 
     );
   } else if (view.link !== "connected") {
     content = <FirstRun view={view} info={info} onRetry={onRetry} />;
-  } else if (view.status && view.status.state !== "disconnected") {
-    content = <StatusView view={view} />;
   } else {
-    content = <BackendWarnings view={view} />;
+    content = (
+      <>
+        {view.status && view.status.state !== "disconnected" ? <StatusPanel status={view.status} /> : null}
+        <BackendWarnings view={view} />
+      </>
+    );
   }
   return content ? <div className="service-area">{content}</div> : null;
 }

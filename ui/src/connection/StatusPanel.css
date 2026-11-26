@@ -8,3 +8,4 @@
 .status-view-state-connected { color: var(--ok); }
 .status-view-state-error { color: var(--err); }
 .status-view-state-connecting, .status-view-state-reconnecting, .status-view-state-needs_input, .status-view-state-disconnecting { color: var(--warn); }
+.status-view-detail { margin: 0; color: var(--muted); }

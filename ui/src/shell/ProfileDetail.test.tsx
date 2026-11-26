@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { ConnectionContext, INERT, type Connection } from "../connection/store";
 import { ToastProvider } from "../design/Toast";
 import { I18n } from "../i18n";
 import type { CmdError, ProfileActions, ProfileDetail as Detail, ProfilePatch, ProfileSummary, RawCheck } from "../rubrica/types";
@@ -16,7 +17,7 @@ type Update = (id: string, patch: ProfilePatch, expectedModified: string) => Pro
 type Validate = (id: string, text: string) => Promise<RawCheck>;
 
 /** The form with a backend that answers what a test says (by default: the patch applied, the text clean) and the calls it received. */
-const setup = (profile: ProfileSummary = OFFICE, detail: Detail | null = makeDetail(profile), detailError: CmdError | null = null, update?: Update, validate?: Validate, extra: { inUse?: boolean; names?: string[]; actions?: Partial<ProfileActions> } = {}) => {
+const setup = (profile: ProfileSummary = OFFICE, detail: Detail | null = makeDetail(profile), detailError: CmdError | null = null, update?: Update, validate?: Validate, extra: { inUse?: boolean; names?: string[]; actions?: Partial<ProfileActions>; connection?: Partial<Connection> } = {}) => {
   const send = vi.fn<Update>(update ?? (async (_id, patch) => applyPatch(detail ?? makeDetail(profile), patch)));
   const check = vi.fn<Validate>(validate ?? (async () => ({ issues: [], can_save: true })));
   const reload = vi.fn(async () => undefined);
@@ -31,11 +32,13 @@ const setup = (profile: ProfileSummary = OFFICE, detail: Detail | null = makeDet
   const onDeleted = vi.fn();
   const tree = (current: Detail | null) => (
     <I18n lang="en">
+      <ConnectionContext.Provider value={{ ...INERT, ...extra.connection }}>
       <ToastProvider closeLabel="Dismiss the notice" announce={announce}>
         <main>
           <ProfileDetail profile={profile} detail={current} detailError={detailError} groups={["Lavoro", "Personale", "Clienti"]} update={send} validateRaw={check} actions={actions} names={extra.names ?? [profile.name]} inUse={extra.inUse ?? false} onSelect={onSelect} onDeleted={onDeleted} reload={reload} />
         </main>
       </ToastProvider>
+      </ConnectionContext.Provider>
     </I18n>
   );
   const view = render(tree(detail));
@@ -101,8 +104,14 @@ describe("ProfileDetail", () => {
     expect(within(document.body).queryAllByText("—").length).toBe(4);
   });
 
-  it("wireguard_shows_the_last_handshake_instead_of_the_duration", () => {
+  it("wireguard_shows_the_last_handshake_when_the_backend_has_one_and_the_duration_when_it_has_not", () => {
     setup(HOMELAB);
+    expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(["State", "Assigned IP", "Traffic", "Duration"]);
+  });
+
+  it("wireguard_shows_the_last_handshake_instead_of_the_duration", () => {
+    const backends = [{ protocol: "wireguard" as const, available: true, version: null, unavailable_reason: null, capabilities: { handshake: true, interactive_auth: false, server_pushed_config: false } }];
+    setup(HOMELAB, makeDetail(HOMELAB), null, undefined, undefined, { connection: { link: "connected", backends } });
     expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(["State", "Assigned IP", "Traffic", "Last handshake"]);
   });
 

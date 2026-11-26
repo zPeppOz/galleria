@@ -3,6 +3,9 @@ import type { SortOrder } from "../app/uiState";
 import type { AppInfo, DaemonView } from "../daemon/types";
 import { Button } from "../design/Button";
 import { ConfirmDialog } from "../design/ConfirmDialog";
+import { ConnectionProvider } from "../connection/ConnectionProvider";
+import { activate } from "../connection/ConnectButton";
+import { useConnection } from "../connection/store";
 import { ToastProvider, type Announce } from "../design/Toast";
 import { useLang, useT } from "../i18n";
 import { ImportDialog } from "../import/ImportDialog";
@@ -28,7 +31,7 @@ import { TopBar } from "./TopBar";
  * from its props and never asks the app or the service for anything itself (the daemon link comes in as `view`). The
  * search text is the shell's own; the sort order is the app's, because the selection needs it too.
  */
-export function Shell(props: {
+export interface ShellProps {
   view: DaemonView | null;
   info: AppInfo | null;
   onRetry: () => void;
@@ -44,8 +47,23 @@ export function Shell(props: {
   secretStore?: SecretStoreKind | null;
   sort: SortOrder;
   onSortChange: (sort: SortOrder) => void;
-}) {
-  const { view, info, onRetry, announce, rubrica, importer, incoming = null, dropHover = false, secretStore = null, sort, onSortChange } = props;
+}
+
+/** The notices, then the connection (which says a replacement once, with a notice), then the window. */
+export function Shell(props: ShellProps) {
+  const t = useT();
+  return (
+    <ToastProvider closeLabel={t("toast.close")} announce={props.announce}>
+      <ConnectionProvider view={props.view}>
+        <ShellBody {...props} />
+      </ConnectionProvider>
+    </ToastProvider>
+  );
+}
+
+function ShellBody(props: ShellProps) {
+  const { view, info, onRetry, rubrica, importer, incoming = null, dropHover = false, secretStore = null, sort, onSortChange } = props;
+  const connection = useConnection();
   const t = useT();
   const lang = useLang();
   const [query, setQuery] = useState("");
@@ -167,73 +185,71 @@ export function Shell(props: {
     [arranged, t, session?.id, session?.state],
   );
   return (
-    <ToastProvider closeLabel={t("toast.close")} announce={announce}>
-      <div className="shell" ref={root}>
-        <TopBar info={info} daemonVersion={view?.daemon_version ?? null} onImport={() => setImporting(true)} />
-        <div className="shell-body">
-          <aside className="shell-aside" aria-label={t("shell.profiles")}>
-            {profiles && profiles.length > 0 ? (
-              <>
-                <div className="shell-tools">
-                  <SearchBox value={query} onChange={setQuery} count={arranged.total} onArrowDown={() => list.current?.focus()} />
-                  <SortControl value={sort} onChange={onSortChange} />
-                </div>
-                <ProfileList label={t("list.label")} groups={groups} selectedId={selected?.id ?? ""} onSelect={choose} empty={t("search.no_match")} focusRef={list} />
-              </>
-            ) : (
-              <p className="shell-aside-empty" ref={emptyText} tabIndex={-1}>{rubrica.loaded ? t("list.empty") : t("rubrica.loading")}</p>
-            )}
-            {rubrica.view ? (
-              <div className="shell-aside-foot">
-                <Button onClick={() => setManaging(true)}>{t("groups.manage")}</Button>
+    <div className="shell" ref={root}>
+      <TopBar info={info} daemonVersion={view?.daemon_version ?? null} onImport={() => setImporting(true)} />
+      <div className="shell-body">
+        <aside className="shell-aside" aria-label={t("shell.profiles")}>
+          {profiles && profiles.length > 0 ? (
+            <>
+              <div className="shell-tools">
+                <SearchBox value={query} onChange={setQuery} count={arranged.total} onArrowDown={() => list.current?.focus()} />
+                <SortControl value={sort} onChange={onSortChange} />
               </div>
-            ) : null}
-          </aside>
-          <main className="shell-main">
-            <ServiceArea view={view} info={info} onRetry={onRetry} />
-            <RubricaNotices rubrica={rubrica} onImport={() => setImporting(true)} secretStore={secretStore} />
-            {selected ? (
-              <ProfileDetail
-                profile={selected}
-                detail={rubrica.detail}
-                detailError={rubrica.detailError}
-                groups={rubrica.view?.groups ?? []}
-                names={profiles?.map((p) => p.name) ?? []}
-                inUse={session?.id === selected.id}
-                update={rubrica.update}
-                validateRaw={rubrica.validateRaw}
-                actions={rubrica.actions}
-                onSelect={choose}
-                onDeleted={setDeleted}
-                reload={rubrica.reload}
-                guard={guard}
-              />
-            ) : null}
-          </main>
-        </div>
-        <StatusBar view={view} info={info} />
-        <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
-        <ImportDialog open={importing} onClose={closeImport} actions={importer} onImported={wasImported} incoming={incoming} secretStore={secretStore} />
-        {dropHover ? (
-          <div className="shell-drop" aria-hidden="true">
-            <span>{t("import.drop_hover")}</span>
-          </div>
-        ) : null}
-        <ConfirmDialog
-          open={leaving !== null}
-          title={t("leave.title")}
-          body={t("leave.body", { name: selected?.name ?? "" })}
-          confirmLabel={t("leave.save")}
-          alternateLabel={t("leave.discard")}
-          cancelLabel={t("leave.cancel")}
-          onConfirm={() => void leave("save")}
-          onAlternate={() => void leave("discard")}
-          onCancel={() => {
-            setLeaving(null);
-            setImported(null);
-          }}
-        />
+              <ProfileList label={t("list.label")} groups={groups} selectedId={selected?.id ?? ""} onSelect={choose} onActivate={(id) => activate(connection, id)} empty={t("search.no_match")} focusRef={list} />
+            </>
+          ) : (
+            <p className="shell-aside-empty" ref={emptyText} tabIndex={-1}>{rubrica.loaded ? t("list.empty") : t("rubrica.loading")}</p>
+          )}
+          {rubrica.view ? (
+            <div className="shell-aside-foot">
+              <Button onClick={() => setManaging(true)}>{t("groups.manage")}</Button>
+            </div>
+          ) : null}
+        </aside>
+        <main className="shell-main">
+          <ServiceArea view={view} info={info} onRetry={onRetry} />
+          <RubricaNotices rubrica={rubrica} onImport={() => setImporting(true)} secretStore={secretStore} />
+          {selected ? (
+            <ProfileDetail
+              profile={selected}
+              detail={rubrica.detail}
+              detailError={rubrica.detailError}
+              groups={rubrica.view?.groups ?? []}
+              names={profiles?.map((p) => p.name) ?? []}
+              inUse={session?.id === selected.id}
+              update={rubrica.update}
+              validateRaw={rubrica.validateRaw}
+              actions={rubrica.actions}
+              onSelect={choose}
+              onDeleted={setDeleted}
+              reload={rubrica.reload}
+              guard={guard}
+            />
+          ) : null}
+        </main>
       </div>
-    </ToastProvider>
+      <StatusBar view={view} info={info} />
+      <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
+      <ImportDialog open={importing} onClose={closeImport} actions={importer} onImported={wasImported} incoming={incoming} secretStore={secretStore} />
+      {dropHover ? (
+        <div className="shell-drop" aria-hidden="true">
+          <span>{t("import.drop_hover")}</span>
+        </div>
+      ) : null}
+      <ConfirmDialog
+        open={leaving !== null}
+        title={t("leave.title")}
+        body={t("leave.body", { name: selected?.name ?? "" })}
+        confirmLabel={t("leave.save")}
+        alternateLabel={t("leave.discard")}
+        cancelLabel={t("leave.cancel")}
+        onConfirm={() => void leave("save")}
+        onAlternate={() => void leave("discard")}
+        onCancel={() => {
+          setLeaving(null);
+          setImported(null);
+        }}
+      />
+    </div>
   );
 }

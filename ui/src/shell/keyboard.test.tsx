@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { DaemonView } from "../daemon/types";
 import type { ImportActions } from "../import/types";
 import type { CmdError, ProfilePatch, ProfileSummary } from "../rubrica/types";
-import { applyPatch, makeDetail, makePreview, makeSummary, makeView, SAMPLE_PROFILES } from "../test/fixtures";
+import { applyPatch, makeDetail, makePreview, makeStatus, makeSummary, makeView, SAMPLE_PROFILES } from "../test/fixtures";
 import { renderShell } from "../test/shell";
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -98,7 +98,7 @@ describe("keyboard on the whole shell", () => {
     const user = userEvent.setup();
     show();
     const seen = (await tabStops(user)).map((el) => `${roleOf(el)}:${nameOf(el)}`);
-    expect(seen.slice(0, 9)).toEqual(["button:Import…", "button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Manage groups", "button:Favourite", "button:More actions", "tab:General"]);
+    expect(seen.slice(0, 10)).toEqual(["button:Import…", "button:Menu", "input:Search connections", "input:By name", "option:Ufficio Napoli", "button:Manage groups", "button:Favourite", "button:Connect", "button:More actions", "tab:General"]);
     expect(seen).not.toContain("button:Copy");
   });
 
@@ -235,6 +235,33 @@ describe("keyboard on the whole shell", () => {
     expect(document.activeElement).toBe(here);
   });
 
+  it("a_connection_needs_no_pointer", async () => {
+    // select a row, Enter connects, the state comes with the events, Enter again disconnects
+    const calls: { cmd: string; args: unknown }[] = [];
+    mockIPC((cmd, args) => void calls.push({ cmd, args }), { shouldMockEvents: true });
+    const user = userEvent.setup();
+    const first = renderShell(makeView());
+    const row = () => screen.getByRole("option", { name: /Ufficio Napoli/ });
+    row().focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(calls.filter((c) => c.cmd === "connect_profile")).toEqual([{ cmd: "connect_profile", args: { id: "office", replace: false } }]));
+    // while the answer has not been followed by an event, a second Enter asks for nothing
+    await user.keyboard("{Enter}");
+    expect(calls.filter((c) => c.cmd === "connect_profile" || c.cmd === "disconnect")).toHaveLength(1);
+    first.unmount();
+    // the session is up (the event came): Enter on the same row ends it
+    renderShell(makeView({ status: makeStatus({ state: "connected", session: 1, profile: { id: "office", name: "Ufficio Napoli" } }) }));
+    row().focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(calls.some((c) => c.cmd === "disconnect")).toBe(true));
+    // a row that is not the chosen one is chosen by Enter and nothing else happens
+    const before = calls.length;
+    screen.getByRole("option", { name: /Homelab/ }).focus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Homelab");
+    expect(calls.length).toBe(before);
+  });
+
   it("a_full_tour_needs_no_pointer", async () => {
     const user = userEvent.setup();
     show();
@@ -258,6 +285,7 @@ describe("keyboard on the whole shell", () => {
     // a tab: to the strip, the arrows choose; the panel shows
     await user.tab(); // «Manage groups»
     await user.tab(); // the star
+    await user.tab(); // Connect
     await user.tab(); // More actions
     await user.tab(); // the tab strip
     expect(roleOf(active())).toBe("tab");

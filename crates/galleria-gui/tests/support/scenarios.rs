@@ -111,3 +111,26 @@ pub fn scenario(name: &str) -> Option<Vec<Vec<FakeStep>>> {
         _ => return None,
     })
 }
+
+/// What the fake daemon says it has in `hello`: both backends, and the fake backend's own capabilities (a handshake to show).
+pub fn backends() -> Vec<galleria_ipc::BackendInfo> {
+    use galleria_ipc::{BackendInfo, Capabilities, Protocol};
+    let capabilities = Capabilities {
+        handshake: true,
+        interactive_auth: true,
+        server_pushed_config: true,
+    };
+    [Protocol::Wireguard, Protocol::Openvpn]
+        .into_iter()
+        .map(|protocol| BackendInfo {
+            protocol,
+            available: true,
+            version: Some("fake".into()),
+            unavailable_reason: None,
+            capabilities: Capabilities {
+                handshake: protocol == Protocol::Wireguard,
+                ..capabilities
+            },
+        })
+        .collect()
+}

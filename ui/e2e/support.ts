@@ -13,8 +13,8 @@ export function env(name: string): string {
   return value;
 }
 
-/** The daemon is part of the scenario: the tests start and stop it from Node, not from the webview. */
-export const daemon = (action: "start" | "stop") => execFileSync(`${env("GALLERIA_SMOKE_BIN")}/daemon-${action}`, { stdio: "inherit" });
+/** The daemon is part of the scenario: the tests start and stop it from Node, not from the webview. `scenario` is a name of `tests/support/scenarios.rs` (what the fake backend does at each connect); it counts only when the daemon is started. */
+export const daemon = (action: "start" | "stop", scenario?: string) => execFileSync(`${env("GALLERIA_SMOKE_BIN")}/daemon-${action}`, scenario ? [scenario] : [], { stdio: "inherit" });
 
 export const TEN_SECONDS = 10_000;
 

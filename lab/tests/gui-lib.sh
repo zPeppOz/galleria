@@ -30,7 +30,10 @@ gui_prepare_outer() {
 set -euo pipefail
 if [[ -f "$tmp/daemon.pid" ]] && kill -0 "\$(cat "$tmp/daemon.pid")" 2>/dev/null; then exit 0; fi
 rm -f "$tmp/galleriad.sock"
-"$GALLERIA_SMOKE_DAEMON" "$tmp" \\
+# \`daemon-start <scenario>\`: the scripts of the fake backend, one for each connect (tests/support/scenarios.rs); none: it says nothing
+scenario=()
+[[ -z "\${1:-}" ]] || scenario=(--scenario "\$1")
+"$GALLERIA_SMOKE_DAEMON" "$tmp" "\${scenario[@]}" \\
   >> "$tmp/daemon.log" 2>&1 &
 echo \$! > "$tmp/daemon.pid"
 for _ in \$(seq 1 100); do

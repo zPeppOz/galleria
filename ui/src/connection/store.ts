@@ -81,9 +81,15 @@ export const useConnection = (): Connection => useContext(ConnectionContext);
  * D28: connecting another profile while a session of the rubrica is up replaces it, with no question. The first call is asked without
  * `replace`; when the service says a session is active and Rust says it is one of ours (`foreign: false`), the second call asks for
  * the replacement. A session that is not ours (`foreign: true`) is never replaced here: the error goes up. The name of the profile
- * that was left is returned, so that the caller can say it once.
+ * that was left is returned, so that the caller can say it once. `onReplacing` is called with that name just before the second call:
+ * the notice about the session that was left has to be sent before the service replaces it, because the state of the new one is
+ * announced by Rust as soon as the service says it (a notice sent when the call returns can come after «Connected to …»).
  */
-export async function connectOrReplace(call: (id: string, replace: boolean) => Promise<void>, id: string): Promise<{ replaced: string | null }> {
+export async function connectOrReplace(
+  call: (id: string, replace: boolean) => Promise<void>,
+  id: string,
+  onReplacing?: (left: string) => void,
+): Promise<{ replaced: string | null }> {
   try {
     await call(id, false);
     return { replaced: null };
@@ -91,6 +97,7 @@ export async function connectOrReplace(call: (id: string, replace: boolean) => P
     const error = failure as CommandError;
     const profile = error.data?.profile as { name?: string } | undefined;
     if (error.code === "already_active" && error.data?.foreign === false) {
+      onReplacing?.(profile?.name ?? "");
       await call(id, true);
       return { replaced: profile?.name ?? "" };
     }

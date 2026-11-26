@@ -1,6 +1,7 @@
 // Helpers shared by the level 3 tests: the WebDriver smoke test (`*.e2e.ts`, lab/tests/gui-smoke.sh) and the screen
 // reader checks (`*.a11y.ts`, lab/tests/gui-a11y.sh). Nothing here asks the daemon to connect.
-import { execFile, execFileSync, spawnSync } from "node:child_process";
+import { execFile, execFileSync, spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { connect } from "node:net";
 import { appendFileSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { remote } from "webdriverio";
@@ -37,18 +38,80 @@ export async function openApp(keepState = false, rubrica: "seeded" | "empty" = "
     rmSync(stateFile(), { force: true });
     seedRubrica(rubrica);
   }
-  current = await remote({
-    hostname: "127.0.0.1",
-    port: Number(env("GALLERIA_SMOKE_DRIVER_PORT")),
-    logLevel: "error",
-    capabilities: { "tauri:options": { application: env(keyring === "none" ? "GALLERIA_SMOKE_APP_NO_KEYRING" : "GALLERIA_SMOKE_APP"), ...(args.length > 0 ? { args } : {}) } } as WebdriverIO.Capabilities,
-  });
+  const port = process.env.GALLERIA_DRIVER_PER_SESSION ? await startPrivateDriver() : Number(env("GALLERIA_SMOKE_DRIVER_PORT"));
+  try {
+    current = await remote({
+      hostname: "127.0.0.1",
+      port,
+      logLevel: "error",
+      capabilities: { "tauri:options": { application: env(keyring === "none" ? "GALLERIA_SMOKE_APP_NO_KEYRING" : "GALLERIA_SMOKE_APP"), ...(args.length > 0 ? { args } : {}) } } as WebdriverIO.Capabilities,
+    });
+  } catch (failure) {
+    await stopPrivateDriver();
+    throw failure;
+  }
   return current;
 }
 
 export async function closeApp(): Promise<void> {
-  await current?.deleteSession().catch(() => undefined);
+  const closing = current?.deleteSession().catch(() => undefined);
   current = undefined;
+  // With a driver of its own the session is ended for good in the next lines, so a driver that hangs on this call is not waited for
+  if (privateDriver) await Promise.race([closing, new Promise((resolve) => setTimeout(resolve, TEN_SECONDS))]);
+  else await closing;
+  await stopPrivateDriver();
+}
+
+// ---- A driver of its own for every session (GALLERIA_DRIVER_PER_SESSION, set by lab/tests/gui-a11y.sh) --------------------
+// One `tauri-driver` and one `WebKitWebDriver` serve every session of a run when the script starts them (the smoke test). If
+// that driver dies, every later test finds the port refused and fails with it (the cascade of `UND_ERR_SOCKET` and «connection
+// refused» seen in the screen reader check). With this variable each session starts its own pair and the end of the session
+// ends it: a driver that dies fails the test that was using it and no other.
+
+let privateDriver: ChildProcess | undefined;
+let nextPort = 4500;
+
+async function startPrivateDriver(): Promise<number> {
+  await stopPrivateDriver();
+  const port = nextPort;
+  nextPort += 2;
+  const child = spawn(env("GALLERIA_SMOKE_DRIVER"), ["--port", String(port), "--native-port", String(port + 1), "--native-driver", env("GALLERIA_NATIVE_DRIVER_WRAPPER")], { stdio: "inherit" });
+  privateDriver = child;
+  let exited = false;
+  child.once("exit", () => (exited = true));
+  const deadline = Date.now() + TEN_SECONDS;
+  while (!(await listening(port))) {
+    if (exited) throw new Error(`tauri-driver exited before it listened on ${port}`);
+    if (Date.now() > deadline) throw new Error(`tauri-driver did not listen on ${port} in ${TEN_SECONDS} ms`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return port;
+}
+
+const listening = (port: number): Promise<boolean> =>
+  new Promise((resolve) => {
+    const socket = connect({ host: "127.0.0.1", port });
+    socket.once("connect", () => (socket.destroy(), resolve(true)));
+    socket.once("error", () => (socket.destroy(), resolve(false)));
+  });
+
+/** Ends the driver of the session and waits until it is gone, and with it the window it opened if the driver left it behind. */
+async function stopPrivateDriver(): Promise<void> {
+  const child = privateDriver;
+  privateDriver = undefined;
+  if (!child) return;
+  if (child.exitCode === null && child.signalCode === null) {
+    const gone = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+    child.kill("SIGTERM");
+    await Promise.race([gone, new Promise((resolve) => setTimeout(resolve, 5000))]);
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  }
+  // A driver that died (or was ended before it had closed its session) leaves the window running, and the window holds the
+  // lock of the single instance (plan B4, T5): every app that the next tests start would hand its arguments over to it and
+  // exit, and each of those tests would wait for a session that never comes. The run has no other galleria-gui.
+  spawnSync("pkill", ["-KILL", "-x", "galleria-gui"]);
+  const deadline = Date.now() + TEN_SECONDS;
+  while (spawnSync("pgrep", ["-x", "galleria-gui"]).status === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
 export async function bodyText(b: Browser): Promise<string> {

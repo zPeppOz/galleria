@@ -23,6 +23,19 @@ describe("connectOrReplace", () => {
     expect(outcome).toEqual({ replaced: "Homelab" });
   });
 
+  it("the_name_of_the_session_that_is_left_is_given_before_the_second_call_not_after_it", async () => {
+    const events: string[] = [];
+    await connectOrReplace(
+      async (_id, replace) => {
+        events.push(replace ? "call with replace" : "call");
+        if (!replace) throw alreadyActive(false);
+      },
+      "office",
+      (left) => events.push(`replacing ${left}`),
+    );
+    expect(events).toEqual(["call", "replacing Homelab", "call with replace"]);
+  });
+
   it("a_connection_with_nothing_in_the_way_is_one_call", async () => {
     const asked: boolean[] = [];
     expect(await connectOrReplace(async (_id, replace) => void asked.push(replace), "office")).toEqual({ replaced: null });

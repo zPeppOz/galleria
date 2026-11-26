@@ -1670,3 +1670,22 @@ Sull'albero del commit del T7 (`44eed1b` più i file del T7, che sono tutti nel 
 - Nessuna prova saltata: il fumo ha **8 prove del manifesto** e le controlla da solo (`gui.sh smoke` finisce con `check-gates.py`); `lab-connect` 23 su 23.
 - **Cosa gira in CI dopo il push** (non provato qui: il push lo fa Aitano): il job `gui-smoke` (le sei `G10`, `the_whole_day_in_one_window`, `G11a`, più le 10 del portachiavi: **18** righe), `gui` (le quattro `update_*` di G11: **9** righe), `lab-connect` ×3 (`G10g` e `t18`: **23** righe). Nessun job ha `continue-on-error` (lo guarda `no_job_of_a_gate_may_fail_softly`).
 - **Non provato / dichiarato.** Il run di CI; `G10g` su 27 e 79 con OpenVPN intorno (le altre prove del giro intero, OpenVPN 2.7 + DCO); la prova di `G10g` contro un tunnel che cade davvero alla chiusura (non l'ho mai visto rosso sul laboratorio vero: il giudice è provato su registri inventati, dove cade in tutti i casi provati); le prove manuali sui tre desktop (M1–M12), KDE, Wayland, e la passata a orecchio: gruppo D.
+
+### Gruppo D — desktop veri, consegna parziale (T8–T10)
+
+Il resoconto dettagliato (versioni, tabella **12 × 3**, riserve **R1–R13**, Orca e tempi) è in
+[Passata desktop B6](08-b6-desktop-pass.md). Le prove grandi restano in `/mnt/b/vm/evidence/b6/`,
+mai nel repo. Handoff: `.claude/handoffs/2026-11-26-173000-fase2-b6-gruppo-d.md`.
+
+- **T8 eseguito**, commit `b900b5a`: nuova Ubuntu 24.04 desktop, firma/hash verificati, disco 40 GiB
+  su HDD, cloud-init finito, GUI costruito dal gruppo C installato sulle tre, finestre e icone fotografate,
+  libreria Fedora caricata verificata. `gui-vm.sh` e il terzo nome di `vmctl.sh` sono riproducibili.
+- **T9 parziale, non verde**: 0/36 casi manuali interi verificati; i tentativi e le prove parziali sono
+  indicati cella per cella. Su 24.04 visto il chooser GTK del processo via AT-SPI, non una prova completa
+  con mouse/tastiera. Il menu Fedora non è verificato: timeout del Notification Watcher dopo alcuni avvii.
+  Questo **non** è un limite di supporto accettato: S56 secondo pezzo resta aperta.
+- **T10**: vedi numeri e parlato nel resoconto dettagliato. Nessun ascolto umano. G13 misura fino alla
+  prima richiesta dello stato dalla pagina, non il primo fotogramma dipinto.
+
+**Non segnare G10 manuale, G12 o fase 2 chiusi sulla base di questa consegna.** Il vincolo della card
+chiede `kanban_complete` anche a budget finito: il gruppo E deve prima riprendere ciò che manca del D.

@@ -27,12 +27,19 @@ for executable in lab/out/tests/*; do
     echo "lab/run.sh: $name not run: it needs GALLERIA_E2E_GUI_STORE=1 (scripts/gui.sh lab-g3 $client)"
     continue
   fi
+  # t18 needs the window to drive the daemon of the client (scripts/gui.sh lab-connect): without it there was nothing to see.
+  if [[ $name == t18_gui_connect && ${GALLERIA_E2E_GUI_CONNECT:-0} != 1 ]]; then
+    echo "lab/run.sh: $name not run: it needs GALLERIA_E2E_GUI_CONNECT=1 (scripts/gui.sh lab-connect $client)"
+    continue
+  fi
   args=()
   if [[ -n $filter && $name != *"$filter"* ]]; then args+=("$filter"); fi
   # Count real matches so a misspelled filter cannot produce a false green run.
-  listed=$(docker exec -e GALLERIA_LAB=1 -e "GALLERIA_E2E_DCO=${GALLERIA_E2E_DCO:-0}" -e "GALLERIA_E2E_GUI_STORE=${GALLERIA_E2E_GUI_STORE:-0}" "glab-client$client" "/lab/$executable" --ignored --list "${args[@]}")
+  listed=$(docker exec -e GALLERIA_LAB=1 -e "GALLERIA_E2E_DCO=${GALLERIA_E2E_DCO:-0}" -e "GALLERIA_E2E_GUI_STORE=${GALLERIA_E2E_GUI_STORE:-0}" -e "GALLERIA_E2E_GUI_CONNECT=${GALLERIA_E2E_GUI_CONNECT:-0}" "glab-client$client" "/lab/$executable" --ignored --list "${args[@]}")
   if [[ $listed != *': test'* ]]; then continue; fi
   matched=$((matched+1))
-  docker exec -e GALLERIA_LAB=1 -e "GALLERIA_E2E_DCO=${GALLERIA_E2E_DCO:-0}" -e "GALLERIA_E2E_GUI_STORE=${GALLERIA_E2E_GUI_STORE:-0}" "glab-client$client" "/lab/$executable" --ignored --test-threads=1 --nocapture "${args[@]}"
+  # LAB_TEST_LOG keeps what the tests print, for scripts/check-gates.py: a proof that was ignored or never ran must not pass as green.
+  docker exec -e GALLERIA_LAB=1 -e "GALLERIA_E2E_DCO=${GALLERIA_E2E_DCO:-0}" -e "GALLERIA_E2E_GUI_STORE=${GALLERIA_E2E_GUI_STORE:-0}" -e "GALLERIA_E2E_GUI_CONNECT=${GALLERIA_E2E_GUI_CONNECT:-0}" "glab-client$client" "/lab/$executable" --ignored --test-threads=1 --nocapture "${args[@]}" \
+    | if [[ -n ${LAB_TEST_LOG:-} ]]; then tee -a "$LAB_TEST_LOG"; else cat; fi
 done
 ((matched>0)) || { echo 'no end-to-end tests matched' >&2; exit 1; }

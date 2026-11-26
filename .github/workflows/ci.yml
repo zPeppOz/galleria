@@ -119,6 +119,30 @@ jobs:
       - run: sudo modprobe wireguard
       - run: LAB_BUILD=host scripts/gui.sh lab-g3 ${{ matrix.client }}
 
+  # G4, G5, G6, G7 and G9 (plan B5, T9 and T10): the real window of the GUI, in the same image as `lab-g3`, drives the REAL daemon of the
+  # client through a bridge of the host (lab/tests/gui-daemon-relay.py, Q42 (b)): connects, disconnects and replaces with WireGuard and
+  # OpenVPN, asks for the credentials, saves them in a real GNOME Keyring, shows the session of another user of the group. The window
+  # writes the results of its proofs to target/gui-lab/vitest.json and t18 (crates/galleria-e2e/tests/t18_gui_connect.rs) reads what the
+  # client saw; the verb ends with scripts/check-gates.py, and so does this job, once more and alone: the 20 proofs of the manifest for
+  # `lab-connect` must be in the log with `ok` or `passed`, none skipped or ignored. `lab` does not run t18 (lab/run.sh says so).
+  # No `continue-on-error`: a red proof is a red job. `ovpn` is not loaded here, as in `lab-g3`: `lab-dco` is the job that proves the module.
+  lab-connect:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        client: [26, 27, 79]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install toolchain
+        run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy,llvm-tools-preview
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - run: sudo modprobe wireguard
+      - run: LAB_BUILD=host scripts/gui.sh lab-connect ${{ matrix.client }}
+      - run: scripts/check-gates.py --job lab-connect --vitest-json target/gui-lab/vitest.json --cargo-log target/gates/lab-connect-cargo.log
+
   # galleria-gui is outside check, coverage and lab/build.sh (they exclude it): it needs WebKitGTK and Node.
   # Locally the same steps run in the image built from lab/images/gui.Dockerfile: scripts/gui.sh check.
   gui:

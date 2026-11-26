@@ -64,3 +64,19 @@ lab-import' lab/run.sh 26 t17`. Senza `GALLERIA_E2E_GUI_STORE=1` `lab/run.sh` no
 salta risulterebbe «ok»): nel giro intero lo salta, con `t17` come filtro esce con errore. Nella CI lo fa il job `lab-g3`
 (`LAB_BUILD=host scripts/gui.sh lab-g3 <client>`, client 26, 27 e 79). La finestra gira
 solo nell'immagine Ubuntu 24.04 (Q37 (a)): sui tre client girano la CLI e il demone, non WebKit.
+
+G4–G9 (finestra contro il demone vero, fase 2 B5 T9 e T10): `scripts/gui.sh lab-connect <26|27|79>` porta su il laboratorio e, tra
+`up.sh` e i test (`LAB_BEFORE_TESTS='scripts/gui.sh lab-connect-window <client>'`), fa questo sull'host: crea nel client `carla`, un
+secondo utente del gruppo `galleria` (le immagini non cambiano; `alice` c'è già); avvia nel client l'osservatore
+`lab/tests/gui-lab-watch.sh` (ogni 200 ms i processi `openvpn` con i loro argomenti e l'interfaccia `glr-wg0`, in
+`/tmp/gui-lab-watch.log`; una volta al secondo un `ping` dentro il tunnel perché i byte si muovano); avvia due **ponti** sull'host
+(`lab/tests/gui-daemon-relay.py`, `target/gui-lab/run/carla.sock` e `alice.sock`): ogni connessione che arriva lancia
+`docker exec -i -u <utente> glab-client<N> python3 … join /run/galleria/galleriad.sock` e unisce i due flussi di byte, così il demone
+vede **`carla` o `alice` veri**, con il loro uid e i loro gruppi (Q42 (b)); il ponte non legge i messaggi e non è in nessun pacchetto;
+lancia nell'immagine della GUI (`lab-connect-here`, Xvfb, bus privato, GNOME Keyring sbloccato) la finestra vera, con
+`GALLERIA_SOCKET` sul ponte di `carla`, che esegue `ui/e2e/lab-connect.e2e.ts`; ferma i ponti e l'osservatore. Poi `t18_gui_connect` gira
+nel client e legge ciò che il client ha visto. `lab/run.sh` non lancia `t18` senza `GALLERIA_E2E_GUI_CONNECT=1` e lo dice (come `t17`:
+una prova che si salta risulta «ok»), e con `LAB_TEST_LOG=<file>` tiene ciò che i test stampano. Il verbo finisce con
+`scripts/check-gates.py --job lab-connect`: ogni prova del manifesto `lab/tests/gates-b5.tsv` per quel job deve essere nell'uscita con
+`ok` o `passed`. Nella CI lo fa il job `lab-connect` (client 26, 27 e 79). **In locale** con Docker rootless OpenVPN 2.7 (client 27 e
+79) prova il DCO e riceve `EPERM`: lì sono verdi solo le prove WireGuard e il giro intero è quello del job.

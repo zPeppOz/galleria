@@ -20,3 +20,10 @@ G6	check	cargo	layered_cli_writes_stay_in_the_file
 G6	check	cargo	a_locked_keyring_is_an_error_and_writes_no_file
 G6	check	cargo	to_connect_params_reads_through_the_layers
 G6	check	cargo	the_cli_without_a_session_bus_reads_the_file_and_stays_quiet
+G4	lab-connect	vitest	G4a_wireguard_connects_and_the_numbers_move
+G4	lab-connect	vitest	G4b_openvpn_connects_after_the_credentials
+G4	lab-connect	vitest	G4c_switching_profile_replaces_without_asking
+G4	lab-connect	vitest	G4d_disconnect_returns_to_disconnected
+G4	lab-connect	vitest	G4e_cancel_while_connecting_is_a_disconnect
+G4	lab-connect	cargo	gui_session_never_had_two_backends
+G4	lab-connect	cargo	gui_session_left_no_residue

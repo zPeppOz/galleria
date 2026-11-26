@@ -74,6 +74,11 @@ run_in_image() {
   # one test or one check at a time (lab/tests/gui-smoke.sh, lab/tests/gui-a11y.sh)
   [[ -z ${GALLERIA_SMOKE_FILTER:-} ]] || opts+=(-e "GALLERIA_SMOKE_FILTER=$GALLERIA_SMOKE_FILTER")
   [[ -z ${GALLERIA_A11Y_FILTER:-} ]] || opts+=(-e "GALLERIA_A11Y_FILTER=$GALLERIA_A11Y_FILTER")
+  # lab-connect (plan B5, T9): the bridges of the window to the daemon of the client, as the image sees them under /work
+  local var
+  for var in GALLERIA_LAB_SOCKET GALLERIA_LAB_SOCKET_OTHER; do
+    [[ -z ${!var:-} ]] || opts+=(-e "$var=${!var}")
+  done
   docker run "${opts[@]}" "$IMAGE" bash -euc \
     'mkdir -p "$CARGO_HOME"; ln -sfn /cargo-registry "$CARGO_HOME/registry"; exec "$@"' gui-run "$@"
 }
@@ -108,6 +113,48 @@ a11y_here() { run_webdriver_here lab/tests/gui-a11y.sh; }
 
 # G3 in the laboratory (plan B4, T6): the real window imports the profiles of the laboratory, see lab/tests/gui-lab-import.sh.
 lab_import_here() { run_webdriver_here lab/tests/gui-lab-import.sh; }
+
+# G4, G5, G6, G7 and G9 in the laboratory (plan B5, T9 and T10): the real window drives the real daemon of a client, see lab/tests/gui-lab-connect.sh.
+lab_connect_here() { run_webdriver_here lab/tests/gui-lab-connect.sh; }
+
+# Host side of `lab-connect`, run by lab/run.sh between `lab/up.sh` and the tests (LAB_BEFORE_TESTS). The laboratory is up:
+#  - `carla`, a second user of the group `galleria`, is made in the client (the images do not change), next to `alice`;
+#  - the watch of the client starts (lab/tests/gui-lab-watch.sh): what t18 reads afterwards;
+#  - two bridges on the host, in target/gui-lab/run/: every connection to one of them is joined with `docker exec -i -u <user>` to the
+#    socket of the daemon in the client, so the daemon sees `carla` or `alice` themselves (Q42 (b), lab/tests/gui-daemon-relay.py);
+#  - the window runs in the image (`lab-connect-here`), with the bridge of carla as its daemon;
+#  - the bridges stop, and the proofs of the window are checked against the manifest of the gates.
+lab_connect_window() {
+  local client=$1 name="glab-client$1" run="$PWD/target/gui-lab/run" relay_pids=() user status=0
+  mkdir -p target/gui-lab target/gates
+  rm -rf "$run" target/gui-lab/vitest.json target/gui-lab/used-otp
+  mkdir -m 700 "$run"
+  docker exec "$name" bash -euc 'getent group galleria > /dev/null; id carla > /dev/null 2>&1 || useradd -m -G galleria carla'
+  docker exec -d "$name" bash /lab/lab/tests/gui-lab-watch.sh
+  for user in carla alice; do
+    python3 lab/tests/gui-daemon-relay.py listen "$run/$user.sock" \
+      docker exec -i -u "$user" "$name" python3 /lab/lab/tests/gui-daemon-relay.py join /run/galleria/galleriad.sock \
+      > "$run/$user.relay.log" 2>&1 &
+    relay_pids+=($!)
+  done
+  for user in carla alice; do
+    for _ in $(seq 1 50); do [[ -S $run/$user.sock ]] && break; sleep 0.1; done
+    [[ -S $run/$user.sock ]] || { echo "lab-connect: the bridge of $user did not start" >&2; cat "$run/$user.relay.log" >&2; kill "${relay_pids[@]}" 2>/dev/null; return 1; }
+  done
+  # the window sees the repository at /work
+  export GALLERIA_LAB_SOCKET=/work/target/gui-lab/run/carla.sock GALLERIA_LAB_SOCKET_OTHER=/work/target/gui-lab/run/alice.sock
+  # The profiles of the laboratory are made in containers, root-owned and 0600 (see `lab-import`).
+  if [[ -r lab/out/base.ovpn ]]; then run_in_image scripts/gui.sh lab-connect-here || status=$?
+  else GUI_UID=0 GUI_GID=0 run_in_image scripts/gui.sh lab-connect-here || status=$?; fi
+  kill "${relay_pids[@]}" 2>/dev/null || true
+  wait "${relay_pids[@]}" 2>/dev/null || true
+  # the register of the watch is complete when t18 reads it
+  sleep 0.5
+  docker exec "$name" pkill -f gui-lab-watch.sh || true
+  sleep 0.5
+  (( status == 0 )) || return "$status"
+  scripts/check-gates.py --job lab-connect --kind vitest --vitest-json target/gui-lab/vitest.json
+}
 
 run_webdriver_here() {
   local target=${CARGO_TARGET_DIR:-$PWD/target}
@@ -152,5 +199,19 @@ case "${1:-}" in
     ensure_image
     GALLERIA_E2E_GUI_STORE=1 LAB_BEFORE_TESTS='scripts/gui.sh lab-import' exec lab/run.sh "$2" t17 ;;
   pnpm-version) pnpm_version ;;
-  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|a11y|lab-import|lab-g3 <26|27|79>|socket-owner|keyring|pnpm-version>' >&2; exit 2 ;;
+  lab-connect)
+    # G4, G5, G6, G7 and G9 whole, on the host: the laboratory comes up, `lab-connect-window` makes the window drive the real daemon of the
+    # client between `lab/up.sh` and the tests, then t18 reads what the client saw. At the end, every proof of the manifest for the job
+    # `lab-connect` (the ones of the window and the ones of t18) must have run and passed: scripts/check-gates.py.
+    [[ ${2:-} =~ ^(26|27|79)$ ]] || { echo 'usage: scripts/gui.sh lab-connect <26|27|79>' >&2; exit 2; }
+    ensure_image
+    mkdir -p target/gates
+    rm -f target/gates/lab-connect-cargo.log
+    GALLERIA_E2E_GUI_CONNECT=1 LAB_TEST_LOG=target/gates/lab-connect-cargo.log LAB_BEFORE_TESTS="scripts/gui.sh lab-connect-window $2" lab/run.sh "$2" t18
+    scripts/check-gates.py --job lab-connect --vitest-json target/gui-lab/vitest.json --cargo-log target/gates/lab-connect-cargo.log ;;
+  lab-connect-window)
+    [[ ${2:-} =~ ^(26|27|79)$ ]] || { echo 'usage: scripts/gui.sh lab-connect-window <26|27|79>' >&2; exit 2; }
+    lab_connect_window "$2" ;;
+  lab-connect-here) lab_connect_here ;;
+  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|a11y|lab-import|lab-g3 <26|27|79>|lab-connect <26|27|79>|socket-owner|keyring|pnpm-version>' >&2; exit 2 ;;
 esac

@@ -1,7 +1,7 @@
 // Helpers shared by the level 3 tests: the WebDriver smoke test (`*.e2e.ts`, lab/tests/gui-smoke.sh) and the screen
 // reader checks (`*.a11y.ts`, lab/tests/gui-a11y.sh). Nothing here asks the daemon to connect.
-import { execFile, execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { execFile, execFileSync, spawnSync } from "node:child_process";
+import { appendFileSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { remote } from "webdriverio";
 
@@ -256,3 +256,40 @@ export function importFixtures(): Record<string, string> {
       .map((line) => [line.slice(0, line.indexOf("=")), line.slice(line.indexOf("=") + 1)]),
   );
 }
+
+// ---- Helpers of the tests that connect (ui/e2e/lab-connect.e2e.ts) ---------------------------------------------------
+
+export const waitFor = (b: Browser, check: () => Promise<boolean>, timeoutMsg: string, timeout = TEN_SECONDS) => b.waitUntil(check, { timeout, interval: 250, timeoutMsg });
+
+/** The text of a cell of the strip of the profile that is open (`strip.state`, `strip.ip`, …). */
+export const cell = async (b: Browser, name: string): Promise<string> => (await b.$(`[data-cell="${name}"] dd`).getText()).trim();
+
+/** The state the bar of the window says. */
+export const barState = async (b: Browser): Promise<string> => (await b.$(".status-bar-state").getText()).trim();
+
+/** Chooses the row of the list whose name starts with `name` and waits for its detail. */
+export async function choose(b: Browser, name: string): Promise<void> {
+  const row = await b.waitUntil(
+    async () => {
+      for (const el of await b.$$('[role="listbox"] [role="option"]')) if ((await el.getText()).trim().startsWith(name)) return el;
+      return false;
+    },
+    { timeout: TEN_SECONDS, interval: 250, timeoutMsg: `the list has no row «${name}»` },
+  );
+  await row.click();
+  await waitFor(b, async () => (await b.$("h1").getText()) === name, `the detail never showed «${name}»`);
+}
+
+/** The id of the profile of this name: the file of the rubrica is named after it. */
+export function profileId(name: string): string {
+  const dir = join(env("XDG_CONFIG_HOME"), "galleria", "profiles");
+  const file = readdirSync(dir).find((entry) => readFileSync(join(dir, entry), "utf8").includes(`name = "${name}"`));
+  if (!file) throw new Error(`no profile named ${name} on the disk`);
+  return file.replace(/\.toml$/, "");
+}
+
+/** What the keyring holds for one key of a profile (empty when it holds nothing): read with `secret-tool`, as a person would. */
+export const keyringLookup = (id: string, key: string): string => spawnSync("secret-tool", ["lookup", "service", "galleria", "profile", id, "key", key], { encoding: "utf8" }).stdout;
+
+/** Every item of the keyring of a profile, with its secret, as text. */
+export const keyringItems = (id: string): string => `${spawnSync("secret-tool", ["search", "--all", "service", "galleria", "profile", id], { encoding: "utf8" }).stdout}`;

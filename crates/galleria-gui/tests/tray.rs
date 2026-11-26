@@ -12,8 +12,8 @@ use galleria_gui::window::WindowControl;
 use galleria_gui::{
     link::{DaemonView, LinkState},
     tray::{
-        LABEL_MAX, MAX_FAVOURITES, Surface, Tray, TrayAction, TrayEntry, TrayIcon, TrayInput,
-        TrayLabels, literal, model,
+        ICON_SETTLE, IconSettler, LABEL_MAX, MAX_FAVOURITES, Surface, Tray, TrayAction, TrayEntry,
+        TrayIcon, TrayInput, TrayLabels, literal, model,
     },
     tray_tauri::{ActionPayload, EV_TRAY_ACTION, run_action},
 };
@@ -550,4 +550,78 @@ fn window_show_is_a_command_with_no_parameter() {
     let world = start_with(&window, "plain");
     assert_eq!(world.invoke("window_show", json!({})).unwrap(), Value::Null);
     assert_eq!(window.shown(), 1);
+}
+
+// ---- the icon that waits for the last change (F2) -----------------------------------------------------------------------
+
+type Put = Arc<Mutex<Vec<(TrayIcon, Instant)>>>;
+
+fn settler(delay: Duration, shown: TrayIcon) -> (IconSettler, Put) {
+    let put: Put = Arc::default();
+    let sink = Arc::clone(&put);
+    let settler = IconSettler::new(shown, delay, move |icon| {
+        sink.lock().unwrap().push((icon, Instant::now()));
+    });
+    (settler, put)
+}
+
+fn icons(put: &Put) -> Vec<TrayIcon> {
+    put.lock().unwrap().iter().map(|(icon, _)| *icon).collect()
+}
+
+#[test]
+fn two_changes_closer_than_the_wait_put_one_icon_the_last() {
+    // the real wait, the one the app uses: more than the 40 ms that broke the extension, and no less than 250 ms
+    assert!(ICON_SETTLE >= Duration::from_millis(250));
+    let (settler, put) = settler(ICON_SETTLE, TrayIcon::On);
+    settler.want(TrayIcon::Busy);
+    std::thread::sleep(Duration::from_millis(40));
+    settler.want(TrayIcon::Off);
+    std::thread::sleep(ICON_SETTLE + Duration::from_millis(200));
+    assert_eq!(icons(&put), [TrayIcon::Off], "one icon, the final one");
+}
+
+#[test]
+fn a_change_that_comes_back_to_what_is_shown_puts_nothing() {
+    let (settler, put) = settler(Duration::from_millis(60), TrayIcon::Off);
+    settler.want(TrayIcon::Busy);
+    std::thread::sleep(Duration::from_millis(10));
+    settler.want(TrayIcon::Off);
+    std::thread::sleep(Duration::from_millis(200));
+    assert_eq!(icons(&put), []);
+    // and the same icon again, with nothing waiting, starts nothing
+    settler.want(TrayIcon::Off);
+    std::thread::sleep(Duration::from_millis(150));
+    assert_eq!(icons(&put), []);
+}
+
+#[test]
+fn a_change_that_stays_is_put_after_the_wait_and_not_before() {
+    let delay = Duration::from_millis(80);
+    let (settler, put) = settler(delay, TrayIcon::Off);
+    let started = Instant::now();
+    settler.want(TrayIcon::Busy);
+    assert_eq!(icons(&put), [], "not at once");
+    std::thread::sleep(delay + Duration::from_millis(150));
+    let put = put.lock().unwrap();
+    assert_eq!(put.len(), 1);
+    assert_eq!(put[0].0, TrayIcon::Busy);
+    assert!(put[0].1.duration_since(started) >= delay);
+}
+
+#[test]
+fn icons_that_are_put_are_never_closer_than_the_wait() {
+    let delay = Duration::from_millis(80);
+    let (settler, put) = settler(delay, TrayIcon::Off);
+    // a change, the wait goes by, and a change right after the icon was put: the second waits its own time
+    settler.want(TrayIcon::Busy);
+    std::thread::sleep(delay + Duration::from_millis(40));
+    settler.want(TrayIcon::On);
+    std::thread::sleep(delay + Duration::from_millis(150));
+    let put = put.lock().unwrap();
+    assert_eq!(
+        put.iter().map(|(i, _)| *i).collect::<Vec<_>>(),
+        [TrayIcon::Busy, TrayIcon::On]
+    );
+    assert!(put[1].1.duration_since(put[0].1) >= delay);
 }

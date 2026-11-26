@@ -8,7 +8,10 @@
 use crate::{announce::clean, link::DaemonView, link::LinkState};
 use galleria_ipc::{State, Status};
 use serde::Deserialize;
-use std::sync::{Mutex, MutexGuard};
+use std::{
+    sync::{Arc, Mutex, MutexGuard},
+    time::Duration,
+};
 use uuid::Uuid;
 
 /// The favourites the menu lists, at most (P2).
@@ -192,6 +195,70 @@ pub fn model(input: &TrayInput<'_>) -> (Vec<TrayEntry>, TrayIcon) {
         action: TrayAction::Quit,
     });
     (entries, icon)
+}
+
+/// How long the icon waits for the next change before it is put on the tray (F2 of the daily round). The indicator extension of
+/// GNOME reads the file of an icon some milliseconds after it is told, and the `tray-icon` crate deletes the file of the old
+/// icon when the next one is set: two changes 40 ms apart (`Busy`, then the final state) leave the extension with a file that
+/// is gone, and it does not recover. Waiting this long gathers them, and two icons that are put are never closer than this.
+pub const ICON_SETTLE: Duration = Duration::from_millis(300);
+
+/// Puts an icon on the tray only when it has been the wanted one for [`ICON_SETTLE`]: the changes that come close together
+/// are gathered and the last one wins; a change that goes back to what is on the tray puts nothing.
+pub struct IconSettler {
+    delay: Duration,
+    apply: Arc<dyn Fn(TrayIcon) + Send + Sync>,
+    state: Arc<Mutex<Settling>>,
+}
+
+struct Settling {
+    /// What the tray shows (or has been told to show).
+    applied: TrayIcon,
+    /// Counts the changes, so a timer knows whether it is still the last.
+    seq: u64,
+}
+
+impl IconSettler {
+    /// `shown` is the icon the tray was made with.
+    pub fn new(
+        shown: TrayIcon,
+        delay: Duration,
+        apply: impl Fn(TrayIcon) + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            delay,
+            apply: Arc::new(apply),
+            state: Arc::new(Mutex::new(Settling {
+                applied: shown,
+                seq: 0,
+            })),
+        }
+    }
+
+    /// The icon the model wants now. Returns at once; `apply` runs on a thread of its own.
+    pub fn want(&self, icon: TrayIcon) {
+        let seq = {
+            let mut state = lock(&self.state);
+            state.seq += 1;
+            // back to what is shown: a timer that waits is now out of date (the number moved), and nothing starts
+            if state.applied == icon {
+                return;
+            }
+            state.seq
+        };
+        let (state, apply, delay) = (Arc::clone(&self.state), Arc::clone(&self.apply), self.delay);
+        std::thread::spawn(move || {
+            std::thread::sleep(delay);
+            {
+                let mut state = lock(&state);
+                if state.seq != seq {
+                    return;
+                }
+                state.applied = icon;
+            }
+            apply(icon);
+        });
+    }
 }
 
 /// Where the entries are drawn. `show` must not wait for the thread of the window: it is called with the lock of the tray held

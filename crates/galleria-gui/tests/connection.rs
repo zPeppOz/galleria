@@ -104,10 +104,19 @@ fn a_second_profile_of_the_rubrica_is_already_active_and_not_foreign() {
 #[test]
 fn a_session_outside_the_rubrica_is_foreign() {
     let world = start(Options::default());
-    // another client of the daemon starts a session with an id that this rubrica does not have (G9)
+    // another client of the daemon starts a session with an id that this rubrica does not have (G9): a real uuid, so that «is a
+    // uuid» is not enough to be one of ours
+    let mut elsewhere = params(false);
+    elsewhere.profile.id = "7f0a4c1e-5b3d-4e8a-9c2f-1d6b8a0e3f45".to_owned();
+    assert!(
+        world
+            .rubrica
+            .get(elsewhere.profile.id.parse().unwrap())
+            .is_err()
+    );
     world.rt.block_on(async {
         let mut other = world.daemon().client().await;
-        let _: Value = other.call("connect", &params(false)).await.unwrap();
+        let _: Value = other.call("connect", &elsewhere).await.unwrap();
     });
     world.until_state("connected", None);
     let error = world.connect("Homelab", false).unwrap_err();

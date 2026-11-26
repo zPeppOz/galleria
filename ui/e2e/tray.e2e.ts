@@ -2,10 +2,11 @@
 // real WebKitGTK window against the fake daemon, with the menu of its tray read and clicked from the session bus by
 // lab/tests/tray-probe.py. Under Xvfb there is no desktop to show a tray, so the probe stands in for it (`startTrayWatcher`); a test
 // that wants no tray starts no watcher. Run by lab/tests/gui-smoke.sh with the other `*.e2e.ts` files.
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { choose, closeApp, daemon, env, openApp, startTrayWatcher, stopTrayWatcher, appRunning, requestClose, trayClick, trayIcon, trayRegistered, trayTexts, until, waitFor, waitForBody, windowState, type Browser } from "./support";
+import { choose, closeApp, daemon, env, importFixtures, openApp, startTrayWatcher, stopTrayWatcher, appRunning, requestClose, trayClick, trayIcon, trayRegistered, trayTexts, until, waitFor, waitForBody, windowState, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 
@@ -78,16 +79,35 @@ describe("connecting and disconnecting from the menu of the tray (plan B6, T2)",
   it("G10b_a_favourite_connects_and_disconnects_from_the_menu_alone", async () => {
     await openWithTray("plain");
     await until(trayTexts, (texts) => texts.includes("Connect «Ufficio Napoli»"), "the menu never offered «Connect «Ufficio Napoli»»");
-    // no call to the window between the two clicks: the menu and the page do it all
+    // the window is hidden in the tray, as after a click on its «X»: from here the menu and the page do it all, hidden (S49)
+    requestClose();
+    await until(windowState, (shown) => shown === "false", "the window was not hidden by the request to close it");
+    // no call to the window between the two clicks
     trayClick("Connect «Ufficio Napoli»");
-    await until(state, (text) => text === "Connected to «Ufficio Napoli»", "the line of the state never said «Connected to «Ufficio Napoli»»");
+    await until(state, (text) => text === "Connected to «Ufficio Napoli»", "the line of the state never said «Connected to «Ufficio Napoli»» with the window hidden");
     expect(await until(trayIcon, (icon) => icon === "on", "the icon never became the one of «connected»")).toBe("on");
     expect(cli("status")).toBe("connected");
     expect(trayTexts()).toContain("Disconnect «Ufficio Napoli»");
+    // a connection that asks for nothing does not bring the window back
+    expect(windowState()).toBe("false");
     trayClick("Disconnect «Ufficio Napoli»");
     await until(state, (text) => text === "Disconnected", "the line of the state never went back to «Disconnected»");
     expect(cli("status")).toBe("disconnected");
     expect(await until(trayIcon, (icon) => icon === "off", "the icon never went back")).toBe("off");
+    expect(windowState()).toBe("false");
+    expect(appRunning()).toBe(true);
+  });
+
+  it("a_favourite_connects_and_disconnects_from_the_menu_with_the_window_shown", async () => {
+    await openWithTray("plain");
+    await until(trayTexts, (texts) => texts.includes("Connect «Ufficio Napoli»"), "the menu never offered «Connect «Ufficio Napoli»»");
+    trayClick("Connect «Ufficio Napoli»");
+    await until(state, (text) => text === "Connected to «Ufficio Napoli»", "the line of the state never said «Connected to «Ufficio Napoli»»");
+    expect(await until(trayIcon, (icon) => icon === "on", "the icon never became the one of «connected»")).toBe("on");
+    expect(cli("status")).toBe("connected");
+    trayClick("Disconnect «Ufficio Napoli»");
+    await until(state, (text) => text === "Disconnected", "the line of the state never went back to «Disconnected»");
+    expect(cli("status")).toBe("disconnected");
   });
 
   it("switching_favourite_from_the_menu_replaces_without_asking", async () => {
@@ -101,6 +121,28 @@ describe("connecting and disconnecting from the menu of the tray (plan B6, T2)",
     expect((JSON.parse(cli("status", "--json")) as { profile: { name: string } }).profile.name).toBe("Homelab");
     expect(await b.$$('[role="dialog"], [role="alertdialog"]')).toHaveLength(0);
     expect(trayTexts()).toEqual(["Connected to «Homelab»", "Disconnect «Homelab»", "Connect «Ufficio Napoli»", "Open Galleria", "Quit (the VPN stays on)"]);
+  });
+});
+
+describe("the menu asks and the window comes back (plan B6, T2, S49)", () => {
+  it("credentials_asked_after_a_menu_connect_bring_the_window_back", async () => {
+    const b = await openWithTray("credentials");
+    await until(trayTexts, (texts) => texts.includes("Connect «Ufficio Napoli»"), "the menu never offered «Connect «Ufficio Napoli»»");
+    requestClose();
+    await until(windowState, (shown) => shown === "false", "the window was not hidden by the request to close it");
+    trayClick("Connect «Ufficio Napoli»");
+    // the daemon asks for the credentials: the page cannot ask in a window that is hidden, so Rust shows it
+    await until(windowState, (shown) => shown === "true", "the window did not come back when the credentials were asked", 15_000);
+    const dialogs = () => b.$$('[role="dialog"]');
+    await waitFor(b, async () => (await dialogs()).length === 1 && /Credentials for «Ufficio Napoli»/.test(await (await dialogs())[0].getText()), "the window of the credentials never showed");
+    expect(await b.execute(() => document.activeElement?.getAttribute("name"))).toBe("username");
+    // nothing connected without them
+    expect(cli("status")).not.toBe("connected");
+    await b.$("#credentials-username").setValue("carla.v");
+    await b.$("#credentials-password").setValue("PW-tray-smoke-4471");
+    await b.$('[role="dialog"] button[type="submit"]').click();
+    await until(state, (text) => text === "Connected to «Ufficio Napoli»", "the session never came up after the credentials");
+    expect(cli("status")).toBe("connected");
   });
 });
 
@@ -135,5 +177,76 @@ describe("closing the window and quitting (plan B6, T3)", () => {
     requestClose();
     await until(appRunning, (running) => !running, "the close did not end the app", 5000);
     expect(cli("status")).toBe("connected");
+  });
+});
+
+describe("closing with changes that are not saved, and a second launch (plan B6, T3)", () => {
+  const profilesDir = () => join(env("XDG_CONFIG_HOME"), "galleria", "profiles");
+  /** How many profile files on the disk hold this name. */
+  const filesNamed = (name: string): number => readdirSync(profilesDir()).filter((file) => readFileSync(join(profilesDir(), file), "utf8").includes(`name = "${name}"`)).length;
+  /** A name typed over the one of the profile in the window, without saving it. */
+  async function typeAName(b: Browser, name: string): Promise<void> {
+    await b.$('input[name="name"]').click();
+    await b.keys(["Control", "a"]);
+    await b.keys(Array.from(name));
+    await waitForBody(b, "You have changes that are not saved.", "the save bar never appeared");
+  }
+  const guard = (b: Browser) => b.$('[role="alertdialog"]');
+  const focused = (b: Browser) => b.execute(() => document.activeElement?.textContent?.trim() ?? "");
+  /**
+   * A choice of the question that hides the window or ends the app. A WebDriver click waits for the page to answer, and a webview that is
+   * hidden (or gone) never does: the command hangs. So the button is clicked from the page, which returns before the window goes.
+   */
+  const pressGuard = (b: Browser, label: string) =>
+    b.execute((text) => [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find((button) => button.textContent?.trim() === text)?.click(), label);
+
+  it("G10f_unsaved_changes_stop_the_close_and_the_quit", async () => {
+    const b = await openWithTray("plain");
+    await waitFor(b, async () => (await b.$('input[name="name"]').getValue()) === "Ufficio Napoli", "the first profile never showed");
+    await typeAName(b, "Sede Napoli");
+    // the close does not hide: the window stays, with the question, and the focus is on «Cancel»
+    requestClose();
+    await waitFor(b, async () => guard(b).isExisting(), "the question of the changes never showed after the close");
+    expect(windowState()).toBe("true");
+    await waitFor(b, async () => (await focused(b)) === "Cancel", "the focus is not on «Cancel»");
+    // «Cancel» keeps everything where it was
+    await guard(b).$("button=Cancel").click();
+    await waitFor(b, async () => !(await guard(b).isExisting()), "the question stayed after «Cancel»");
+    expect(windowState()).toBe("true");
+    expect(await b.$('input[name="name"]').getValue()).toBe("Sede Napoli");
+    expect(appRunning()).toBe(true);
+    // «Discard» hides the window, and the file on the disk has the name it had
+    requestClose();
+    await waitFor(b, async () => guard(b).isExisting(), "the question never showed the second time");
+    await pressGuard(b, "Discard");
+    await until(windowState, (shown) => shown === "false", "«Discard» did not hide the window");
+    expect(filesNamed("Ufficio Napoli")).toBe(1);
+    expect(filesNamed("Sede Napoli")).toBe(0);
+    expect(appRunning()).toBe(true);
+    // again, and now «Quit» from the tray: the question comes up in a window that is shown, «Save» writes the file and the process ends
+    trayClick("Open Galleria");
+    await until(windowState, (shown) => shown === "true", "«Open Galleria» did not show the window");
+    await waitFor(b, async () => (await b.$('input[name="name"]').getValue()) === "Ufficio Napoli", "the discarded name came back");
+    await typeAName(b, "Sede Napoli");
+    trayClick("Quit");
+    await waitFor(b, async () => guard(b).isExisting(), "the question never showed after «Quit»");
+    expect(windowState()).toBe("true");
+    expect(appRunning()).toBe(true);
+    await pressGuard(b, "Save");
+    await until(appRunning, (running) => !running, "«Save» and the quit did not end the app", 5000);
+    expect(filesNamed("Sede Napoli")).toBe(1);
+  });
+
+  it("a_second_launch_shows_the_hidden_window", async () => {
+    const b = await openWithTray("plain");
+    const files = importFixtures();
+    requestClose();
+    await until(windowState, (shown) => shown === "false", "the window was not hidden by the request to close it");
+    // the second launch hands the file over and ends; the window that was hidden is shown, with the preview
+    const second = spawnSync(env("GALLERIA_SMOKE_APP"), [files.inline], { encoding: "utf8", timeout: 5000 });
+    expect(second.status, `the second launch ended with ${second.status}: ${second.stderr}`).toBe(0);
+    await until(windowState, (shown) => shown === "true", "the second launch did not show the hidden window");
+    await waitForBody(b, "File: inline.ovpn", "the preview of the file of the second launch never showed");
+    expect(appRunning()).toBe(true);
   });
 });

@@ -17,15 +17,17 @@ trap 'exit 143' TERM
 lab/build.sh "$client"
 lab/gen-pki.sh
 CLIENTS="$client" lab/up.sh
+# A step that needs the laboratory up before the tests (G3: the window imports the profiles, scripts/gui.sh lab-g3).
+if [[ -n ${LAB_BEFORE_TESTS:-} ]]; then bash -euc "$LAB_BEFORE_TESTS"; fi
 matched=0
 for executable in lab/out/tests/*; do
   name=$(basename "$executable")
   args=()
   if [[ -n $filter && $name != *"$filter"* ]]; then args+=("$filter"); fi
   # Count real matches so a misspelled filter cannot produce a false green run.
-  listed=$(docker exec -e GALLERIA_LAB=1 -e "GALLERIA_E2E_DCO=${GALLERIA_E2E_DCO:-0}" "glab-client$client" "/lab/$executable" --ignored --list "${args[@]}")
+  listed=$(docker exec -e GALLERIA_LAB=1 -e "GALLERIA_E2E_DCO=${GALLERIA_E2E_DCO:-0}" -e "GALLERIA_E2E_GUI_STORE=${GALLERIA_E2E_GUI_STORE:-0}" "glab-client$client" "/lab/$executable" --ignored --list "${args[@]}")
   if [[ $listed != *': test'* ]]; then continue; fi
   matched=$((matched+1))
-  docker exec -e GALLERIA_LAB=1 -e "GALLERIA_E2E_DCO=${GALLERIA_E2E_DCO:-0}" "glab-client$client" "/lab/$executable" --ignored --test-threads=1 --nocapture "${args[@]}"
+  docker exec -e GALLERIA_LAB=1 -e "GALLERIA_E2E_DCO=${GALLERIA_E2E_DCO:-0}" -e "GALLERIA_E2E_GUI_STORE=${GALLERIA_E2E_GUI_STORE:-0}" "glab-client$client" "/lab/$executable" --ignored --test-threads=1 --nocapture "${args[@]}"
 done
 ((matched>0)) || { echo 'no end-to-end tests matched' >&2; exit 1; }

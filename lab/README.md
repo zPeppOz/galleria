@@ -53,3 +53,12 @@ creazione del proprio namespace tramite --sysctl. Il runner di rete verifica il
 valore dopo il comando: procps 4.0.4 può restituire successo senza scrivere,
 mentre procps 4.0.6 segnala errore anche se il valore è già quello richiesto.
 Nessun sysctl dell'host viene modificato.
+
+G3 (import dalla finestra, fase 2 B4 T6): `scripts/gui.sh lab-g3 <26|27|79>` porta su il laboratorio, fa importare alla
+finestra vera (immagine `galleria-gui-dev`, sotto Xvfb) i profili `base.ovpn`, `malicious.ovpn` e `wg-split.conf` di
+`lab/out` e lascia la sua cartella dei profili in `target/gui-lab/config/galleria`; poi `t17_gui_import` gira sul client:
+la CLI e il demone veri elencano e connettono ciò che la finestra ha importato, e nessun `PWNED-*` compare. Le chiavi
+WireGuard di `wg-split.conf` cambiano a ogni `lab/up.sh`, quindi l'import avviene dopo `up.sh` e prima dei test:
+`lab/run.sh` esegue `LAB_BEFORE_TESTS` in quel punto. A mano: `GALLERIA_E2E_GUI_STORE=1 LAB_BEFORE_TESTS='scripts/gui.sh
+lab-import' lab/run.sh 26 t17`. Senza `GALLERIA_E2E_GUI_STORE=1` le prove di `t17` si saltano e lo dicono. La finestra gira
+solo nell'immagine Ubuntu 24.04 (Q37 (a)): sui tre client girano la CLI e il demone, non WebKit.

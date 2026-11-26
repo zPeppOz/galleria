@@ -9,6 +9,10 @@
 #   scripts/gui.sh smoke          build the app, the fake daemon and the seed of the rubrica, then the WebDriver smoke test (lab/tests/gui-smoke.sh)
 #   scripts/gui.sh a11y           the same build, then the screen reader check under Orca and AT-SPI (lab/tests/gui-a11y.sh);
 #                                 local only (Q22), writes target/gui-a11y/
+#   scripts/gui.sh lab-import     G3, the half in the image: the real window imports the profiles of the laboratory (lab/out) and leaves
+#                                 its folder of profiles in target/gui-lab/ (lab/tests/gui-lab-import.sh); the laboratory must be up
+#   scripts/gui.sh lab-g3 <26|27|79>   G3 whole, on the host: brings the laboratory up, runs `lab-import` between `lab/up.sh` and the
+#                                 tests, then t17 on that client (the real CLI and daemon list and connect what the window imported)
 #   scripts/gui.sh pnpm-version   print the pnpm version pinned in package.json (for CI)
 #
 # GUI_UID / GUI_GID set the user of the container (default: the invoking user), to try a uid the image does not know.
@@ -96,6 +100,9 @@ smoke_here() { run_webdriver_here lab/tests/gui-smoke.sh; }
 # Screen reader check (Q22): the same app and fake daemon, under Orca and the AT-SPI bus. Local only, not a CI job.
 a11y_here() { run_webdriver_here lab/tests/gui-a11y.sh; }
 
+# G3 in the laboratory (plan B4, T6): the real window imports the profiles of the laboratory, see lab/tests/gui-lab-import.sh.
+lab_import_here() { run_webdriver_here lab/tests/gui-lab-import.sh; }
+
 run_webdriver_here() {
   local target=${CARGO_TARGET_DIR:-$PWD/target}
   build_here
@@ -119,6 +126,14 @@ case "${1:-}" in
   smoke-here) smoke_here ;;
   a11y) run_in_image scripts/gui.sh a11y-here ;;
   a11y-here) a11y_here ;;
+  lab-import) run_in_image scripts/gui.sh lab-import-here ;;
+  lab-import-here) lab_import_here ;;
+  lab-g3)
+    # The WireGuard keys of the laboratory are new at every `lab/up.sh`, so the window imports after the laboratory is up and
+    # before the tests: lab/run.sh runs LAB_BEFORE_TESTS at that point. Host side: it needs docker, the lab images and the image of the GUI.
+    [[ ${2:-} =~ ^(26|27|79)$ ]] || { echo 'usage: scripts/gui.sh lab-g3 <26|27|79>' >&2; exit 2; }
+    ensure_image
+    GALLERIA_E2E_GUI_STORE=1 LAB_BEFORE_TESTS='scripts/gui.sh lab-import' exec lab/run.sh "$2" t17 ;;
   pnpm-version) pnpm_version ;;
-  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|a11y|pnpm-version>' >&2; exit 2 ;;
+  *) echo 'usage: scripts/gui.sh <image|run CMD...|check|check-here|build|smoke|a11y|lab-import|lab-g3 <26|27|79>|pnpm-version>' >&2; exit 2 ;;
 esac

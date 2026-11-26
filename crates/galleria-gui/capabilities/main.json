@@ -31,6 +31,8 @@
     "allow-secret-store-status",
     "allow-connect-profile",
     "allow-disconnect",
-    "allow-announce-phrases"
+    "allow-announce-phrases",
+    "allow-provide-input",
+    "allow-forget-credentials"
   ]
 }

@@ -35,6 +35,8 @@ const ALLOWED: &[&str] = &[
     "allow-connect-profile",
     "allow-disconnect",
     "allow-announce-phrases",
+    "allow-provide-input",
+    "allow-forget-credentials",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

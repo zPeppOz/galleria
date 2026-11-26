@@ -86,3 +86,41 @@ describe("Dialog", () => {
     await expectNoAccessibilityViolations(document.body, { landmarks: false });
   });
 });
+
+describe("Dialog, a click on the veil", () => {
+  function Veil({ ignore }: { ignore: boolean }) {
+    const [open, setOpen] = useState(true);
+    return (
+      <>
+        <button type="button">Behind</button>
+        <Dialog open={open} onClose={() => setOpen(false)} title="Credentials" closeLabel="Close" ignoreOutsidePress={ignore}>
+          <p>Body text</p>
+        </Dialog>
+      </>
+    );
+  }
+  const clickTheVeil = async () => {
+    const user = userEvent.setup();
+    await screen.findByRole("dialog");
+    const veil = document.querySelector(".gx-backdrop");
+    expect(veil).toBeTruthy();
+    await user.click(veil as Element);
+    return user;
+  };
+
+  it("closes_the_dialog_by_default", async () => {
+    render(<Veil ignore={false} />);
+    await clickTheVeil();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("does_nothing_when_the_dialog_ignores_it_and_escape_still_closes", async () => {
+    render(<Veil ignore />);
+    const user = await clickTheVeil();
+    // give a closing dialog the time it would take
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(screen.queryByRole("dialog")).toBeTruthy();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+});

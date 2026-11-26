@@ -347,5 +347,19 @@
   "delete.title": "Delete {name}?",
   "delete.body": "The profile and its secrets are removed from this computer. This cannot be undone.",
   "delete.confirm": "Delete",
-  "delete.cancel": "Cancel"
+  "delete.cancel": "Cancel",
+  "credentials.title.credentials": "Credentials for «{name}»",
+  "credentials.title.otp": "Code for «{name}»",
+  "credentials.title.key_passphrase": "Passphrase for «{name}»",
+  "credentials.username": "User name",
+  "credentials.password": "Password",
+  "credentials.passphrase": "Passphrase of the key",
+  "credentials.remember": "Remember in the keyring",
+  "credentials.remember.hint": "Saved only if the connection works.",
+  "credentials.countdown": "Time left: {time}",
+  "auth.saved": "Credentials saved in the keyring",
+  "auth.saved.hint": "The user name and the password are sent at each connection.",
+  "auth.forget": "Forget",
+  "status.saved_refused": "The saved credentials were not accepted.",
+  "status.forget_saved": "Forget the saved credentials"
 }

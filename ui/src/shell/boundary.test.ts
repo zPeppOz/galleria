@@ -64,6 +64,19 @@ describe("shell sources", () => {
     expect(heard).toContain("galleria:drop-hover");
   });
 
+  it("the_credentials_dialog_keeps_no_value_in_state", () => {
+    // Step 1 of «Il viaggio di una credenziale»: what is typed is in the `<input>` and nowhere else. The file has no state, no
+    // store and no log, and the answer goes through one function that is called from one place.
+    const dialog = readFileSync(join(SRC, "connection", "CredentialsDialog.tsx"), "utf8");
+    for (const forbidden of [/\buseState\b/, /\buseReducer\b/, /\bcreateContext\b/, /\buseContext\b/, /\bconsole\./, /\blocalStorage\b/, /\bsessionStorage\b/, /\bvalue=\{/, /\bdefaultValue\b/, /\bonChange\b/]) {
+      expect(forbidden.test(dialog), `CredentialsDialog.tsx matches ${String(forbidden)}`).toBe(false);
+    }
+    const sourcesOfThePage = webviewSources(SRC);
+    expect(sourcesOfThePage.filter(({ text }) => text.includes('"provide_input"')).map(({ file }) => file)).toEqual([join("daemon", "commands.ts")]);
+    // and the function that invokes it is called from the connection only
+    expect(sourcesOfThePage.filter(({ file, text }) => file !== join("daemon", "commands.ts") && /\bprovideInput\(/.test(text)).map(({ file }) => file)).toEqual([join("connection", "ConnectionProvider.tsx")]);
+  });
+
   it("no_sample_data_is_left", () => {
     expect(existsSync(join(SHELL, `${"de"}mo-data.ts`))).toBe(false);
     expect(webviewSources(SRC).filter(({ text }) => /Sample data|Dati di esempio/.test(text)).map(({ file }) => file)).toEqual([]);

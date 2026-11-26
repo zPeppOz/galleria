@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import { PROTOCOL_NAME } from "../daemon/protocol";
 import type { Status } from "../daemon/types";
 import { InlineAlert } from "../design/InlineAlert";
+import { Button } from "../design/Button";
 import { errorText, hasKey, useT, type Translate } from "../i18n";
+import { useConnection } from "./store";
 import "./StatusPanel.css";
 import "../design/Facts.css";
 
@@ -27,8 +29,11 @@ export function detailText(t: Translate, detail: string): string {
  * know (D22). It is above the profile whatever profile is chosen; the buttons are in the profile. Rust announces the changes of state:
  * nothing here is a live region.
  */
-export function StatusPanel({ status }: { status: Status }) {
+export function StatusPanel({ status, savedCredentials = false }: { status: Status; savedCredentials?: boolean }) {
   const t = useT();
+  const { forget } = useConnection();
+  // Q47: a refusal of a password that was sent from the keyring is not mended by trying again; the person is told, and may forget it.
+  const refusedSaved = savedCredentials && status.state === "error" && status.error?.code === "auth_failed" && status.profile !== null;
   const net = status.net;
   return (
     <section className="status-view" aria-labelledby="status-title">
@@ -52,6 +57,11 @@ export function StatusPanel({ status }: { status: Status }) {
           {t("status.error", { code: status.error.code, message: errorText(t, status.error.code, status.error.message) })}
         </InlineAlert>
       )}
+      {refusedSaved && status.profile ? (
+        <InlineAlert tone="warn" toneLabel={t("alert.warn")} actions={<Button onClick={() => void forget(status.profile?.id ?? "")}>{t("status.forget_saved")}</Button>}>
+          {t("status.saved_refused")}
+        </InlineAlert>
+      ) : null}
     </section>
   );
 }

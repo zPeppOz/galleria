@@ -1,3 +1,5 @@
+import { useConnection } from "../../connection/store";
+import { Button } from "../../design/Button";
 import { Field } from "../../design/Field";
 import { useT } from "../../i18n";
 import { peerLabel, type TabProps } from "./tab";
@@ -9,6 +11,8 @@ import { peerLabel, type TabProps } from "./tab";
  */
 export function Authentication({ detail, draft, edit, errors }: TabProps) {
   const t = useT();
+  const { forget } = useConnection();
+  const saved = detail.protocol === "openvpn" && ["openvpn.username", "openvpn.password"].every((name) => detail.secret_refs.includes(name));
   const peers = draft.wireguard?.peers ?? [];
   const flags = detail.openvpn?.auth;
   const methods = flags
@@ -21,6 +25,15 @@ export function Authentication({ detail, draft, edit, errors }: TabProps) {
           <h2 className="detail-section">{t("auth.method")}</h2>
           <p className="detail-fact">{methods.length > 0 ? methods.join(", ") : t("auth.method.none")}</p>
           <p className="detail-hint">{t("auth.method.hint")}</p>
+          {saved ? (
+            <>
+              <h2 className="detail-section">{t("auth.saved")}</h2>
+              <p className="detail-hint">{t("auth.saved.hint")}</p>
+              <div>
+                <Button onClick={() => void forget(detail.id)}>{t("auth.forget")}</Button>
+              </div>
+            </>
+          ) : null}
           <h2 className="detail-section">{t("auth.secrets")}</h2>
           {detail.secret_refs.length > 0 ? (
             <ul className="detail-secrets">

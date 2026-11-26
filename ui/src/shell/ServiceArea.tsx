@@ -10,7 +10,7 @@ import "./ServiceArea.css";
  * What the service has to say above the profile (Q26). Without a link it is the first-run panel; with a link it is the
  * warning about the backends it cannot use and, once a session exists, its status. The list below stays usable always.
  */
-export function ServiceArea({ view, info, onRetry }: { view: DaemonView | null; info: AppInfo | null; onRetry: () => void }) {
+export function ServiceArea({ view, info, onRetry, savedCredentials = false }: { view: DaemonView | null; info: AppInfo | null; onRetry: () => void; savedCredentials?: boolean }) {
   const t = useT();
   let content = null;
   if (!view || !info) {
@@ -25,7 +25,7 @@ export function ServiceArea({ view, info, onRetry }: { view: DaemonView | null; 
   } else {
     content = (
       <>
-        {view.status && view.status.state !== "disconnected" ? <StatusPanel status={view.status} /> : null}
+        {view.status && view.status.state !== "disconnected" ? <StatusPanel status={view.status} savedCredentials={savedCredentials} /> : null}
         <BackendWarnings view={view} />
       </>
     );

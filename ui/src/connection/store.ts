@@ -1,7 +1,20 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { createContext, useContext, useEffect, useState } from "react";
-import type { CommandError } from "../daemon/commands";
-import type { BackendInfo, LinkState, Stats, Status } from "../daemon/types";
+import type { CommandError, InputAnswer } from "../daemon/commands";
+import type { BackendInfo, InputKind, LinkState, Stats, Status } from "../daemon/types";
+
+/** The question the service is waiting on and nobody has answered yet: what the window of the credentials draws. */
+export interface Question {
+  session: number;
+  request: number;
+  kind: InputKind;
+  /** The text of the server, as it came. */
+  prompt: string;
+  echo: boolean;
+  profile: { id: string; name: string };
+  /** The time, in milliseconds, when the question runs out: from the moment the event arrived, not from the moment it was drawn. */
+  expiresAt: number;
+}
 
 /** What the page knows of the connection and can do about it. The state is the flow of events (spec §3.3), never the answer of a call. */
 export interface Connection {
@@ -16,8 +29,14 @@ export interface Connection {
   error: { id: string; error: CommandError } | null;
   /** When the page first saw the session connected: the service gives no `since`, so the duration counts from here. */
   connectedAt: number | null;
+  /** The question of the service that waits for an answer; `null` when there is none or it was answered (an answered one does not come back). */
+  question: Question | null;
   connect: (id: string) => Promise<void>;
   disconnect: () => Promise<void>;
+  /** Answers the open question. What was typed goes into this one call and nowhere else: the caller empties its fields before it waits. */
+  provide: (values: InputAnswer, remember: boolean) => Promise<void>;
+  /** Takes the remembered credentials of a profile out of the keyring. */
+  forget: (id: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -29,8 +48,11 @@ export const INERT: Connection = {
   pending: null,
   error: null,
   connectedAt: null,
+  question: null,
   connect: async () => undefined,
   disconnect: async () => undefined,
+  provide: async () => undefined,
+  forget: async () => undefined,
   clearError: () => undefined,
 };
 
@@ -102,4 +124,25 @@ export function useNow(on: boolean): number {
     return () => clearInterval(timer);
   }, [on]);
   return now;
+}
+
+/**
+ * The seconds left until `expiresAt`, counted down while it is in the future: refreshed every 10 seconds and, in the last minute, every
+ * second. A text, not a live region. `0` when there is nothing to count.
+ */
+export function useCountdown(expiresAt: number | null): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (expiresAt === null) return undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      const at = Date.now();
+      setNow(at);
+      const left = (expiresAt - at) / 1000;
+      if (left > 0) timer = setTimeout(tick, left > 60 ? 10_000 : 1000);
+    };
+    tick();
+    return () => clearTimeout(timer);
+  }, [expiresAt]);
+  return expiresAt === null ? 0 : Math.max(0, Math.ceil((expiresAt - now) / 1000));
 }

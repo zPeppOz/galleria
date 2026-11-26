@@ -15,6 +15,7 @@ const rubrica = (over: Partial<Rubrica> = {}): Rubrica => ({
   select: () => undefined,
   detail: null,
   detailError: null,
+  refreshDetail: () => undefined,
   reload: async () => undefined,
   update: async () => {
     throw new Error("not used");

@@ -347,5 +347,19 @@
   "delete.title": "Eliminare {name}?",
   "delete.body": "Il profilo e i suoi segreti vengono tolti da questo computer. Non si può annullare.",
   "delete.confirm": "Elimina",
-  "delete.cancel": "Annulla"
+  "delete.cancel": "Annulla",
+  "credentials.title.credentials": "Credenziali per «{name}»",
+  "credentials.title.otp": "Codice per «{name}»",
+  "credentials.title.key_passphrase": "Passphrase per «{name}»",
+  "credentials.username": "Utente",
+  "credentials.password": "Password",
+  "credentials.passphrase": "Passphrase della chiave",
+  "credentials.remember": "Ricorda nel portachiavi",
+  "credentials.remember.hint": "Salvate solo se la connessione riesce.",
+  "credentials.countdown": "Tempo rimasto: {time}",
+  "auth.saved": "Credenziali salvate nel portachiavi",
+  "auth.saved.hint": "Utente e password vengono inviati a ogni connessione.",
+  "auth.forget": "Dimentica",
+  "status.saved_refused": "Le credenziali salvate non sono state accettate.",
+  "status.forget_saved": "Dimentica le credenziali salvate"
 }

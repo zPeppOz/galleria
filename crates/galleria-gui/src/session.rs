@@ -10,10 +10,13 @@ use crate::{
     rubrica::{Rubrica, RubricaError},
     ui_state::UiStateFile,
 };
-use galleria_ipc::{ProfileRef, SessionErrorCode, State, Status};
+use galleria_ipc::{
+    InputKind, InputValues, ProfileRef, ProvideInputParams, Secret, SessionErrorCode, State, Status,
+};
 use serde::Deserialize;
 use std::{
     collections::BTreeMap,
+    fmt,
     path::PathBuf,
     sync::{Arc, Mutex, MutexGuard},
 };
@@ -82,6 +85,31 @@ impl From<RubricaError> for SessionFailure {
 
 type Triple = (State, Option<String>, Option<SessionErrorCode>);
 
+/// The user and the password of a connection that is on its way, held for «Remember» until the session of the daemon is `connected`
+/// (spec §9, rule 4; plan B5, «Il viaggio di una credenziale», step 5). Nothing else is kept of what the user typed: not a code,
+/// not a passphrase. `Debug` says nothing of the values, and `Secret` wipes them when they are dropped.
+struct Pending {
+    session: u64,
+    profile: Uuid,
+    username: Secret,
+    password: Secret,
+}
+
+impl fmt::Debug for Pending {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Pending(..)")
+    }
+}
+
+/// The question the daemon asked last: what an answer is checked against before anything is held.
+#[derive(Debug, Clone, Copy)]
+struct Asked {
+    session: u64,
+    request: u64,
+    kind: InputKind,
+    profile: Option<Uuid>,
+}
+
 /// The session of the window. One for the app; it is shared between the commands and the thread that delivers the events.
 pub struct Sessions {
     socket: PathBuf,
@@ -94,6 +122,10 @@ pub struct Sessions {
     name: Mutex<String>,
     /// The session whose connection already touched the last use of its profile.
     touched: Mutex<Option<u64>>,
+    /// The question the daemon is waiting on, as the events told it.
+    asked: Mutex<Option<Asked>>,
+    /// The credentials to remember when the session that took them is up.
+    pending: Mutex<Option<Pending>>,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -112,6 +144,8 @@ impl Sessions {
             last: Mutex::new((State::Disconnected, None, None)),
             name: Mutex::new(String::new()),
             touched: Mutex::new(None),
+            asked: Mutex::new(None),
+            pending: Mutex::new(None),
         }
     }
 
@@ -124,6 +158,8 @@ impl Sessions {
     /// the errors of the rubrica for a profile that is not there, a key that is missing or a keyring that is locked, and
     /// the error of the call.
     pub async fn connect_profile(&self, id: Uuid, replace: bool) -> Result<(), SessionFailure> {
+        // a connection that starts is not the one whose credentials were waiting to be remembered
+        *lock(&self.pending) = None;
         let rubrica = Arc::clone(&self.rubrica);
         // The archive may be a keyring that waits for the user to unlock it: not on a thread of the runtime.
         let params = tokio::task::spawn_blocking(move || rubrica.connect_params(id, replace))
@@ -170,6 +206,86 @@ impl Sessions {
             .map_err(SessionFailure::Call)
     }
 
+    /// Gives the daemon the answer to its question. With `remember` and a question of credentials, the user and the password are held
+    /// (and only they) until the session is `connected`; they are written then, and dropped at an error, a disconnect or another
+    /// session. The values are consumed: the caller keeps no copy, and neither does this function beyond what was just said.
+    ///
+    /// # Errors
+    ///
+    /// The error of the call: `input_not_expected` for a question that expired or is not the one asked, or a daemon that cannot be
+    /// reached. On an error nothing is held.
+    pub async fn provide_input(
+        &self,
+        session: u64,
+        request: u64,
+        values: InputValues,
+        remember: bool,
+    ) -> Result<(), SessionFailure> {
+        let held = remember && self.hold(session, request, &values);
+        let outcome = calls::provide_input(
+            &self.socket,
+            ProvideInputParams {
+                session,
+                request,
+                values,
+            },
+        )
+        .await;
+        if held && outcome.is_err() {
+            let mut pending = lock(&self.pending);
+            if pending.as_ref().is_some_and(|p| p.session == session) {
+                *pending = None;
+            }
+        }
+        outcome.map_err(SessionFailure::Call)
+    }
+
+    /// Holds the user and the password of an answer to a question of credentials. A code and a passphrase are never held; a question
+    /// the window did not see, or one of a profile that is not in the rubrica, holds nothing. Held before the call is made, so that
+    /// a `connected` that comes quicker than the answer finds it.
+    fn hold(&self, session: u64, request: u64, values: &InputValues) -> bool {
+        let asked = *lock(&self.asked);
+        let Some(Asked {
+            kind: InputKind::Credentials,
+            profile: Some(profile),
+            ..
+        }) = asked.filter(|a| a.session == session && a.request == request)
+        else {
+            return false;
+        };
+        if values.otp.is_some()
+            || values.key_passphrase.is_some()
+            || !self.is_own(&profile.to_string())
+        {
+            return false;
+        }
+        let (Some(username), Some(password)) = (&values.username, &values.password) else {
+            return false;
+        };
+        *lock(&self.pending) = Some(Pending {
+            session,
+            profile,
+            username: Secret::new(username.clone()),
+            password: password.clone(),
+        });
+        true
+    }
+
+    /// Whether credentials are waiting for the session to be up. The proofs ask; nothing else does.
+    #[must_use]
+    pub fn has_pending(&self) -> bool {
+        lock(&self.pending).is_some()
+    }
+
+    /// Takes the remembered user and password of a profile out of the archive and their names out of the profile (P6).
+    ///
+    /// # Errors
+    ///
+    /// The errors of the rubrica: a profile that is not there, a locked keyring.
+    pub fn forget_credentials(&self, id: Uuid) -> Result<(), SessionFailure> {
+        Ok(self.rubrica.forget_credentials(id)?)
+    }
+
     /// Whether the session of the daemon belongs to a profile of this rubrica. A rubrica that cannot be read says no.
     fn is_own(&self, id: &str) -> bool {
         Uuid::parse_str(id).is_ok_and(|id| self.rubrica.get(id).is_ok())
@@ -184,6 +300,7 @@ impl Sessions {
     /// rubrica is up, and the sentence to say when the (state, profile, error) changed.
     pub fn on_state(&self, status: &Status) -> Option<(String, Urgency)> {
         self.touch_last_use(status);
+        self.follow_input(status);
         if let Some(profile) = &status.profile {
             lock(&self.name).clone_from(&profile.name);
         }
@@ -225,6 +342,45 @@ impl Sessions {
             .map_or_else(|| lock(&self.name).clone(), |p| p.name.clone());
         let text = clean(&template.replace("{name}", &name))?;
         Some((text, urgency))
+    }
+
+    /// What the state says about the question and about the credentials that wait to be remembered: the question is noted, and the
+    /// credentials are written when their session is `connected` and dropped when it ends or another one begins.
+    fn follow_input(&self, status: &Status) {
+        if let (State::NeedsInput, Some(request), Some(session)) =
+            (status.state, &status.input_request, status.session)
+        {
+            *lock(&self.asked) = Some(Asked {
+                session,
+                request: request.request,
+                kind: request.kind,
+                profile: status
+                    .profile
+                    .as_ref()
+                    .and_then(|p| Uuid::parse_str(&p.id).ok()),
+            });
+        }
+        let taken = {
+            let mut pending = lock(&self.pending);
+            let Some(held) = pending.as_ref() else {
+                return;
+            };
+            let ours = status.session.is_none_or(|s| s == held.session);
+            match status.state {
+                State::Connected if ours && status.session.is_some() => pending.take(),
+                State::Connecting | State::NeedsInput | State::Reconnecting if ours => return,
+                _ => {
+                    *pending = None;
+                    return;
+                }
+            }
+        };
+        if let Some(held) = taken {
+            // not worth stopping anything for: the next connection asks again
+            let _ = self
+                .rubrica
+                .remember_credentials(held.profile, &held.username, &held.password);
+        }
     }
 
     /// «Last use» (P15): a session of a profile of the rubrica that reaches `connected` writes it, once per session. A session

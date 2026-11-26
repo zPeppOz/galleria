@@ -1,12 +1,14 @@
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { icons } from "./icons";
 import "./overlays.css";
 
 /**
  * Modal dialog. Our own props: no type of the headless library leaves this file (the boundary test checks that).
  * Title and description are linked with aria-labelledby / aria-describedby by the library; focus enters the dialog
- * on open, stays inside while it is open and returns to the element that had it on close.
+ * on open, stays inside while it is open and returns to the element that had it on close. `ignoreOutsidePress` is for a window
+ * whose closing throws something away (the credentials of a connection): a click on the veil does nothing, while Escape and the
+ * buttons still close it. `initialFocus` names the control that takes the focus when it opens (the first tabbable is the close button).
  */
 export function Dialog(props: {
   open: boolean;
@@ -15,14 +17,23 @@ export function Dialog(props: {
   description?: string;
   closeLabel: string;
   footer?: ReactNode;
+  ignoreOutsidePress?: boolean;
+  initialFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
-  const { open, onClose, title, description, closeLabel, footer, children } = props;
+  const { open, onClose, title, description, closeLabel, footer, ignoreOutsidePress, initialFocus, children } = props;
   return (
-    <BaseDialog.Root open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <BaseDialog.Root
+      open={open}
+      onOpenChange={(next, details) => {
+        if (next) return;
+        if (ignoreOutsidePress && details.reason === "outside-press") return;
+        onClose();
+      }}
+    >
       <BaseDialog.Portal>
         <BaseDialog.Backdrop className="gx-backdrop" />
-        <BaseDialog.Popup className="gx-dialog">
+        <BaseDialog.Popup className="gx-dialog" initialFocus={initialFocus}>
           <div className="gx-dialog-head">
             <BaseDialog.Title className="gx-dialog-title">{title}</BaseDialog.Title>
             <BaseDialog.Close className="gx-icon-button" aria-label={closeLabel}>

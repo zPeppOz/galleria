@@ -27,6 +27,8 @@ const COMMANDS: &[&str] = &[
     "connect_profile",
     "disconnect",
     "announce_phrases",
+    "provide_input",
+    "forget_credentials",
 ];
 
 fn main() {

@@ -17,6 +17,7 @@ pub const NAMES: &[&str] = &[
     "unreachable",
     "stats",
     "slow",
+    "stuck",
 ];
 
 const TURNS: usize = 12;
@@ -87,6 +88,16 @@ fn slow() -> Vec<FakeStep> {
     ]
 }
 
+/// Asks for the user and the password, takes the answer and then never gets to `connected`: what an answer that has been sent
+/// and not yet accepted looks like, for the credentials that are held until the session is up.
+fn stuck() -> Vec<FakeStep> {
+    vec![
+        ask(InputKind::Credentials, "Username and password", false),
+        FakeStep::WaitCommand,
+        FakeStep::Sleep(Duration::from_secs(3600)),
+    ]
+}
+
 /// The scripts of a scenario, one for each connection; `None` for a name that is not one.
 pub fn scenario(name: &str) -> Option<Vec<Vec<FakeStep>>> {
     let repeat = |make: &dyn Fn() -> Vec<FakeStep>| (0..TURNS).map(|_| make()).collect();
@@ -108,6 +119,7 @@ pub fn scenario(name: &str) -> Option<Vec<Vec<FakeStep>>> {
         "unreachable" => repeat(&unreachable),
         "stats" => repeat(&counting),
         "slow" => repeat(&slow),
+        "stuck" => repeat(&stuck),
         _ => return None,
     })
 }

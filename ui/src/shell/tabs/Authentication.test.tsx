@@ -1,6 +1,9 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import { backend, renderConnected } from "../../test/connection";
 import { expectNoAccessibilityViolations } from "../../test/axe";
+import { toDraft } from "../../rubrica/draft";
 import { makeDetail, SAMPLE_PROFILES } from "../../test/fixtures";
 import { renderTab, withGoodKey } from "../../test/tabs";
 import type { ProfileDetail } from "../../rubrica/types";
@@ -63,5 +66,26 @@ describe("Authentication", () => {
     unmount();
     const wireguard = renderTab(Authentication, withGoodKey(makeDetail(HOMELAB)), { errors: { "peers.0.public_key": "A WireGuard key is 44 characters of base64 that end with =." } });
     await expectNoAccessibilityViolations(wireguard.container);
+  });
+
+  it("saved_credentials_are_named_and_can_be_forgotten", async () => {
+    const user = userEvent.setup();
+    const calls = backend();
+    const detail = withSecrets(makeDetail(ROSSI), ["openvpn.block.key", "openvpn.username", "openvpn.password"]);
+    renderConnected(<Authentication detail={detail} draft={toDraft(detail)} edit={() => undefined} errors={{}} groups={[]} settings={detail.settings} setSwitch={() => undefined} />);
+    expect(screen.getByRole("heading", { name: "Credentials saved in the keyring" })).toBeTruthy();
+    // the names are listed, the values never
+    expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toContain("openvpn.password");
+    await user.click(screen.getByRole("button", { name: "Forget" }));
+    await waitFor(() => expect(calls.map((c) => c.cmd)).toEqual(["forget_credentials"]));
+    expect(calls[0].args).toEqual({ id: detail.id });
+  });
+
+  it("without_saved_credentials_there_is_nothing_to_forget", () => {
+    backend();
+    const detail = withSecrets(makeDetail(ROSSI), ["openvpn.block.key"]);
+    renderConnected(<Authentication detail={detail} draft={toDraft(detail)} edit={() => undefined} errors={{}} groups={[]} settings={detail.settings} setSwitch={() => undefined} />);
+    expect(screen.queryByRole("button", { name: "Forget" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Credentials saved in the keyring" })).toBeNull();
   });
 });

@@ -17,3 +17,17 @@ export const connectProfile = (id: string, replace: boolean): Promise<void> => i
 
 /** Ends the session of the service. */
 export const disconnectSession = (): Promise<void> => invoke<void>("disconnect");
+
+/** What the user typed for a question of the service: only the fields of that question are set. */
+export interface InputAnswer { username?: string; password?: string; otp?: string; key_passphrase?: string }
+
+/**
+ * Gives the service what was typed (plan B5, «Il viaggio di una credenziale»). It is the only place of the page that invokes
+ * `provide_input`, and the only caller is the connection: the values go in this one call, nothing keeps them, and the answer is empty.
+ * `remember` asks Rust to keep the user and the password once the session is up; for a code or a passphrase it does nothing.
+ */
+export const provideInput = (session: number, request: number, values: InputAnswer, remember: boolean): Promise<void> =>
+  invoke<void>("provide_input", { session, request, values, remember });
+
+/** Takes the remembered user and password of a profile out of the keyring (P6). */
+export const forgetCredentials = (id: string): Promise<void> => invoke<void>("forget_credentials", { id });

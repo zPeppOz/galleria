@@ -90,7 +90,9 @@ pub fn configure_with<R: Runtime>(
             commands::secrets::secret_store_status,
             commands::connection::connect_profile,
             commands::connection::disconnect,
-            commands::connection::announce_phrases
+            commands::connection::announce_phrases,
+            commands::connection::provide_input,
+            commands::connection::forget_credentials
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.

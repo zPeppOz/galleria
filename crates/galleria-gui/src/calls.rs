@@ -5,7 +5,7 @@
 //! it: the parameters are borrowed or consumed, and the error carries the answer of the daemon, which never has one.
 
 use galleria_ipc::{
-    ConnectParams, ConnectResult,
+    ConnectParams, ConnectResult, ProvideInputParams,
     client::{Client, ClientError},
 };
 use serde_json::Value;
@@ -82,4 +82,21 @@ pub async fn disconnect(socket: &Path) -> Result<(), CallError> {
         .await
         .map(|_| ())
         .map_err(CallError::from_client)
+}
+
+/// Gives the daemon what the user typed for a question it asked. The parameters are consumed: they are dropped (and so wiped) when
+/// this returns, whatever the outcome, and nothing is kept, logged or put in the error.
+///
+/// # Errors
+///
+/// As [`connect`]; `input_not_expected` is the daemon's way to say the question expired or was answered.
+pub async fn provide_input(socket: &Path, params: ProvideInputParams) -> Result<(), CallError> {
+    let outcome = open(socket)
+        .await?
+        .call::<_, Value>("provide_input", &params)
+        .await
+        .map(|_| ())
+        .map_err(CallError::from_client);
+    drop(params);
+    outcome
 }

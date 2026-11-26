@@ -308,7 +308,8 @@ function Form({ detail, groups, update, validateRaw, reload, guard, menu }: Pick
       return rest;
     });
   };
-  const props = { detail: base, draft, edit, errors, groups, settings, setSwitch };
+  // the names of the secrets are read live: what Rust remembers changes without the profile being edited
+  const props = { detail: { ...base, secret_refs: detail.secret_refs }, draft, edit, errors, groups, settings, setSwitch };
   const reloadNow = () => {
     setAdopt(true);
     void reload();

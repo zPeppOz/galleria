@@ -4,6 +4,7 @@ import type { AppInfo, DaemonView } from "../daemon/types";
 import { Button } from "../design/Button";
 import { ConfirmDialog } from "../design/ConfirmDialog";
 import { ConnectionProvider } from "../connection/ConnectionProvider";
+import { CredentialsDialog } from "../connection/CredentialsDialog";
 import { activate } from "../connection/ConnectButton";
 import { useConnection } from "../connection/store";
 import { ToastProvider, type Announce } from "../design/Toast";
@@ -49,12 +50,17 @@ export interface ShellProps {
   onSortChange: (sort: SortOrder) => void;
 }
 
+/** Whether the profile of the session has credentials remembered, from the names the profile lists (never the values). */
+function savedCredentials(detail: { id: string; secret_refs: string[] } | null, profile: string | undefined): boolean {
+  return detail !== null && detail.id === profile && ["openvpn.username", "openvpn.password"].every((name) => detail.secret_refs.includes(name));
+}
+
 /** The notices, then the connection (which says a replacement once, with a notice), then the window. */
 export function Shell(props: ShellProps) {
   const t = useT();
   return (
     <ToastProvider closeLabel={t("toast.close")} announce={props.announce}>
-      <ConnectionProvider view={props.view}>
+      <ConnectionProvider view={props.view} onCredentialsChanged={props.rubrica.refreshDetail}>
         <ShellBody {...props} />
       </ConnectionProvider>
     </ToastProvider>
@@ -207,7 +213,7 @@ function ShellBody(props: ShellProps) {
           ) : null}
         </aside>
         <main className="shell-main">
-          <ServiceArea view={view} info={info} onRetry={onRetry} />
+          <ServiceArea view={view} info={info} onRetry={onRetry} savedCredentials={savedCredentials(rubrica.detail, view?.status?.profile?.id)} />
           <RubricaNotices rubrica={rubrica} onImport={() => setImporting(true)} secretStore={secretStore} />
           {selected ? (
             <ProfileDetail
@@ -230,6 +236,7 @@ function ShellBody(props: ShellProps) {
       </div>
       <StatusBar view={view} info={info} />
       <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
+      <CredentialsDialog />
       <ImportDialog open={importing} onClose={closeImport} actions={importer} onImported={wasImported} incoming={incoming} secretStore={secretStore} />
       {dropHover ? (
         <div className="shell-drop" aria-hidden="true">

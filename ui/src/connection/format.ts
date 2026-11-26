@@ -47,3 +47,9 @@ export function formatHandshakeAge(value: string, now: number, lang: Lang): stri
   if (seconds < 86400) return relative.format(-Math.floor(seconds / 3600), "hour");
   return relative.format(-Math.floor(seconds / 86400), "day");
 }
+
+/** «2:05» for the time left to answer a question of the service. */
+export function formatClock(seconds: number): string {
+  const whole = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}

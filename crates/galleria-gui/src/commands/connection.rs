@@ -7,6 +7,7 @@ use crate::{
     error::CmdError,
     session::{Phrases, SessionFailure, Sessions},
 };
+use galleria_ipc::InputValues;
 use serde_json::json;
 use std::sync::Arc;
 use tauri::State;
@@ -71,5 +72,39 @@ pub fn announce_phrases(
     phrases: Phrases,
 ) -> Result<(), CmdError> {
     sessions.set_phrases(phrases);
+    Ok(())
+}
+
+/// What the user typed for the question the daemon asked (plan B5, T6). The values arrive as the `InputValues` of the daemon, that
+/// is as `Secret`s, and go to the daemon in one call; the answer is `()` and nothing else, whatever was typed. `remember` is only
+/// honoured for a question of credentials and only once the session is up.
+#[tauri::command]
+pub async fn provide_input(
+    sessions: State<'_, Arc<Sessions>>,
+    session: u64,
+    request: u64,
+    values: InputValues,
+    remember: bool,
+) -> Result<(), CmdError> {
+    Ok(sessions
+        .provide_input(session, request, values, remember)
+        .await?)
+}
+
+/// Takes the remembered user and password of a profile out of the archive (P6). The archive may be a keyring that waits for the
+/// user to unlock it: not on the thread of the window.
+#[tauri::command]
+pub async fn forget_credentials(
+    sessions: State<'_, Arc<Sessions>>,
+    id: Uuid,
+) -> Result<(), CmdError> {
+    let sessions = Arc::clone(&sessions);
+    tokio::task::spawn_blocking(move || sessions.forget_credentials(id))
+        .await
+        .map_err(|_| CmdError {
+            code: "internal".to_owned(),
+            message: "The task ended".to_owned(),
+            data: None,
+        })??;
     Ok(())
 }

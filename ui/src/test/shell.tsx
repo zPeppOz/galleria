@@ -98,6 +98,7 @@ function Harness({ view, options }: { view: DaemonView | null; options: Options 
     select,
     detail: selected ? makeDetail(selected) : null,
     detailError: null,
+    refreshDetail: () => undefined,
     reload: async () => undefined,
     update: options.update ?? (async (id, patch) => applyPatch(makeDetail(list?.profiles.find((p) => p.id === id) ?? selected!), patch)),
     validateRaw: options.validateRaw ?? (async () => ({ issues: [], can_save: true })),

@@ -1,8 +1,11 @@
 // WebDriver smoke test of the connection (plan B5, T5 and T6): the real app in a real WebKitGTK window against the fake daemon, which
 // serves the real IPC with a fake backend that follows a scenario (`daemon-start <scenario>`, tests/support/scenarios.rs). Run by
 // lab/tests/gui-smoke.sh with the other `*.e2e.ts` files. Nothing here touches a route, a DNS or an interface: the backend is fake.
+import { spawnSync } from "node:child_process";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { bodyText, closeApp, daemon, openApp, TEN_SECONDS, waitForBody, type Browser } from "./support";
+import { bodyText, closeApp, daemon, env, openApp, TEN_SECONDS, waitForBody, type Browser } from "./support";
 
 const CONNECTED = /Connected to the service|Collegato al servizio/;
 
@@ -106,5 +109,115 @@ describe("connecting from the window against the fake daemon (plan B5, T5)", () 
     await italian.click();
     await waitForBody(b, "Server irraggiungibile dopo tutti i tentativi", "the error did not follow the language");
     expect(await bodyText(b)).not.toContain("Server unreachable after all attempts");
+  });
+});
+
+describe("credentials asked from the window (plan B5, T6)", () => {
+  const USER = "carla.v";
+  const PASSWORD = "PW-smoke-9d41-typed";
+  const dialogs = (b: Browser) => b.$$('[role="dialog"]');
+
+  /** The id of the profile of this name: the file of the rubrica is named after it. */
+  function profileId(name: string): string {
+    const dir = join(env("XDG_CONFIG_HOME"), "galleria", "profiles");
+    const file = readdirSync(dir).find((entry) => readFileSync(join(dir, entry), "utf8").includes(`name = "${name}"`));
+    if (!file) throw new Error(`no profile named ${name} on the disk`);
+    return file.replace(/\.toml$/, "");
+  }
+  const keyring = (id: string, key: string) => spawnSync("secret-tool", ["lookup", "service", "galleria", "profile", id, "key", key], { encoding: "utf8" });
+  const keysOf = (id: string) => `${spawnSync("secret-tool", ["search", "--all", "service", "galleria", "profile", id], { encoding: "utf8" }).stdout}`;
+
+  async function waitForDialog(b: Browser, title: RegExp): Promise<void> {
+    await waitFor(b, async () => (await dialogs(b)).length === 1 && title.test(await (await dialogs(b))[0].getText()), `the window of the credentials never showed ${String(title)}`);
+  }
+  const send = (b: Browser) => b.$('[role="dialog"] button[type="submit"]').click();
+
+  it("credentials_are_asked_once_and_remembered", async () => {
+    const b = await openWith("credentials");
+    await choose(b, "Datacenter Milano");
+    const id = profileId("Datacenter Milano");
+    await b.$("button=Connect").click();
+    await waitForDialog(b, /Credentials for «Datacenter Milano»/);
+    // only the user, the password and the box; the focus is on the first field
+    expect(await b.$$('[role="dialog"] input:not([type="checkbox"])')).toHaveLength(2);
+    expect(await b.execute(() => document.activeElement?.getAttribute("name"))).toBe("username");
+    await b.$("#credentials-username").setValue(USER);
+    await b.$("#credentials-password").setValue(PASSWORD);
+    await b.$('[role="dialog"] input[name="remember"]').click();
+    await send(b);
+    await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the profile never connected");
+    // the keyring has the two entries, and the profile lists their names
+    await waitFor(b, async () => keyring(id, "openvpn.password").stdout === PASSWORD, `the keyring has no password for the profile: ${keysOf(id)}`);
+    expect(keyring(id, "openvpn.username").stdout).toBe(USER);
+    const names = readFileSync(join(env("XDG_CONFIG_HOME"), "galleria", "profiles", `${id}.toml`), "utf8");
+    expect(names).toContain("openvpn.username");
+    expect(names).toContain("openvpn.password");
+    expect(names, "the profile file names the credentials and has none of them").not.toContain(PASSWORD);
+    // the tab «Authentication» says they are saved, and offers to forget them
+    await b.$("button=Authentication").click();
+    await waitForBody(b, "Credentials saved in the keyring", "the tab never said the credentials are saved");
+    // the second connection does not ask
+    await b.$("button=Disconnect").click();
+    await waitFor(b, async () => (await barState(b)) === "Disconnected", "the bar never went back to «Disconnected»");
+    await b.$("button=Connect").click();
+    await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the second connection never came up");
+    expect(await dialogs(b), "no window asked for the credentials the second time").toHaveLength(0);
+    // and forgetting takes them out of the keyring and out of the profile
+    await b.$("button=Forget").click();
+    await waitFor(b, async () => keyring(id, "openvpn.password").stdout === "", "the password is still in the keyring after «Forget»");
+    expect(keyring(id, "openvpn.username").stdout).toBe("");
+    await waitFor(b, async () => !(await bodyText(b)).includes("Credentials saved in the keyring"), "the tab still says the credentials are saved");
+  });
+
+  it("the_otp_is_asked_every_time_and_never_saved", async () => {
+    const b = await openWith("otp");
+    await choose(b, "Cliente Rossi");
+    const id = profileId("Cliente Rossi");
+    for (const turn of [1, 2]) {
+      await b.$("button=Connect").click();
+      await waitForDialog(b, /Code for «Cliente Rossi»/);
+      // the prompt of the server is the label, and a code is not offered to be remembered
+      expect(await b.$('[role="dialog"] label[for="credentials-otp"]').getText()).toBe("Enter OTP");
+      expect(await b.$$('[role="dialog"] input[type="checkbox"]'), `turn ${turn}`).toHaveLength(0);
+      await b.$("#credentials-otp").setValue("482913");
+      await send(b);
+      await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", `the connection ${turn} never came up`);
+      await b.$("button=Disconnect").click();
+      await waitFor(b, async () => (await barState(b)) === "Disconnected", "the bar never went back to «Disconnected»");
+    }
+    expect(keysOf(id)).not.toContain("openvpn.otp");
+    expect(keysOf(id)).not.toContain("openvpn.password");
+    expect(readFileSync(join(env("XDG_CONFIG_HOME"), "galleria", "profiles", `${id}.toml`), "utf8")).not.toContain("openvpn.password");
+  });
+
+  it("no_typed_value_is_left_in_the_page", async () => {
+    const b = await openWith("credentials");
+    await choose(b, "Datacenter Milano");
+    await b.$("button=Connect").click();
+    await waitForDialog(b, /Credentials for «Datacenter Milano»/);
+    await b.$("#credentials-username").setValue(USER);
+    await b.$("#credentials-password").setValue(PASSWORD);
+    // before it is sent the value is in the field, and nowhere else (S43: WebDriver writes in the fields and sees them emptied)
+    expect(await b.$("#credentials-password").getValue()).toBe(PASSWORD);
+    await send(b);
+    await waitFor(b, async () => (await dialogs(b)).length === 0, "the window of the credentials never closed");
+    const left = () =>
+      b.execute(() => ({
+        values: [...document.querySelectorAll("input, textarea")].map((el) => (el as HTMLInputElement).value),
+        attributes: [...document.querySelectorAll("*")].flatMap((el) => [...el.attributes].map((a) => a.value)),
+        html: document.documentElement.outerHTML,
+        text: document.body.innerText,
+      }));
+    for (const when of ["just sent", "connected"]) {
+      if (when === "connected") await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the profile never connected");
+      const page = await left();
+      expect(page.values.filter((v) => v.includes(PASSWORD)), `a field holds the password (${when})`).toEqual([]);
+      expect(page.attributes.filter((v) => v.includes(PASSWORD)), `an attribute holds the password (${when})`).toEqual([]);
+      expect(page.html.includes(PASSWORD), `the page holds the password (${when})`).toBe(false);
+      expect(page.text.includes(PASSWORD), `the text holds the password (${when})`).toBe(false);
+      expect(await b.$$('input[type="password"]'), `no password field is left (${when})`).toHaveLength(0);
+    }
+    // nothing was asked to be remembered: the keyring has nothing of it
+    expect(keysOf(profileId("Datacenter Milano"))).not.toContain("openvpn.password");
   });
 });

@@ -15,6 +15,8 @@ export interface Rubrica {
   /** The detail of the selected profile, once it has arrived (never the one of the previous selection). */
   detail: ProfileDetail | null;
   detailError: CmdError | null;
+  /** Reads the chosen profile again although its time of modification did not change: what is remembered of it (its credentials) did. */
+  refreshDetail: () => void;
   /** Reads the list again. The window does it by itself on focus; a write of the window calls it when it is done. */
   reload: () => Promise<void>;
   /**
@@ -56,6 +58,9 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ProfileDetail | null>(null);
   const [detailError, setDetailError] = useState<CmdError | null>(null);
+  // The detail read again with no change of `modified`: what Rust remembers of the profile (its credentials) changed.
+  const [detailTurn, setDetailTurn] = useState(0);
+  const refreshDetail = useCallback(() => setDetailTurn((turn) => turn + 1), []);
   // Only the newest read counts: an older answer that arrives late must not overwrite it.
   const newest = useRef(0);
   const lastOrder = useRef<string[]>([]);
@@ -199,7 +204,7 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
     return () => {
       current = false;
     };
-  }, [selectedId, modified, reload]);
+  }, [selectedId, modified, reload, detailTurn]);
 
   return {
     loaded,
@@ -209,6 +214,7 @@ export function useRubrica(order: (view: RubricaView) => string[] = displayOrder
     select: setSelectedId,
     detail: detail && detail.id === selectedId ? detail : null,
     detailError,
+    refreshDetail,
     reload,
     update,
     validateRaw,

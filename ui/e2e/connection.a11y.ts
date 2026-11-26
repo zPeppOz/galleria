@@ -121,8 +121,13 @@ describe("the connection under a screen reader", () => {
     await waitForTree((t) => focusedNode(t)?.name === "User name", "the focus on «User name»");
     expect(descendants(tree, dialog).some((n) => n.states.has("focused"))).toBe(true);
     expect(findNode(tree, "page tab", "General")).toBeUndefined();
-    const spoken = speechSince(mark);
-    record("K5c the window of the credentials, opened (what Orca said is below, and may be nothing: see the outcome document)", spoken, tree);
+    // Both are required: an empty field read as «blank» is not a reading of this dialog. Wait for the title AND the field,
+    // not just for the focus in the tree: AT-SPI's focus can arrive before Orca speaks.
+    await waitForSpeech(mark, "Credentials for «Datacenter Milano»");
+    const spoken = await waitForSpeech(mark, "User name");
+    expect(spoken.some((line) => line.includes("Credentials for «Datacenter Milano»"))).toBe(true);
+    expect(spoken.some((line) => line.includes("User name"))).toBe(true);
+    record("K5c the window of the credentials, opened and read", spoken, tree);
     // it takes the focus and does not announce: `connecting` and `needs_input` are not said (Q27, rule 2)
     await settle(1500);
     expect(announced().slice(before), "no announcement was sent for the window of the credentials").toEqual([]);

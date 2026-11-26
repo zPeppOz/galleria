@@ -139,6 +139,29 @@ export async function dumpFileWindow(): Promise<FileWindowDump> {
   return JSON.parse(await fileWindow(["dump"])) as FileWindowDump;
 }
 
+/** What the source of a real drag reports (lab/tests/gtk-drag-source.py): where it started, where it let go, and whether a window took the file. */
+export interface DragResult {
+  source: [number, number];
+  target: [number, number];
+  ended: boolean;
+  dropped: boolean;
+}
+
+/**
+ * Drags a file onto the window of Galleria with a real drag: a small GTK window offers the file as `text/uri-list`, the
+ * mouse is pressed on it, moved over the window and released there, over AT-SPI (S28). With `cancel` the button is
+ * released in the corner of the screen, where nothing takes a drop. It does not block the event loop.
+ */
+export async function dragFile(path: string, options: { cancel?: boolean } = {}): Promise<DragResult> {
+  const done = await new Promise<{ status: number | null; out: string }>((resolve) => {
+    execFile("python3", [env("GALLERIA_A11Y_DRAG_SOURCE"), path, ...(options.cancel ? ["--cancel"] : [])], { encoding: "utf8" }, (error, stdout, stderr) =>
+      resolve({ status: error ? ((error.code as number | undefined) ?? 1) : 0, out: `${stdout}${stderr}` }),
+    );
+  });
+  if (done.status !== 0) throw new Error(`the drag did not end (${done.status}): ${done.out}`);
+  return JSON.parse(done.out.trim().split("\n").pop() ?? "{}") as DragResult;
+}
+
 export function descendants(tree: AtNode[], root: AtNode): AtNode[] {
   const out: AtNode[] = [];
   for (let i = root.index + 1; i < tree.length && tree[i].depth > root.depth; i++) out.push(tree[i]);

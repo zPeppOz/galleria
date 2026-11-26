@@ -22,6 +22,7 @@ const COMMANDS: &[&str] = &[
     "import_commit",
     "import_discard",
     "import_pick_file",
+    "import_pending",
 ];
 
 fn main() {

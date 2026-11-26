@@ -5,11 +5,12 @@
 //   I5b  a file chosen in the real window is previewed and imported: one notice, polite, nothing of the folder in the page
 //   I5c  «Cancel» in the real window changes nothing: no notice, no preview, the focus on the button
 //   I5d  the preview is read as a dialog: its name, and the focus on «Name»
+//   I5e  a file dragged onto the window with a real drag (T4) is previewed with the text of D19, and imported: one notice
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  answerFileWindow, atspiTree, bodyText, closeApp, daemon, dumpFileWindow, env, findNode, focusedNode, importFixtures, openApp, orcaDebugLines, record, speechMark, speechSince,
+  answerFileWindow, atspiTree, bodyText, closeApp, daemon, dragFile, dumpFileWindow, env, findNode, focusedNode, importFixtures, openApp, orcaDebugLines, record, speechMark, speechSince,
   waitForBody, waitForSpeech, waitForTree,
   type AtNode, type Browser,
 } from "./support";
@@ -162,5 +163,44 @@ describe("the window «Open» of the import under a screen reader", () => {
     expect(findNode(tree, "combo box", "Group") ?? findNode(tree, "menu", "Group") ?? findNode(tree, "list box", "Group"), "the field «Group»").toBeTruthy();
     expect(tree.some((n) => n.role === "push button" && n.name === "Import")).toBe(true);
     expect(tree.some((n) => n.role === "push button" && n.name === "Back")).toBe(true);
+  });
+});
+
+describe("a file dragged onto the window under a screen reader", () => {
+  it("I5e_a_file_dragged_onto_the_window_is_previewed", async () => {
+    const files = importFixtures();
+    const folder = files.office.slice(0, files.office.lastIndexOf("/"));
+    const profilesBefore = readdirSync(join(configDir(), "profiles")).length;
+    const before = onDisk();
+    const mark = speechMark();
+    // a real drag between two windows: the file is offered as `text/uri-list` by a window of GTK, and let go over Galleria
+    const dragged = await dragFile(files.office);
+    record("I5e the drag", [JSON.stringify(dragged)]);
+    expect(dragged, JSON.stringify(dragged)).toMatchObject({ ended: true, dropped: true });
+    // the preview opens by itself, at the second step: WireGuard, the file, and the hook that was removed with the text of D19
+    await waitForBody(b, "File: office.conf", "the preview of the dropped file never showed");
+    const preview = await bodyText(b);
+    expect(preview, "the protocol tag says WireGuard").toContain("WG");
+    expect(preview).toContain("PostUp");
+    expect(preview).toContain("Galleria does not run the scripts of profiles.");
+    expect(preview, "the folder of the file is not in the page").not.toContain(folder);
+    expect(preview, "the secrets are named and never shown").not.toContain("SEED-SECRET-");
+    expect(onDisk(), "nothing is written before «Import»").toBe(before);
+    const tree = await waitForTree(focusedIs("Name"), "the field «Name» focused");
+    expect(findNode(tree, "dialog", "Import profile"), "a dialog named «Import profile»").toBeTruthy();
+    // «Import»: one notice, with the number of directives removed, said once
+    const markImport = speechMark();
+    await key("Enter");
+    const DONE = "Imported “office”. 1 directive removed.";
+    await waitForSpeech(markImport, DONE, 5000);
+    await settle(1500);
+    const times = speechSince(markImport).filter((line) => line.includes(DONE)).length;
+    record("I5e the import of a dropped file", speechSince(mark), atspiTree());
+    expect(times, `Orca said the notice ${times} times: ${JSON.stringify(speechSince(markImport))}`).toBe(1);
+    const lines = orcaDebugLines(/Dequeued object:announcement/).filter((line) => line.includes(DONE));
+    expect(lines.length, "Orca dequeued an object:announcement carrying the notice").toBeGreaterThan(0);
+    for (const line of lines) expect(line).toContain(`(1, 0, ${DONE})`);
+    expect(readdirSync(join(configDir(), "profiles"))).toHaveLength(profilesBefore + 1);
+    expect(await bodyText(b)).not.toContain(folder);
   });
 });

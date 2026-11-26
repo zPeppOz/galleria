@@ -6,7 +6,10 @@
 //! One point holds the previews, and every way in is a way of calling it (P1). A path is never trusted: it is read with
 //! the checks of `galleria_profile::read_import_file` (a regular file, at most 1 MiB, UTF-8).
 
-use crate::rubrica::{AuthFlags, ProfileSummary, Rubrica, RubricaError, openvpn_view, summarize};
+use crate::{
+    error::CmdError,
+    rubrica::{AuthFlags, ProfileSummary, Rubrica, RubricaError, openvpn_view, summarize},
+};
 use galleria_ipc::Protocol;
 use galleria_profile::{
     IMPORT_MAX_BYTES, ImportError, ImportFileError, ImportWarning, Imported, WarningKind,
@@ -14,7 +17,7 @@ use galleria_profile::{
 };
 use serde::Serialize;
 use std::{
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex, PoisonError},
     time::{Duration, Instant},
 };
@@ -93,6 +96,8 @@ pub enum ImportFailure {
     TooLarge,
     #[error("Not a .ovpn or .conf profile")]
     UnsupportedFile { file_name: Option<String> },
+    #[error("Only one file can be imported at a time")]
+    Many,
     #[error("The preview is no longer there")]
     Expired,
     #[error(transparent)]
@@ -136,6 +141,30 @@ impl ImportFailure {
     }
 }
 
+/// What the page is told of a file that came from outside (dropped on the window, or given as an argument): the preview,
+/// or the error with the name of the file (never its folder). The same type goes out as the payload of
+/// `galleria:open-file` and as the answer of `import_pending`.
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportOffer {
+    Preview(ImportPreview),
+    Failed {
+        error: CmdError,
+        file_name: Option<String>,
+    },
+}
+
+impl ImportOffer {
+    fn failed(failure: ImportFailure, path: Option<&Path>) -> Self {
+        Self::Failed {
+            error: CmdError::from(failure),
+            file_name: path
+                .and_then(Path::file_name)
+                .map(|n| n.to_string_lossy().into_owned()),
+        }
+    }
+}
+
 /// A preview that waits: the profile and its secrets as the import made them, and when it was made.
 struct Held {
     id: Uuid,
@@ -149,6 +178,8 @@ pub struct Imports {
     rubrica: Arc<Rubrica>,
     clock: Clock,
     held: Mutex<Vec<Held>>,
+    /// The last offer from outside that the page has not taken yet (the page may not be there yet).
+    pending: Mutex<Option<ImportOffer>>,
 }
 
 /// The name of the file without its extension, with nothing that is not a name: no control character, at most 64
@@ -256,6 +287,7 @@ impl Imports {
             rubrica,
             clock,
             held: Mutex::new(vec![]),
+            pending: Mutex::new(None),
         }
     }
 
@@ -300,6 +332,38 @@ impl Imports {
             .map_err(|failure| failure.at_line_of(&text))?;
         let base = name_from_file(path);
         self.keep(imported, &text, origin, file_name.clone(), base)
+    }
+
+    /// The preview, or the error, of the files that came from outside (dropped, or given as arguments), kept for the page
+    /// until it asks (`take_pending`). One file per gesture (Q40): more than one is an error that says so, and nothing is
+    /// read. Without files there is nothing to offer (`None`). A new offer replaces the one that waits, and the preview of
+    /// the old one is let go (P7). Every path is read as `offer_path` reads it: it is not trusted.
+    pub fn offer_from_outside(&self, paths: &[PathBuf], origin: Origin) -> Option<ImportOffer> {
+        let offer = match paths {
+            [] => return None,
+            [path] => match self.offer_path(path, origin) {
+                Ok(preview) => ImportOffer::Preview(preview),
+                Err(failure) => ImportOffer::failed(failure, Some(path)),
+            },
+            _ => ImportOffer::failed(ImportFailure::Many, None),
+        };
+        let replaced = self
+            .pending
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .replace(offer.clone());
+        if let Some(ImportOffer::Preview(old)) = replaced {
+            self.discard(old.id);
+        }
+        Some(offer)
+    }
+
+    /// The offer that waits for the page, if there is one: the page takes it once.
+    pub fn take_pending(&self) -> Option<ImportOffer> {
+        self.pending
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
     }
 
     /// Puts the import among the previews and describes it.

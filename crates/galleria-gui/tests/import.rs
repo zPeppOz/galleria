@@ -12,7 +12,8 @@ use galleria_gui::{
     configure_with,
     error::CmdError,
     import::{
-        ImportFailure, ImportPreview, Imports, MAX_PREVIEWS, NoticeKind, Origin, PREVIEW_TTL,
+        ImportFailure, ImportOffer, ImportPreview, Imports, MAX_PREVIEWS, NoticeKind, Origin,
+        PREVIEW_TTL,
     },
     picker::FilePicker,
     rubrica::{Rubrica, RubricaError},
@@ -32,7 +33,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{
-    WebviewWindow, WebviewWindowBuilder,
+    Listener, Manager, WebviewWindow, WebviewWindowBuilder,
     ipc::{CallbackFn, InvokeBody},
     test::{INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder, mock_context, noop_assets},
     webview::InvokeRequest,
@@ -1055,6 +1056,224 @@ fn a_picked_file_gets_the_same_checks_as_a_dropped_one() {
     let (gui, _) = gui_picking(&world, Some(world.files.outside.clone()));
     let error = invoke(&gui.window, "import_pick_file", json!({})).unwrap_err();
     assert_eq!(error["code"], "import_outside_folder");
+}
+
+// ---- the files that come from outside (T4) --------------------------------------------------------------------------
+
+fn preview_of(offer: Option<ImportOffer>) -> ImportPreview {
+    match offer {
+        Some(ImportOffer::Preview(preview)) => preview,
+        other => panic!("a preview was expected: {other:?}"),
+    }
+}
+
+/// The code of the error that an offer carries.
+fn failed_code(offer: Option<ImportOffer>) -> String {
+    match offer {
+        Some(ImportOffer::Failed { error, .. }) => error.code,
+        other => panic!("an error was expected: {other:?}"),
+    }
+}
+
+#[test]
+fn a_dropped_file_becomes_a_pending_preview() {
+    let world = World::seeded();
+    let imports = world.imports();
+    let before = snapshot(&world.dir());
+    let offered = preview_of(
+        imports.offer_from_outside(std::slice::from_ref(&world.files.office), Origin::Drop),
+    );
+    assert_eq!(offered.origin, Origin::Drop);
+    assert_eq!(offered.file_name.as_deref(), Some("office.conf"));
+    assert_eq!(offered.protocol, Protocol::Wireguard);
+    // it waits for the page: the same preview, once
+    let waiting = preview_of(imports.take_pending());
+    assert_eq!(waiting.id, offered.id);
+    assert!(imports.take_pending().is_none());
+    // and nothing was written before «Import»
+    assert_eq!(snapshot(&world.dir()), before);
+    imports.commit(offered.id, "Office", None).unwrap();
+    assert_eq!(world.rubrica.list().unwrap().profiles.len(), 6);
+}
+
+#[test]
+fn two_dropped_files_are_refused_and_nothing_is_previewed() {
+    let world = World::seeded();
+    let imports = world.imports();
+    let before = snapshot(&world.dir());
+    let offer = imports.offer_from_outside(
+        &[world.files.inline.clone(), world.files.office.clone()],
+        Origin::Drop,
+    );
+    assert_eq!(failed_code(offer), "gui_import_many");
+    // the error is what waits for the page, and no file was read: no preview is held
+    assert_eq!(failed_code(imports.take_pending()), "gui_import_many");
+    assert_eq!(snapshot(&world.dir()), before);
+    // no files at all (a text was dragged): nothing is offered and nothing waits
+    assert!(imports.offer_from_outside(&[], Origin::Drop).is_none());
+    assert!(imports.take_pending().is_none());
+}
+
+#[test]
+fn a_dropped_folder_or_fifo_is_refused() {
+    let world = World::new();
+    let fifo = world.files.separate.with_file_name("fifo.ovpn");
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let folder = world.files.separate.parent().unwrap().join("folder.ovpn");
+    fs::create_dir(&folder).unwrap();
+    for path in [fifo, folder] {
+        // a thread and a deadline: a FIFO that blocked the read would stop the test for good
+        let (tx, rx) = std::sync::mpsc::channel();
+        let imports = Imports::new(Arc::clone(&world.rubrica));
+        std::thread::spawn(move || {
+            let _ = tx.send(imports.offer_from_outside(&[path], Origin::Drop));
+        });
+        let offer = rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("the read did not wait for a writer");
+        assert_eq!(failed_code(offer), "gui_import_unsupported_file");
+    }
+}
+
+#[test]
+fn an_offer_made_before_the_page_is_ready_is_not_lost() {
+    let world = World::new();
+    let imports = world.imports();
+    // nobody asked yet: the offer waits, with the file name and no folder
+    let failed =
+        imports.offer_from_outside(std::slice::from_ref(&world.files.outside), Origin::Open);
+    assert_eq!(failed_code(failed), "import_outside_folder");
+    let waiting = imports.take_pending();
+    let Some(ImportOffer::Failed { file_name, .. }) = &waiting else {
+        panic!("the error was lost: {waiting:?}");
+    };
+    assert_eq!(file_name.as_deref(), Some("outside.ovpn"));
+    // taken once
+    assert!(imports.take_pending().is_none());
+}
+
+#[test]
+fn a_new_offer_replaces_the_pending_one_and_discards_its_preview() {
+    let world = World::new();
+    let imports = world.imports();
+    let first = preview_of(
+        imports.offer_from_outside(std::slice::from_ref(&world.files.inline), Origin::Drop),
+    );
+    let second = preview_of(
+        imports.offer_from_outside(std::slice::from_ref(&world.files.office), Origin::Open),
+    );
+    assert_ne!(first.id, second.id);
+    // the one that waits is the second; the first preview is gone with its secrets
+    assert_eq!(preview_of(imports.take_pending()).id, second.id);
+    assert!(matches!(
+        imports.commit(first.id, "First", None).unwrap_err(),
+        ImportFailure::Expired
+    ));
+    imports.commit(second.id, "Second", None).unwrap();
+    // an offer that fails replaces a waiting preview too
+    let third = preview_of(
+        imports.offer_from_outside(std::slice::from_ref(&world.files.inline), Origin::Drop),
+    );
+    let failed =
+        imports.offer_from_outside(std::slice::from_ref(&world.files.outside), Origin::Drop);
+    assert_eq!(failed_code(failed), "import_outside_folder");
+    assert!(matches!(
+        imports.commit(third.id, "Third", None).unwrap_err(),
+        ImportFailure::Expired
+    ));
+}
+
+#[test]
+fn the_offer_payload_holds_no_path_and_no_secret() {
+    let world = World::seeded();
+    let imports = world.imports();
+    let folders = [world.root.path(), world.files.separate.parent().unwrap()];
+    for file in [
+        &world.files.malicious,
+        &world.files.office,
+        &world.files.separate,
+    ] {
+        let offer = imports
+            .offer_from_outside(std::slice::from_ref(file), Origin::Drop)
+            .unwrap();
+        assert_clean(&offer, &folders);
+        assert!(
+            serde_json::to_value(&offer)
+                .unwrap()
+                .get("preview")
+                .is_some()
+        );
+    }
+    for files in [
+        vec![world.files.outside.clone()],
+        vec![world.files.inline.clone(), world.files.office.clone()],
+        vec![world.files.inline.with_file_name("nothing.ovpn")],
+    ] {
+        let offer = imports.offer_from_outside(&files, Origin::Open).unwrap();
+        assert_clean(&offer, &folders);
+        assert!(
+            serde_json::to_value(&offer)
+                .unwrap()
+                .get("failed")
+                .is_some()
+        );
+    }
+}
+
+#[test]
+fn import_pending_gives_the_waiting_offer_once_through_the_command() {
+    let world = World::new();
+    let gui = gui(&world);
+    assert_eq!(
+        invoke(&gui.window, "import_pending", json!({})).unwrap(),
+        Value::Null
+    );
+    let imports = gui._app.state::<Arc<Imports>>();
+    imports.offer_from_outside(std::slice::from_ref(&world.files.inline), Origin::Open);
+    let offer = invoke(&gui.window, "import_pending", json!({})).unwrap();
+    assert_eq!(offer["preview"]["origin"], "open");
+    assert_eq!(offer["preview"]["file_name"], "inline.ovpn");
+    assert_clean(&offer, &[world.root.path()]);
+    assert_eq!(
+        invoke(&gui.window, "import_pending", json!({})).unwrap(),
+        Value::Null
+    );
+    // the command takes nothing: no path, no text
+    imports.offer_from_outside(std::slice::from_ref(&world.files.inline), Origin::Open);
+    assert!(invoke(&gui.window, "import_pending", json!({})).unwrap()["preview"].is_object());
+}
+
+#[test]
+fn the_offer_goes_to_the_page_as_the_open_file_event() {
+    let world = World::new();
+    let gui = gui(&world);
+    let heard: Arc<Mutex<Vec<String>>> = Arc::default();
+    let sink = Arc::clone(&heard);
+    gui._app
+        .handle()
+        .listen(galleria_gui::events::EV_OPEN_FILE, move |event| {
+            sink.lock().unwrap().push(event.payload().to_owned());
+        });
+    // what the handler of the drop does, off the thread of the window
+    galleria_gui::events::offer_from_outside(
+        gui._app.handle(),
+        std::slice::from_ref(&world.files.office),
+        Origin::Drop,
+    );
+    // zero files: no event
+    galleria_gui::events::offer_from_outside(gui._app.handle(), &[], Origin::Drop);
+    let heard = heard.lock().unwrap();
+    assert_eq!(heard.len(), 1, "{heard:?}");
+    let payload: Value = serde_json::from_str(&heard[0]).unwrap();
+    assert_eq!(payload["preview"]["origin"], "drop");
+    assert_eq!(payload["preview"]["file_name"], "office.conf");
+    assert_clean(&payload, &[world.root.path()]);
 }
 
 // ---- the fixtures ---------------------------------------------------------------------------------------------------

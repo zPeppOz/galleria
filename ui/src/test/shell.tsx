@@ -5,7 +5,7 @@ import type { DaemonView } from "../daemon/types";
 import type { Announce } from "../design/Toast";
 import { Preferences } from "../prefs";
 import { arrange } from "../rubrica/arrange";
-import type { ImportActions } from "../import/types";
+import type { ImportActions, Incoming } from "../import/types";
 import type { Rubrica } from "../rubrica/store";
 import type { CmdError, GroupActions, ProfileActions, ProfileDetail, ProfilePatch, ProfileSummary, RawCheck, RubricaView } from "../rubrica/types";
 import { Shell } from "../shell/Shell";
@@ -30,6 +30,9 @@ interface Options {
   actions?: ProfileActions;
   /** The import; by default any text makes the preview of a clean profile, and saving it adds the profile to the list, as the backend would. */
   importer?: ImportActions;
+  /** A file that came from outside, and the hint of a file dragged over the window. */
+  incoming?: Incoming | null;
+  dropHover?: boolean;
 }
 
 /** The shell with a rubrica that answers at once and keeps its own selection and sort order: no app behind it, nothing to wait for. */
@@ -99,7 +102,7 @@ function Harness({ view, options }: { view: DaemonView | null; options: Options 
     groups: options.groups ?? groupActions,
   };
   return (
-    <Shell view={view} info={view ? makeInfo() : null} onRetry={options.onRetry ?? (() => undefined)} announce={options.announce} rubrica={rubrica} importer={options.importer ?? importActions} sort={sort} onSortChange={setSort} />
+    <Shell view={view} info={view ? makeInfo() : null} onRetry={options.onRetry ?? (() => undefined)} announce={options.announce} rubrica={rubrica} importer={options.importer ?? importActions} incoming={options.incoming} dropHover={options.dropHover} sort={sort} onSortChange={setSort} />
   );
 }
 

@@ -15,3 +15,6 @@
 .shell-tools { position: sticky; top: 0; z-index: 1; display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-5) var(--sp-5) var(--sp-3); background: var(--bg); }
 /* «Manage groups» at the foot of the list column: it stays in view while the list scrolls. */
 .shell-aside-foot { position: sticky; bottom: 0; padding: var(--sp-5); border-top: 1px solid var(--line); background: var(--bg); }
+/* «Drop to import»: over the whole window while a file is dragged on it. Only to look at: it takes no click and no focus,
+   and the screen reader does not read it (the way in from the keyboard is Ctrl+O). */
+.shell-drop { position: fixed; inset: var(--sp-4); z-index: 50; display: grid; place-items: center; pointer-events: none; border: 2px dashed var(--accent); border-radius: var(--r-md); background: color-mix(in oklab, var(--bg) 82%, transparent); color: var(--ink); font-size: var(--fs-lg); font-weight: 600; }

@@ -9,7 +9,7 @@ import type { CmdError, ProfileSummary } from "../rubrica/types";
 import { issueText } from "../shell/tabs/tab";
 import "./ImportDialog.css";
 import { Preview } from "./Preview";
-import type { ImportActions, ImportPreview } from "./types";
+import type { ImportActions, ImportPreview, Incoming } from "./types";
 
 type Focus = "text" | "choose" | "name" | "group" | "error";
 
@@ -42,8 +42,10 @@ export function ImportDialog(props: {
   actions: ImportActions;
   /** The profile was saved and the rubrica read again: the shell selects it and puts the focus on its row. */
   onImported: (profile: ProfileSummary) => void;
+  /** A file that came from outside (dropped, or given to the app): it opens the window with its preview or its error. */
+  incoming?: Incoming | null;
 }) {
-  const { open, onClose, actions, onImported } = props;
+  const { open, onClose, actions, onImported, incoming } = props;
   const t = useT();
   const toast = useToast();
   const body = useRef<HTMLDivElement>(null);
@@ -139,6 +141,25 @@ export function ImportDialog(props: {
     setGroupError("");
     ask("name");
   };
+
+  // A file that came from outside (dropped on the window, or given to the app) takes the place of what the window shows
+  // (P7): the preview that was there is let go, and the new one, or its error, is shown. The error is read where the focus is.
+  useEffect(() => {
+    if (!open || !incoming) return;
+    letGo(preview);
+    setText("");
+    setBusy(false);
+    setChoosing(false);
+    if ("preview" in incoming.offer) {
+      showPreview(incoming.offer.preview);
+    } else {
+      setPreview(null);
+      setError(incoming.offer.failed.error);
+      ask("error");
+    }
+    // only a new offer counts: the rest is read as it was when it arrived
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incoming?.turn]);
 
   const makePreview = async () => {
     if (busy || choosing) return;
@@ -242,6 +263,7 @@ export function ImportDialog(props: {
           <>
             <div className="import-choose">
               <Button busy={choosing} disabled={busy} onClick={() => void chooseFile()}>{t("import.choose")}</Button>
+              <p className="import-drop-hint">{t("import.drop_hint")}</p>
             </div>
             <Field as="textarea" mono rows={10} spellCheck={false} name="import-text" label={t("import.text.label")} value={text} onChange={(value) => { setText(value); }} />
           </>

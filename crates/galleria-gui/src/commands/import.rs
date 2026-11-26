@@ -4,7 +4,7 @@
 
 use crate::{
     error::CmdError,
-    import::{ImportFailure, ImportPreview, Imports, Origin},
+    import::{ImportFailure, ImportOffer, ImportPreview, Imports, Origin},
     picker::FilePicker,
     rubrica::ProfileSummary,
 };
@@ -36,6 +36,7 @@ impl From<ImportFailure> for CmdError {
                 "gui_import_unsupported_file",
                 file_name.map(|name| json!({ "file_name": name })),
             ),
+            ImportFailure::Many => ("gui_import_many", None),
             ImportFailure::Expired => ("gui_import_expired", None),
             ImportFailure::Rubrica(error) => return CmdError::from(error),
         };
@@ -85,4 +86,12 @@ pub fn import_pick_file(
         return Ok(None);
     };
     Ok(Some(imports.offer_path(&path, Origin::Picker)?))
+}
+
+/// The file that came from outside before the page was there to hear it (an argument of the process, or a drop while the
+/// page was loading), or `None`. The page asks once, at the start, and listens to `galleria:open-file` afterwards; the
+/// offer that is taken leaves the wait.
+#[tauri::command(async)]
+pub fn import_pending(imports: State<'_, Arc<Imports>>) -> Option<ImportOffer> {
+    imports.take_pending()
 }

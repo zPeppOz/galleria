@@ -1,8 +1,9 @@
+import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { makeSummary } from "../test/fixtures";
-import { useImportActions } from "./store";
+import { useImportActions, useIncoming } from "./store";
 import type { ImportPreview } from "./types";
 
 const preview: ImportPreview = {
@@ -71,5 +72,106 @@ describe("useImportActions", () => {
     mockIPC(() => Promise.reject({ code: "gui_import_expired", message: "gone" }));
     const { result } = renderHook(() => useImportActions(async () => undefined));
     await expect(result.current.discard("i1")).resolves.toBeUndefined();
+  });
+});
+
+describe("useIncoming", () => {
+  const failed = { failed: { error: { code: "gui_import_many", message: "x" }, file_name: null } };
+
+  it("asks_for_a_pending_offer_at_start", async () => {
+    const calls: { cmd: string; args: unknown }[] = [];
+    mockIPC(
+      (cmd, args) => {
+        calls.push({ cmd, args });
+        return cmd === "import_pending" ? { preview: { ...preview, origin: "open", file_name: "inline.ovpn" } } : undefined;
+      },
+      { shouldMockEvents: true },
+    );
+    const { result } = renderHook(() => useIncoming());
+    await waitFor(() => expect(result.current.incoming).not.toBeNull());
+    expect(result.current.incoming?.offer).toEqual({ preview: { ...preview, origin: "open", file_name: "inline.ovpn" } });
+    // asked once, with nothing: no path and no text go out
+    expect(calls.map((c) => c.cmd)).toEqual(["import_pending"]);
+    expect(Object.keys((calls[0].args ?? {}) as object)).toEqual([]);
+  });
+
+  it("nothing_waiting_is_no_offer", async () => {
+    mockIPC(() => null, { shouldMockEvents: true });
+    const { result } = renderHook(() => useIncoming());
+    await waitFor(() => expect(result.current.hovering).toBe(false));
+    expect(result.current.incoming).toBeNull();
+  });
+
+  it("an_open_file_event_opens_the_preview", async () => {
+    const calls: string[] = [];
+    mockIPC(
+      (cmd) => {
+        calls.push(cmd);
+        return null;
+      },
+      { shouldMockEvents: true },
+    );
+    const { result } = renderHook(() => useIncoming());
+    await waitFor(() => expect(calls).toEqual(["import_pending"]));
+    await act(async () => {
+      await emit("galleria:open-file", { preview: { ...preview, origin: "drop" } });
+    });
+    expect(result.current.incoming?.offer).toEqual({ preview: { ...preview, origin: "drop" } });
+    // an offer that was heard does not wait any more: the page tells Rust, which lets go of it
+    await waitFor(() => expect(calls).toEqual(["import_pending", "import_pending"]));
+    // the same failure twice is two offers: the number changes
+    const turns: number[] = [];
+    for (let i = 0; i < 2; i++) {
+      await act(async () => {
+        await emit("galleria:open-file", failed);
+      });
+      turns.push(result.current.incoming?.turn ?? 0);
+    }
+    expect(turns[1]).toBeGreaterThan(turns[0]);
+    expect(result.current.incoming?.offer).toEqual(failed);
+  });
+
+  it("an_offer_that_is_both_heard_and_pending_is_shown_once", async () => {
+    // the event arrives while the answer of `import_pending` is on its way: the answer holds the same offer
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let asked!: () => void;
+    const askedAt = new Promise<void>((resolve) => (asked = resolve));
+    const offer = { preview: { ...preview, origin: "open" } };
+    mockIPC(
+      async (cmd) => {
+        if (cmd !== "import_pending") return undefined;
+        asked();
+        await gate;
+        return offer;
+      },
+      { shouldMockEvents: true },
+    );
+    const { result } = renderHook(() => useIncoming());
+    await askedAt;
+    await act(async () => {
+      await emit("galleria:open-file", offer);
+    });
+    const turn = result.current.incoming?.turn;
+    expect(turn).toBeGreaterThan(0);
+    await act(async () => {
+      release();
+      await gate;
+    });
+    expect(result.current.incoming?.turn).toBe(turn);
+  });
+
+  it("the_hover_event_tells_a_file_is_over_the_window", async () => {
+    mockIPC(() => null, { shouldMockEvents: true });
+    const { result } = renderHook(() => useIncoming());
+    await waitFor(() => expect(result.current.hovering).toBe(false));
+    await act(async () => {
+      await emit("galleria:drop-hover", { active: true });
+    });
+    expect(result.current.hovering).toBe(true);
+    await act(async () => {
+      await emit("galleria:drop-hover", { active: false });
+    });
+    expect(result.current.hovering).toBe(false);
   });
 });

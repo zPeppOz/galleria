@@ -30,6 +30,7 @@ const ALLOWED: &[&str] = &[
     "allow-import-commit",
     "allow-import-discard",
     "allow-import-pick-file",
+    "allow-import-pending",
 ];
 
 fn crate_file(name: &str) -> PathBuf {
@@ -172,4 +173,25 @@ fn the_webview_has_no_dialog_or_file_permission() {
         !manifest.contains("tauri-plugin"),
         "a Tauri plugin is a dependency"
     );
+}
+
+/// The drag of a file is handled by Tauri, which gives the paths to Rust (plan B4, T4, Q38): the handler stays on, and
+/// the protocol that would let the page open a file stays off.
+#[test]
+fn drag_drop_stays_on_and_the_asset_protocol_stays_off() {
+    let conf = tauri_conf();
+    for window in conf["app"]["windows"].as_array().unwrap() {
+        assert_ne!(
+            window["dragDropEnabled"],
+            Value::Bool(false),
+            "{window} turns the drag and drop of Tauri off"
+        );
+    }
+    let asset = &conf["app"]["security"]["assetProtocol"];
+    assert!(
+        asset.is_null() || asset["enable"] == Value::Bool(false),
+        "the asset protocol is on: {asset}"
+    );
+    let csp = conf["app"]["security"]["csp"].as_str().unwrap();
+    assert!(!csp.contains("asset:"), "the CSP names asset: {csp}");
 }

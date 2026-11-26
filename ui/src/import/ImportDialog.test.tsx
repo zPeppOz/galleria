@@ -5,29 +5,35 @@ import { describe, expect, it, vi } from "vitest";
 import { renderShell } from "../test/shell";
 import { makePreview, makeView } from "../test/fixtures";
 import type { CmdError } from "../rubrica/types";
-import type { ImportActions } from "./types";
+import type { ImportActions, Incoming } from "./types";
 import { ImportDialog } from "./ImportDialog";
 import { I18n } from "../i18n";
 import { ToastProvider } from "../design/Toast";
 import { expectNoAccessibilityViolations } from "../test/axe";
 
 /** The window alone, opened by a button, over actions the test gives. */
-function Alone({ actions, onImported = () => undefined, announce }: { actions: ImportActions; onImported?: Parameters<typeof ImportDialog>[0]["onImported"]; announce?: (text: string, assertive: boolean) => void }) {
+function Alone({ actions, onImported = () => undefined, announce, incoming = null }: { actions: ImportActions; onImported?: Parameters<typeof ImportDialog>[0]["onImported"]; announce?: (text: string, assertive: boolean) => void; incoming?: Incoming | null }) {
   return (
     <I18n lang="en">
       <ToastProvider closeLabel="Dismiss the notice" announce={announce}>
-        <Opener actions={actions} onImported={onImported} />
+        <Opener actions={actions} onImported={onImported} incoming={incoming} />
       </ToastProvider>
     </I18n>
   );
 }
 
-function Opener({ actions, onImported }: { actions: ImportActions; onImported: Parameters<typeof ImportDialog>[0]["onImported"] }) {
+function Opener({ actions, onImported, incoming }: { actions: ImportActions; onImported: Parameters<typeof ImportDialog>[0]["onImported"]; incoming: Incoming | null }) {
   const [open, setOpen] = useState(false);
+  // like the shell: an offer that arrives opens the window in the pass that brings it
+  const [offered, setOffered] = useState(0);
+  if (incoming && incoming.turn !== offered) {
+    setOffered(incoming.turn);
+    setOpen(true);
+  }
   return (
     <main>
       <button type="button" onClick={() => setOpen(true)}>Import…</button>
-      <ImportDialog open={open} onClose={() => setOpen(false)} actions={actions} onImported={onImported} />
+      <ImportDialog open={open} onClose={() => setOpen(false)} actions={actions} onImported={onImported} incoming={incoming} />
     </main>
   );
 }
@@ -258,6 +264,84 @@ describe("ImportDialog", () => {
     expect(alert.textContent).toContain("The preview has expired: choose the file again.");
     expect(textbox()).toBeTruthy();
     expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
+  });
+
+  it("the_first_step_says_a_file_can_be_dragged_in", async () => {
+    const { dialog } = await openAlone(fakeActions());
+    expect(within(dialog).getByText("Drag a .ovpn or .conf file here.")).toBeTruthy();
+  });
+
+  it("an_open_file_event_opens_the_preview", async () => {
+    // nothing was opened by hand: the offer opens the window at the second step, and the focus is on the name
+    const actions = fakeActions();
+    const offer = { preview: makePreview({ origin: "drop", file_name: "office.conf", suggested_name: "office", protocol: "wireguard" }) };
+    render(<Alone actions={actions} incoming={{ offer, turn: 1 }} />);
+    const dialog = await screen.findByRole("dialog", { name: "Import profile" });
+    const name = await screen.findByRole("textbox", { name: "Name" });
+    await waitFor(() => expect(document.activeElement).toBe(name));
+    expect((name as HTMLInputElement).value).toBe("office");
+    expect(dialog.textContent).toContain("File: office.conf");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    // Import saves what was previewed, once
+    const user = userEvent.setup();
+    await user.click(within(dialog).getByRole("button", { name: "Import" }));
+    await waitFor(() => expect(actions.commit).toHaveBeenCalledWith("import-1", "office", null));
+    expect(actions.fromText).not.toHaveBeenCalled();
+    expect(actions.pickFile).not.toHaveBeenCalled();
+  });
+
+  it("a_failed_offer_shows_the_error_with_the_focus", async () => {
+    const announce = vi.fn();
+    const offer = { failed: { error: { code: "gui_import_unsupported_file", message: "x", data: { file_name: "a.txt" } } as CmdError, file_name: "a.txt" } };
+    render(<Alone actions={fakeActions()} announce={announce} incoming={{ offer, turn: 1 }} />);
+    const dialog = await screen.findByRole("dialog", { name: "Import profile" });
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Only .ovpn and .conf files can be imported.");
+    await waitFor(() => expect(alert.closest(".import-error")?.contains(document.activeElement)).toBe(true));
+    // the first step is there to try again; an error is read where the focus is, not announced
+    expect(within(dialog).getByRole("button", { name: "Choose a file…" })).toBeTruthy();
+    expect(document.querySelectorAll(".gx-toast")).toHaveLength(0);
+    expect(announce).not.toHaveBeenCalled();
+  });
+
+  it("two_files_at_once_say_that_one_is_enough", async () => {
+    const offer = { failed: { error: { code: "gui_import_many", message: "x" } as CmdError, file_name: null } };
+    render(<Alone actions={fakeActions()} incoming={{ offer, turn: 1 }} />);
+    const alert = await within(await screen.findByRole("dialog")).findByRole("alert");
+    expect(alert.textContent).toContain("Only one file can be imported at a time");
+  });
+
+  it("a_new_offer_replaces_what_the_window_shows_and_lets_go_of_the_old_preview", async () => {
+    const actions = fakeActions();
+    const first = { preview: makePreview({ id: "import-1", origin: "drop", file_name: "a.ovpn", suggested_name: "a" }) };
+    const view = render(<Alone actions={actions} incoming={{ offer: first, turn: 1 }} />);
+    await screen.findByRole("textbox", { name: "Name" });
+    // a second file, then an error: each takes the place of the one before
+    const second = { preview: makePreview({ id: "import-2", origin: "open", file_name: "b.ovpn", suggested_name: "b" }) };
+    view.rerender(<Alone actions={actions} incoming={{ offer: second, turn: 2 }} />);
+    await waitFor(() => expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("b"));
+    expect(actions.discard).toHaveBeenCalledWith("import-1");
+    const failed = { failed: { error: { code: "gui_import_many", message: "x" } as CmdError, file_name: null } };
+    view.rerender(<Alone actions={actions} incoming={{ offer: failed, turn: 3 }} />);
+    await within(await screen.findByRole("dialog")).findByRole("alert");
+    expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
+    expect(actions.discard).toHaveBeenCalledWith("import-2");
+  });
+
+  it("an_offer_that_was_closed_is_not_shown_again_at_the_next_opening", async () => {
+    const actions = fakeActions();
+    const offer = { preview: makePreview({ origin: "drop", file_name: "a.ovpn", suggested_name: "a" }) };
+    const user = userEvent.setup();
+    render(<Alone actions={actions} incoming={{ offer, turn: 1 }} />);
+    const dialog = await screen.findByRole("dialog", { name: "Import profile" });
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(actions.discard).toHaveBeenCalledWith("import-1");
+    // opened by hand later: the first step, not the offer again
+    await user.click(screen.getByRole("button", { name: "Import…" }));
+    await screen.findByRole("dialog", { name: "Import profile" });
+    expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
+    expect(textbox()).toBeTruthy();
   });
 
   it("has_no_accessibility_violations", async () => {

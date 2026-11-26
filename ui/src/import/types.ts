@@ -1,5 +1,5 @@
 import type { Protocol } from "../daemon/types";
-import type { AuthFlags, ProfileSummary } from "../rubrica/types";
+import type { AuthFlags, CmdError, ProfileSummary } from "../rubrica/types";
 
 // Hand-written mirror of the views of `crates/galleria-gui/src/import.rs` (snake_case, as serialised). None of them has a
 // secret, a path or the text of the profile: `found` holds the names of the secrets that were found, never their values.
@@ -49,3 +49,13 @@ export interface ImportActions {
   /** Lets the preview go; a preview that is not there any more is not an error, and neither is any other failure. */
   discard: (id: string) => Promise<void>;
 }
+
+/**
+ * A file that came from outside the page: dropped on the window, or given to the app as an argument. Rust read it and
+ * made the preview or the error; the page never has the path, only the name of the file. It arrives as the event
+ * `galleria:open-file` and, when it came before the page was listening, as the answer of `import_pending`.
+ */
+export type ImportOffer = { preview: ImportPreview } | { failed: { error: CmdError; file_name: string | null } };
+
+/** An offer, with a number that changes each time one arrives, so that the same error twice opens the window twice. */
+export interface Incoming { offer: ImportOffer; turn: number }

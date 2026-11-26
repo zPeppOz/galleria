@@ -31,6 +31,7 @@ fi
 export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 WEBKIT_DISABLE_DMABUF_RENDERER=1
 export GALLERIA_A11Y_ORCA_LOG=$GALLERIA_A11Y_OUT/orca-debug.log GALLERIA_A11Y_DUMP=$GALLERIA_SMOKE_REPO/lab/tests/atspi-dump.py
 export GALLERIA_A11Y_FILE_WINDOW=$GALLERIA_SMOKE_REPO/lab/tests/atspi-file-window.py
+export GALLERIA_A11Y_DRAG_SOURCE=$GALLERIA_SMOKE_REPO/lab/tests/gtk-drag-source.py
 
 # The toolkits only talk to the AT-SPI bus when this setting is on, and the bus has to be up before Orca.
 gsettings set org.gnome.desktop.interface toolkit-accessibility true

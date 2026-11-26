@@ -6,7 +6,7 @@ import { ConfirmDialog } from "../design/ConfirmDialog";
 import { ToastProvider, type Announce } from "../design/Toast";
 import { useLang, useT } from "../i18n";
 import { ImportDialog } from "../import/ImportDialog";
-import type { ImportActions } from "../import/types";
+import type { ImportActions, Incoming } from "../import/types";
 import { arrange } from "../rubrica/arrange";
 import type { Rubrica } from "../rubrica/store";
 import type { ProfileSummary } from "../rubrica/types";
@@ -35,14 +35,25 @@ export function Shell(props: {
   rubrica: Rubrica;
   /** What the window can do with an import: the preview of a text, saving it, letting it go. */
   importer: ImportActions;
+  /** A file that came from outside (dropped on the window, or given to the app): the shell opens the import window on it. */
+  incoming?: Incoming | null;
+  /** A file is dragged over the window: only a hint to draw, with no path in it. */
+  dropHover?: boolean;
   sort: SortOrder;
   onSortChange: (sort: SortOrder) => void;
 }) {
-  const { view, info, onRetry, announce, rubrica, importer, sort, onSortChange } = props;
+  const { view, info, onRetry, announce, rubrica, importer, incoming = null, dropHover = false, sort, onSortChange } = props;
   const t = useT();
   const lang = useLang();
   const [query, setQuery] = useState("");
   const [importing, setImporting] = useState(false);
+  // A file from outside opens the window on its own, in the same pass that brings it (set while drawing, so that the
+  // window opens with the offer and not one pass after it).
+  const [offered, setOffered] = useState(0);
+  if (incoming && incoming.turn !== offered) {
+    setOffered(incoming.turn);
+    setImporting(true);
+  }
   // A profile was imported: the focus goes to its row once the rubrica has been read again and the selection has moved to it.
   const [imported, setImported] = useState<string | null>(null);
   const list = useRef<{ focus: () => void }>(null);
@@ -184,7 +195,12 @@ export function Shell(props: {
         </div>
         <StatusBar view={view} info={info} />
         <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
-        <ImportDialog open={importing} onClose={() => setImporting(false)} actions={importer} onImported={wasImported} />
+        <ImportDialog open={importing} onClose={() => setImporting(false)} actions={importer} onImported={wasImported} incoming={incoming} />
+        {dropHover ? (
+          <div className="shell-drop" aria-hidden="true">
+            <span>{t("import.drop_hover")}</span>
+          </div>
+        ) : null}
         <ConfirmDialog
           open={leaving !== null}
           title={t("leave.title")}

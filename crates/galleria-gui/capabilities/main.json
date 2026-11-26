@@ -26,6 +26,7 @@
     "allow-import-from-text",
     "allow-import-commit",
     "allow-import-discard",
-    "allow-import-pick-file"
+    "allow-import-pick-file",
+    "allow-import-pending"
   ]
 }

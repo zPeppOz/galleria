@@ -36,5 +36,6 @@ pub const GUI_CODES: &[&str] = &[
     "gui_import_unreadable",
     "gui_import_too_large",
     "gui_import_unsupported_file",
+    "gui_import_many",
     "gui_import_expired",
 ];

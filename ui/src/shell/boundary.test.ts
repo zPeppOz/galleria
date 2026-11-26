@@ -46,6 +46,24 @@ describe("shell sources", () => {
     expect(allowed.filter((name) => !invoked.has(name)).sort()).toEqual([]);
   });
 
+  it("the_page_never_listens_to_the_drag_events_of_tauri", () => {
+    // Tauri also sends the paths of a dragged file to the page, as events, to whoever listens (Q38). The page does not: the
+    // paths stay in Rust, and the page only hears the two events of Galleria, which carry none.
+    const sourcesOfThePage = webviewSources(SRC);
+    for (const { file, text } of sourcesOfThePage) {
+      for (const forbidden of ["tauri://", "onDragDropEvent", "getCurrentWebview", "getCurrentWindow", "TauriEvent"]) {
+        expect(text.includes(forbidden), `${file} names ${forbidden}`).toBe(false);
+      }
+      for (const match of text.matchAll(/\blisten(?:<[^>(]*>)?\(\s*([^,)]*)/g)) {
+        expect(match[1], `${file}: listen(${match[1]}`).toMatch(/^"galleria:[a-z-]+"$/);
+      }
+    }
+    // the events the page does listen to are the ones of Galleria, and the check above has something to look at
+    const heard = sourcesOfThePage.flatMap(({ text }) => [...text.matchAll(/\blisten(?:<[^>(]*>)?\(\s*"([^"]*)"/g)].map((m) => m[1]));
+    expect(heard).toContain("galleria:open-file");
+    expect(heard).toContain("galleria:drop-hover");
+  });
+
   it("no_sample_data_is_left", () => {
     expect(existsSync(join(SHELL, `${"de"}mo-data.ts`))).toBe(false);
     expect(webviewSources(SRC).filter(({ text }) => /Sample data|Dati di esempio/.test(text)).map(({ file }) => file)).toEqual([]);

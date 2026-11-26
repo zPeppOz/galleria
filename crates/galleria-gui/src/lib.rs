@@ -56,7 +56,10 @@ pub fn configure_with<R: Runtime>(
     let saver = Arc::new(WindowSaver::new(Arc::clone(&state)));
     builder
         .manage(Arc::clone(&state))
-        .on_window_event(move |window, event| window::on_event(&saver, window, event))
+        .on_window_event(move |window, event| {
+            window::on_event(&saver, window, event);
+            events::on_drag_drop(window, event);
+        })
         .invoke_handler(tauri::generate_handler![
             commands::daemon::daemon_view,
             commands::daemon::daemon_retry,
@@ -78,7 +81,8 @@ pub fn configure_with<R: Runtime>(
             commands::import::import_from_text,
             commands::import::import_commit,
             commands::import::import_discard,
-            commands::import::import_pick_file
+            commands::import::import_pick_file,
+            commands::import::import_pending
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.

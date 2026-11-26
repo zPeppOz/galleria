@@ -397,7 +397,7 @@ Il numero dei task di B2–B6 resta la stima di `docs/07` §5; quello definitivo
 | B3 · Rubrica e profili | 9 (piano scritto, in quattro gruppi) | lista, gruppi, ricerca, preferiti, ordinamento; schede secondo D26; editor raw; duplica, esporta, elimina; `state.toml` (D32) con lingua e tema (Q25); comando `announce` e primo uso di Q27 | B2 | G12 per la parte degli annunci | rubrica completa sui profili importati dalla CLI |
 | B4 · Import | 7 (piano scritto, in tre gruppi) | file, trascinamento, testo; anteprima con il testo di D19; associazione di `.ovpn` e istanza unica (D31) | B3 | G3 | si importa dalla GUI e si connette dalla CLI |
 | B5 · Connessione | 11 (piano scritto, in quattro gruppi) | archivio dei segreti (D25); connetti, disconnetti, sostituisci (D28); stati e statistiche; credenziali su `needs_input`; errori tradotti; Log con «Esporta log…» (D20); sessione estranea (D21) | B3 (B4 per il giro completo) | G4, G5, G6, G7, G9 | **uso quotidiano possibile** |
-| B6 · Tray, versione, chiusura | 6 | tray, chiusura nella tray, avviso di versione (D16), fumo completo, prove manuali, `docs/08-esito-fase2.md` | B5 | G10, G11, G13 | fase 2 chiusa |
+| B6 · Tray, versione, chiusura | 12 (piano scritto, in cinque gruppi) | tray, chiusura nella tray e modifiche non salvate (Q35), avviso di versione (D16), fumo completo, VM Ubuntu 24.04 e prove manuali sui tre desktop, riserve di B3–B5, `docs/08-esito-fase2.md`, roadmap | B5 | G10, G11, G13 | fase 2 chiusa |
 
 «Fase 1 in `main`»: oggi `main` e `origin/main` sono a `e4a2d71` e contengono i crate della fase 1 **[V: `git log
 -1 main`, 2026-11-25]**. Lo step «Integra la fase 1 in `main`» della roadmap dice ancora `8964358`: va riallineato
@@ -499,6 +499,13 @@ come raccomandate:
 | Q45 | La CLI e le credenziali ricordate | **Approvata (a)**: la CLI legge dai due archivi solo le chiavi |
 | Q46 | Dove si scrive che un profilo ha credenziali ricordate | **Approvata (a)**: i nomi stanno in `secret_refs` |
 | Q47 | Password ricordata rifiutata dal server | **Approvata (a)**: l'errore offre «Dimentica le credenziali salvate» |
+
+Q48 (cosa conta come backend per l'osservatore di `t18`) e Q49 (Orca e la finestra delle credenziali): decise da Aitano
+durante le correzioni di B5, testo in `docs/08-esito-fase2.md`, sezione «B5».
+
+Q50–Q57 (indirizzo e client della richiesta delle versioni, chi esegue le azioni della tray, la chiusura senza tray,
+«Esci» con una sessione attiva, il link dell'avviso, la passata a orecchio, dove si misura l'avvio a freddo): testo e
+raccomandazione nel piano di B6, `docs/superpowers/plans/2026-11-26-fase2-b6-tray-chiusura.md`. **Da decidere.**
 
 ## 19. Cosa non ho verificato
 

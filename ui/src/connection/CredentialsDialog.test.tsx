@@ -166,6 +166,34 @@ describe("CredentialsDialog", () => {
     expect(calls.filter((c) => c.cmd === "provide_input")).toHaveLength(2);
   });
 
+  // The real daemon numbers no request: the OpenVPN backend sends `request: 0` every time (found by G5a in the laboratory, where the
+  // window asked for the credentials and then never for the code). A question is new when the state moved on in between, or when its kind
+  // is another, whatever its number says.
+  it("every_request_numbered_zero_is_asked_in_turn", async () => {
+    const user = userEvent.setup();
+    const calls = backend();
+    const moving = makeView({ status: makeStatus({ state: "connecting", session: 7, profile: { id: "dc", name: "Datacenter Milano" } }) });
+    const view = renderConnected(<CredentialsDialog />, ask({ request: 0 }));
+    await user.type(await screen.findByLabelText("User name"), "bob");
+    await user.type(screen.getByLabelText("Password"), PASSWORD);
+    await user.click(screen.getByRole("button", { name: "Connect" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // the code, same session, same number, another kind: the state may not even be seen to move
+    view.show(ask({ ...OTP, request: 0 }));
+    await user.type(await screen.findByLabelText("Enter OTP"), "111111");
+    await user.click(screen.getByRole("button", { name: "Connect" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // a repeated state is not a new question, but the state that moved on and asks for a code again (a reconnection) is
+    view.show(ask({ ...OTP, request: 0 }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    view.show(moving);
+    view.show(ask({ ...OTP, request: 0 }));
+    await user.type(await screen.findByLabelText("Enter OTP"), "222222");
+    await user.click(screen.getByRole("button", { name: "Connect" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(calls.filter((c) => c.cmd === "provide_input")).toHaveLength(3);
+  });
+
   it("the_dialog_goes_when_the_state_is_no_longer_needs_input", async () => {
     backend();
     const view = renderConnected(<CredentialsDialog />, ask());

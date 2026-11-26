@@ -76,11 +76,22 @@ export function ConnectionProvider({ view, ownIds, onCredentialsChanged, childre
   }, [session]);
 
   // The question of the service, until it is answered. Its clock starts when the event arrives (this memo runs once for it).
+  // The key is the session, the number of the request and its kind: the daemon numbers no request (the OpenVPN backend sends 0 every time,
+  // G5a in the laboratory), so the number alone would take the code for the credentials just answered. And a question that comes after
+  // the state moved on (a reconnection asks for a new code) is a new one even with the same key: the answer is forgotten when the state
+  // is no longer `needs_input`.
   const asked = status?.state === "needs_input" && status.input_request && status.session !== null && status.profile ? status : null;
-  const questionKey = asked?.input_request ? `${asked.session}:${asked.input_request.request}` : null;
+  const questionKey = asked?.input_request ? `${asked.session}:${asked.input_request.request}:${asked.input_request.kind}` : null;
   const arrivedAt = useMemo(() => Date.now(), [questionKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const [answered, setAnswered] = useState<string | null>(null);
   const answeredNow = useRef<string | null>(null);
+  const isAsking = asked !== null;
+  useEffect(() => {
+    if (!isAsking) {
+      answeredNow.current = null;
+      setAnswered(null);
+    }
+  }, [isAsking]);
   const question = useMemo<Question | null>(() => {
     if (!asked?.input_request || asked.session === null || !asked.profile || questionKey === answered) return null;
     const request = asked.input_request;
@@ -122,7 +133,7 @@ export function ConnectionProvider({ view, ownIds, onCredentialsChanged, childre
   const provide = useCallback(async (values: InputAnswer, remember: boolean) => {
     const now = open.current;
     if (!now) return;
-    const key = `${now.session}:${now.request}`;
+    const key = `${now.session}:${now.request}:${now.kind}`;
     // once: a second submit of the same question finds it answered, even before the page has been drawn again
     if (answeredNow.current === key) return;
     answeredNow.current = key;

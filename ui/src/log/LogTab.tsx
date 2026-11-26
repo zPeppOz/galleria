@@ -19,9 +19,9 @@ function clock(ts: string, lang: Lang): string {
 const Line = memo(function Line({ entry, lang }: { entry: LogEntry; lang: Lang }) {
   return (
     <div className="log-line">
-      <span className="log-time">{clock(entry.ts, lang)}</span>
-      <span className={`log-level log-level-${entry.level}`}>{entry.level}</span>
-      <span className="log-source">{entry.source}</span>
+      <span className="log-time">{clock(entry.ts, lang)}</span>{" "}
+      <span className={`log-level log-level-${entry.level}`}>{entry.level}</span>{" "}
+      <span className="log-source">{entry.source}</span>{" "}
       <span className="log-message">{entry.message}</span>
     </div>
   );

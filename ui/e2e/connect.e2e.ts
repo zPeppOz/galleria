@@ -238,7 +238,7 @@ describe("the log of the session (plan B5, T7)", () => {
     expect(await bodyText(b)).toMatch(/current session/i);
     // a list with its announcements off, and the level and the source are words
     expect(await b.$('[role="log"]').getAttribute("aria-live")).toBe("off");
-    expect((await lines(b)).some((line) => /info\s+daemon.*connect/.test(line)), `lines: ${JSON.stringify(await lines(b))}`).toBe(true);
+    expect((await lines(b)).some((line) => /info\s*daemon.*connect/.test(line)), `lines: ${JSON.stringify(await lines(b))}`).toBe(true);
     // «Copy» fills the system clipboard with what the tab shows, in the format of `galleria logs`
     await b.$("button=Copy").click();
     await waitForBody(b, "Log copied.", "the outcome of the copy was never said");
@@ -282,7 +282,8 @@ describe("a session of someone else (plan B5, T8)", () => {
     const b = await openWith("plain");
     connectFromAnotherRubrica();
     await waitFor(b, async () => await b.$(GROUP).isExisting(), "the list never showed the fixed row of the session of someone else");
-    const text = await b.$(GROUP).getText();
+    // the text of the row as the page has it: a button whose parts are clipped with an ellipsis gives WebDriver no visible text for them
+    const text = (await b.execute((sel: string) => document.querySelector(sel)?.textContent ?? "", GROUP)) as string;
     expect(text).toContain(FOREIGN);
     expect(text).toMatch(/started outside this rubrica/i);
     expect(text).toMatch(/connected/i);
@@ -306,13 +307,13 @@ describe("a session of someone else (plan B5, T8)", () => {
     expect(await (await dialogs(b))[0].getText()).toMatch(/Another user of this computer may be using it/);
     // the focus is on the safe answer, and «Cancel» does nothing
     expect(await b.execute(() => document.activeElement?.textContent)).toBe("Cancel");
-    await b.$('[role="alertdialog"] button=Cancel').click();
+    await b.$('[role="alertdialog"]').$("button=Cancel").click();
     await waitFor(b, async () => (await dialogs(b)).length === 0, "the confirmation never closed");
     expect(cli("status").trim(), "«Cancel» ended the session").toBe("connected");
     // the answer ends it
     await b.$(`${GROUP} button[aria-label^="Disconnect"]`).click();
     await waitFor(b, async () => (await dialogs(b)).length === 1, "the confirmation never showed the second time");
-    await b.$('[role="alertdialog"] button=Disconnect').click();
+    await b.$('[role="alertdialog"]').$("button=Disconnect").click();
     await waitFor(b, async () => cli("status").trim() === "disconnected", "the session of someone else was never ended");
     await waitFor(b, async () => !(await b.$(GROUP).isExisting()), "the row stayed after the session ended");
   });

@@ -2,6 +2,7 @@ import { useConnection } from "../../connection/store";
 import { Button } from "../../design/Button";
 import { Field } from "../../design/Field";
 import { useT } from "../../i18n";
+import { useSecretStoreKind } from "../../secrets/store";
 import { peerLabel, type TabProps } from "./tab";
 
 /**
@@ -11,6 +12,7 @@ import { peerLabel, type TabProps } from "./tab";
  */
 export function Authentication({ detail, draft, edit, errors }: TabProps) {
   const t = useT();
+  const store = useSecretStoreKind();
   const { forget } = useConnection();
   const saved = detail.protocol === "openvpn" && ["openvpn.username", "openvpn.password"].every((name) => detail.secret_refs.includes(name));
   const peers = draft.wireguard?.peers ?? [];
@@ -27,7 +29,7 @@ export function Authentication({ detail, draft, edit, errors }: TabProps) {
           <p className="detail-hint">{t("auth.method.hint")}</p>
           {saved ? (
             <>
-              <h2 className="detail-section">{t("auth.saved")}</h2>
+              <h2 className="detail-section">{t(store === "keyring" ? "auth.saved.keyring" : store === "file" ? "auth.saved.file" : "auth.saved")}</h2>
               <p className="detail-hint">{t("auth.saved.hint")}</p>
               <div>
                 <Button onClick={() => void forget(detail.id)}>{t("auth.forget")}</Button>

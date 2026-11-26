@@ -21,7 +21,7 @@ import { ProfileDetail, type Guard } from "./ProfileDetail";
 import { ProfileList, type ListGroup } from "./ProfileList";
 import { RubricaNotices } from "./RubricaNotices";
 import { SearchBox } from "./SearchBox";
-import type { SecretStoreKind } from "../secrets/store";
+import { SecretStoreContext, type SecretStoreKind } from "../secrets/store";
 import { ServiceArea } from "./ServiceArea";
 import "./Shell.css";
 import { SortControl } from "./SortControl";
@@ -210,76 +210,78 @@ function ShellBody(props: ShellProps) {
     [arranged, t, session?.id, session?.state],
   );
   return (
-    <div className="shell" ref={root}>
-      <TopBar info={info} daemonVersion={view?.daemon_version ?? null} onImport={() => setImporting(true)} />
-      <div className="shell-body">
-        <aside className="shell-aside" aria-label={t("shell.profiles")}>
-          <ForeignRow selected={foreignChosen && connection.foreign !== null} onSelect={() => choose(FOREIGN)} />
-          {profiles && profiles.length > 0 ? (
-            <>
-              <div className="shell-tools">
-                <SearchBox value={query} onChange={setQuery} count={arranged.total} onArrowDown={() => list.current?.focus()} />
-                <SortControl value={sort} onChange={onSortChange} />
+    <SecretStoreContext.Provider value={secretStore}>
+      <div className="shell" ref={root}>
+        <TopBar info={info} daemonVersion={view?.daemon_version ?? null} onImport={() => setImporting(true)} />
+        <div className="shell-body">
+          <aside className="shell-aside" aria-label={t("shell.profiles")}>
+            <ForeignRow selected={foreignChosen && connection.foreign !== null} onSelect={() => choose(FOREIGN)} />
+            {profiles && profiles.length > 0 ? (
+              <>
+                <div className="shell-tools">
+                  <SearchBox value={query} onChange={setQuery} count={arranged.total} onArrowDown={() => list.current?.focus()} />
+                  <SortControl value={sort} onChange={onSortChange} />
+                </div>
+                <ProfileList label={t("list.label")} groups={groups} selectedId={foreignChosen && connection.foreign !== null ? "" : (selected?.id ?? "")} onSelect={choose} onActivate={(id) => activate(connection, id)} empty={t("search.no_match")} focusRef={list} />
+              </>
+            ) : (
+              <p className="shell-aside-empty" ref={emptyText} tabIndex={-1}>{rubrica.loaded ? t("list.empty") : t("rubrica.loading")}</p>
+            )}
+            {rubrica.view ? (
+              <div className="shell-aside-foot">
+                <Button onClick={() => setManaging(true)}>{t("groups.manage")}</Button>
               </div>
-              <ProfileList label={t("list.label")} groups={groups} selectedId={foreignChosen && connection.foreign !== null ? "" : (selected?.id ?? "")} onSelect={choose} onActivate={(id) => activate(connection, id)} empty={t("search.no_match")} focusRef={list} />
-            </>
-          ) : (
-            <p className="shell-aside-empty" ref={emptyText} tabIndex={-1}>{rubrica.loaded ? t("list.empty") : t("rubrica.loading")}</p>
-          )}
-          {rubrica.view ? (
-            <div className="shell-aside-foot">
-              <Button onClick={() => setManaging(true)}>{t("groups.manage")}</Button>
-            </div>
-          ) : null}
-        </aside>
-        <main className="shell-main">
-          <ServiceArea view={view} info={info} onRetry={onRetry} savedCredentials={savedCredentials(rubrica.detail, view?.status?.profile?.id)} />
-          <RubricaNotices rubrica={rubrica} onImport={() => setImporting(true)} secretStore={secretStore} />
-          {foreignChosen && connection.foreign !== null ? (
-            <ForeignDetail />
-          ) : selected ? (
-            <ProfileDetail
-              profile={selected}
-              detail={rubrica.detail}
-              detailError={rubrica.detailError}
-              groups={rubrica.view?.groups ?? []}
-              names={profiles?.map((p) => p.name) ?? []}
-              inUse={session?.id === selected.id}
-              update={rubrica.update}
-              validateRaw={rubrica.validateRaw}
-              actions={rubrica.actions}
-              onSelect={choose}
-              onDeleted={setDeleted}
-              reload={rubrica.reload}
-              guard={guard}
-            />
-          ) : null}
-        </main>
-      </div>
-      <StatusBar view={view} info={info} />
-      <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
-      <CredentialsDialog />
-      <ReplaceConfirm />
-      <ImportDialog open={importing} onClose={closeImport} actions={importer} onImported={wasImported} incoming={incoming} secretStore={secretStore} />
-      {dropHover ? (
-        <div className="shell-drop" aria-hidden="true">
-          <span>{t("import.drop_hover")}</span>
+            ) : null}
+          </aside>
+          <main className="shell-main">
+            <ServiceArea view={view} info={info} onRetry={onRetry} savedCredentials={savedCredentials(rubrica.detail, view?.status?.profile?.id)} />
+            <RubricaNotices rubrica={rubrica} onImport={() => setImporting(true)} secretStore={secretStore} />
+            {foreignChosen && connection.foreign !== null ? (
+              <ForeignDetail />
+            ) : selected ? (
+              <ProfileDetail
+                profile={selected}
+                detail={rubrica.detail}
+                detailError={rubrica.detailError}
+                groups={rubrica.view?.groups ?? []}
+                names={profiles?.map((p) => p.name) ?? []}
+                inUse={session?.id === selected.id}
+                update={rubrica.update}
+                validateRaw={rubrica.validateRaw}
+                actions={rubrica.actions}
+                onSelect={choose}
+                onDeleted={setDeleted}
+                reload={rubrica.reload}
+                guard={guard}
+              />
+            ) : null}
+          </main>
         </div>
-      ) : null}
-      <ConfirmDialog
-        open={leaving !== null}
-        title={t("leave.title")}
-        body={t("leave.body", { name: selected?.name ?? "" })}
-        confirmLabel={t("leave.save")}
-        alternateLabel={t("leave.discard")}
-        cancelLabel={t("leave.cancel")}
-        onConfirm={() => void leave("save")}
-        onAlternate={() => void leave("discard")}
-        onCancel={() => {
-          setLeaving(null);
-          setImported(null);
-        }}
-      />
-    </div>
+        <StatusBar view={view} info={info} />
+        <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
+        <CredentialsDialog />
+        <ReplaceConfirm />
+        <ImportDialog open={importing} onClose={closeImport} actions={importer} onImported={wasImported} incoming={incoming} secretStore={secretStore} />
+        {dropHover ? (
+          <div className="shell-drop" aria-hidden="true">
+            <span>{t("import.drop_hover")}</span>
+          </div>
+        ) : null}
+        <ConfirmDialog
+          open={leaving !== null}
+          title={t("leave.title")}
+          body={t("leave.body", { name: selected?.name ?? "" })}
+          confirmLabel={t("leave.save")}
+          alternateLabel={t("leave.discard")}
+          cancelLabel={t("leave.cancel")}
+          onConfirm={() => void leave("save")}
+          onAlternate={() => void leave("discard")}
+          onCancel={() => {
+            setLeaving(null);
+            setImported(null);
+          }}
+        />
+      </div>
+    </SecretStoreContext.Provider>
   );
 }

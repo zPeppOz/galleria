@@ -7,6 +7,7 @@ import { toDraft } from "../../rubrica/draft";
 import { makeDetail, SAMPLE_PROFILES } from "../../test/fixtures";
 import { renderTab, withGoodKey } from "../../test/tabs";
 import type { ProfileDetail } from "../../rubrica/types";
+import { SecretStoreContext, type SecretStoreKind } from "../../secrets/store";
 import { Authentication } from "./Authentication";
 
 const [OFFICE, , HOMELAB, , ROSSI] = SAMPLE_PROFILES;
@@ -73,7 +74,7 @@ describe("Authentication", () => {
     const calls = backend();
     const detail = withSecrets(makeDetail(ROSSI), ["openvpn.block.key", "openvpn.username", "openvpn.password"]);
     renderConnected(<Authentication detail={detail} draft={toDraft(detail)} edit={() => undefined} errors={{}} groups={[]} settings={detail.settings} setSwitch={() => undefined} />);
-    expect(screen.getByRole("heading", { name: "Credentials saved in the keyring" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Credentials saved in the secrets archive" })).toBeTruthy();
     // the names are listed, the values never
     expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toContain("openvpn.password");
     await user.click(screen.getByRole("button", { name: "Forget" }));
@@ -81,11 +82,29 @@ describe("Authentication", () => {
     expect(calls[0].args).toEqual({ id: detail.id });
   });
 
+  it.each<[SecretStoreKind, string, string]>([
+    ["keyring", "Credentials saved in the keyring", "Credenziali salvate nel portachiavi"],
+    ["file", "Credentials saved in a file only you can read", "Credenziali salvate in un file leggibile solo da te"],
+  ])("saved_credentials_name_the_place_they_are_in: %s", (store, english, italian) => {
+    backend();
+    const detail = withSecrets(makeDetail(ROSSI), ["openvpn.block.key", "openvpn.username", "openvpn.password"]);
+    const draw = () => (
+      <SecretStoreContext.Provider value={store}>
+        <Authentication detail={detail} draft={toDraft(detail)} edit={() => undefined} errors={{}} groups={[]} settings={detail.settings} setSwitch={() => undefined} />
+      </SecretStoreContext.Provider>
+    );
+    const first = renderConnected(draw());
+    expect(screen.getByRole("heading", { name: english })).toBeTruthy();
+    first.unmount();
+    renderConnected(draw(), undefined, "it");
+    expect(screen.getByRole("heading", { name: italian })).toBeTruthy();
+  });
+
   it("without_saved_credentials_there_is_nothing_to_forget", () => {
     backend();
     const detail = withSecrets(makeDetail(ROSSI), ["openvpn.block.key"]);
     renderConnected(<Authentication detail={detail} draft={toDraft(detail)} edit={() => undefined} errors={{}} groups={[]} settings={detail.settings} setSwitch={() => undefined} />);
     expect(screen.queryByRole("button", { name: "Forget" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Credentials saved in the keyring" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /^Credentials saved/ })).toBeNull();
   });
 });

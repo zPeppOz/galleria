@@ -330,7 +330,7 @@ describe("keyboard on the whole shell", () => {
     const user = userEvent.setup();
     const active = () => document.activeElement as HTMLElement;
     const calls = (cmd: string) => sent.filter((c) => c.cmd === cmd);
-    const { show } = renderShell(makeView());
+    const { show } = renderShell(makeView(), { secretStore: "keyring" });
 
     // Enter on the row connects; the state comes with the events and not with the answer
     screen.getByRole("option", { name: /Ufficio Napoli/ }).focus();

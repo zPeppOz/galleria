@@ -5,6 +5,7 @@ import type { InputKind, InputRequest } from "../daemon/types";
 import { backend, renderConnected } from "../test/connection";
 import { expectNoAccessibilityViolations } from "../test/axe";
 import { makeStatus, makeView } from "../test/fixtures";
+import { SecretStoreContext, type SecretStoreKind } from "../secrets/store";
 import { CredentialsDialog } from "./CredentialsDialog";
 
 const PASSWORD = "PW-typed-5f3a";
@@ -68,7 +69,7 @@ describe("CredentialsDialog", () => {
     backend();
     const view = renderConnected(<CredentialsDialog />, ask());
     const box = await screen.findByRole("dialog");
-    const remember = within(box).getByRole("checkbox", { name: /Remember in the keyring/ }) as HTMLInputElement;
+    const remember = within(box).getByRole("checkbox", { name: /^Remember in / }) as HTMLInputElement;
     // off the first time
     expect(remember.checked).toBe(false);
     view.show(ask({ ...OTP, request: 4 }));
@@ -76,6 +77,25 @@ describe("CredentialsDialog", () => {
     view.show(ask({ kind: "key_passphrase", request: 5 }));
     await waitFor(() => expect(screen.getByLabelText("Passphrase of the key")).toBeTruthy());
     expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it.each<[SecretStoreKind | null, string, string]>([
+    ["keyring", "Remember in the keyring", "Ricorda nel portachiavi"],
+    ["file", "Remember in a file only you can read", "Ricorda in un file leggibile solo da te"],
+    [null, "Remember in the secrets archive", "Ricorda nell'archivio dei segreti"],
+  ])("remember_names_the_place_the_secrets_go: %s", async (store, english, italian) => {
+    backend();
+    const view = ask();
+    const draw = () => (
+      <SecretStoreContext.Provider value={store}>
+        <CredentialsDialog />
+      </SecretStoreContext.Provider>
+    );
+    const first = renderConnected(draw(), view);
+    expect(within(await screen.findByRole("dialog")).getByRole("checkbox", { name: english })).toBeTruthy();
+    first.unmount();
+    renderConnected(draw(), view, "it");
+    expect(within(await screen.findByRole("dialog")).getByRole("checkbox", { name: italian })).toBeTruthy();
   });
 
   it("the_dialog_takes_the_focus_and_is_not_announced", async () => {

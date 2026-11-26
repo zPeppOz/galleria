@@ -6,6 +6,7 @@ import "../design/Button.css";
 import "../design/Field.css";
 import "./CredentialsDialog.css";
 import { formatClock } from "./format";
+import { useSecretStoreKind } from "../secrets/store";
 import { useConnection, useCountdown } from "./store";
 
 /**
@@ -21,6 +22,7 @@ import { useConnection, useCountdown } from "./store";
  */
 export function CredentialsDialog() {
   const t = useT();
+  const store = useSecretStoreKind();
   const { question, provide, disconnect } = useConnection();
   const left = useCountdown(question?.expiresAt ?? null);
   const username = useRef<HTMLInputElement>(null);
@@ -77,7 +79,7 @@ export function CredentialsDialog() {
             {field(password, t("credentials.password"), "password", "password")}
             <div className="gx-field">
               <label className="gx-field-label">
-                <input ref={remember} type="checkbox" name="remember" /> {t("credentials.remember")}
+                <input ref={remember} type="checkbox" name="remember" /> {t(store === "keyring" ? "credentials.remember.keyring" : store === "file" ? "credentials.remember.file" : "credentials.remember")}
               </label>
               <p className="gx-field-hint">{t("credentials.remember.hint")}</p>
             </div>

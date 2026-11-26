@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 /** Where a secret of this window is written: the keyring of the system, or a file only the user can read (spec §9). */
 export type SecretStoreKind = "keyring" | "file";
@@ -37,3 +37,8 @@ export function useSecretStore(): SecretStoreKind | null {
   }, []);
   return store;
 }
+
+/** What the window knows of where the secrets go, for the texts that name the place (the shell provides it; `null`: not known, and the texts are the general ones). */
+export const SecretStoreContext = createContext<SecretStoreKind | null>(null);
+
+export const useSecretStoreKind = (): SecretStoreKind | null => useContext(SecretStoreContext);

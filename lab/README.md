@@ -77,6 +77,15 @@ lancia nell'immagine della GUI (`lab-connect-here`, Xvfb, bus privato, GNOME Key
 `GALLERIA_SOCKET` sul ponte di `carla`, che esegue `ui/e2e/lab-connect.e2e.ts`; ferma i ponti e l'osservatore. Poi `t18_gui_connect` gira
 nel client e legge ciò che il client ha visto. `lab/run.sh` non lancia `t18` senza `GALLERIA_E2E_GUI_CONNECT=1` e lo dice (come `t17`:
 una prova che si salta risulta «ok»), e con `LAB_TEST_LOG=<file>` tiene ciò che i test stampano. Il verbo finisce con
-`scripts/check-gates.py --job lab-connect`: ogni prova del manifesto `lab/tests/gates-b5.tsv` per quel job deve essere nell'uscita con
+`scripts/check-gates.py --job lab-connect`: ogni prova dei manifesti `lab/tests/gates-*.tsv` (B5 e B6) per quel job deve essere nell'uscita con
 `ok` o `passed`. Nella CI lo fa il job `lab-connect` (client 26, 27 e 79). **In locale** con Docker rootless OpenVPN 2.7 (client 27 e
 79) prova il DCO e riceve `EPERM`: lì sono verdi solo le prove WireGuard e il giro intero è quello del job.
+
+G10g (finestra chiusa, tunnel acceso; fase 2 B6 T6): nello stesso giro di `lab-connect` la finestra connette `wg-split` con la sonda della tray
+(`lab/tests/tray-probe.py`, il «desktop» che mostra l'icona) accesa prima dell'app, la chiude, e per dieci secondi guarda che il demone dica
+`connected`, l'app sia viva e nascosta; poi disconnette dal menu della tray. Dice all'osservatore del client cosa sta facendo scrivendo
+`<ms> <nome>` in `target/gui-lab/marks` (`closed`, `disconnect`, `disconnected`): `gui-lab-watch.sh` copia ogni riga nel suo registro come
+`mark <ms> <nome>`, e `t18_gui_connect` (`gui_closed_window_kept_the_tunnel`) vuole `glr-wg0` in **ogni** campione tra `closed` e `disconnect`
+(almeno 30) e fuori entro cinque secondi da `disconnect`. `G10g` usa WireGuard: in locale con Docker rootless è verde su tutti e tre i client,
+anche dove OpenVPN 2.7 è rosso (27 e 79). `GALLERIA_SMOKE_FILTER=G10g scripts/gui.sh lab-connect 27` lancia solo quella (il manifesto non si
+controlla con un filtro).

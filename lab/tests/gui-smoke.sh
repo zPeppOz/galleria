@@ -37,5 +37,10 @@ gui_start_keyring
 gui_start_driver
 
 cd "$GALLERIA_SMOKE_REPO"
+# The results of the run go to target/gates/smoke-vitest.json (the path is relative to ui/), where `scripts/check-gates.py --job gui-smoke`
+# reads them: G10 and G11 are proved by tests of this run, and a test that is skipped counts as green in the runner (plan B6, T6). A file left
+# by an earlier run must not stand in for this one.
+mkdir -p target/gates
+rm -f target/gates/smoke-vitest.json
 # GALLERIA_SMOKE_FILTER runs only the tests whose name matches (a vitest -t pattern), to work on one test.
-pnpm --dir ui test:e2e ${GALLERIA_SMOKE_FILTER:+-t "$GALLERIA_SMOKE_FILTER"}
+pnpm --dir ui test:e2e --reporter=default --reporter=json --outputFile.json=../target/gates/smoke-vitest.json ${GALLERIA_SMOKE_FILTER:+-t "$GALLERIA_SMOKE_FILTER"}

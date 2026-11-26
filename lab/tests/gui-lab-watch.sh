@@ -7,11 +7,16 @@
 #                                 (1 only if it was there before and after the processes) and whether `glr-ovpn0`, the interface of
 #                                 an OpenVPN tunnel, is there (1 if it was there before or after: when in doubt, it is there)
 #   argv <ms> <pid> <arguments>   the arguments of each `openvpn` process of a sample
+#   mark <ms> <name>              what the window said it was doing (plan B6, T6, G10g): the window appends `<ms> <name>` to
+#                                 target/gui-lab/marks, which the client sees as /lab/target/gui-lab/marks; the watch copies each
+#                                 line as it appears. t18 reads the samples between two marks (`gui_closed_window_kept_the_tunnel`)
 #
 # Once a second, with a tunnel up, one ping through it so the bytes of the window move (10.8.0.1 for OpenVPN as in t16, 10.99.0.1
 # for WireGuard as in t08). The watch never writes a value it did not read from the processes or the interfaces.
 set -u
 log=/tmp/gui-lab-watch.log
+marks=${GALLERIA_LAB_MARKS:-/lab/target/gui-lab/marks}
+marks_seen=0
 : > "$log"
 {
   echo residue-begin
@@ -44,6 +49,14 @@ while :; do
   if (( tick % 5 == 0 )); then
     if (( wg == 1 )); then (ping -c 1 -W 1 10.99.0.1 > /dev/null 2>&1 &); fi
     if (( count > 0 )); then (ping -c 1 -W 1 10.8.0.1 > /dev/null 2>&1 &); fi
+  fi
+  # the marks of the window, a whole line at a time: the window writes each with one append, and `wc -l` counts only finished lines
+  if [[ -r $marks ]]; then
+    marks_total=$(wc -l < "$marks")
+    if (( marks_total > marks_seen )); then
+      sed -n "$((marks_seen + 1)),${marks_total}p" "$marks" | sed 's/^/mark /' >> "$log"
+      marks_seen=$marks_total
+    fi
   fi
   tick=$((tick + 1))
   sleep 0.2

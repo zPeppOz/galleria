@@ -2,15 +2,16 @@
 """Checks that every proof a CI job declares for a gate really ran and passed (plan B5, T2).
 
 A proof that is skipped counts as green in most runners, and that is how a gate stops proving anything. This reads
-`lab/tests/gates-b5.tsv` (gate, job, kind, name; tab separated, `#` starts a comment) and, for the rows of one job, looks
-for each proof in the output the job kept:
+every `lab/tests/gates-*.tsv` (gate, job, kind, name; tab separated, `#` starts a comment; one file for each block of the
+plan, and a gate that is in two of them is an error) and, for the rows of one job, looks for each proof in the output the
+job kept:
 
   cargo   a line `test <path::>name ... ok` in a `cargo test` log. `ignored`, `FAILED`, or no line at all, is an error.
   vitest  `name` is the full name or the title of a test in the JSON of `vitest --reporter=json`, with status `passed`.
           `skipped`, `todo`, `pending`, `failed`, or not there at all, is an error.
   lab     `name` is the name of a test in a log that has lines `ok <name>`; for the lab jobs, see the later tasks.
 
-    check-gates.py --job <job> [--kind K]... [--cargo-log FILE]... [--vitest-json FILE]... [--lab-log FILE]... [--manifest FILE]
+    check-gates.py --job <job> [--kind K]... [--cargo-log FILE]... [--vitest-json FILE]... [--lab-log FILE]... [--manifest FILE]...
 
 Prints one line per proof and exits with 1 at the first gate that is not proved (the others are still printed), 2 on a bad
 call or a bad manifest.
@@ -25,6 +26,25 @@ CARGO_LINE = re.compile(r"^test (\S+) \.\.\. (\w+)")
 LAB_LINE = re.compile(r"^\s*(ok|FAIL|SKIP|skipped)\s+(\S+)")
 
 
+def bad_manifest(message):
+    """A manifest that cannot be read is a bad call (2), not a proof that is missing (1)."""
+    print(f"check-gates: {message}", file=sys.stderr)
+    sys.exit(2)
+
+
+def read_manifests(paths):
+    """The rows of every manifest. A gate is the subject of one manifest only: each block owns its gates."""
+    rows = []
+    owner = {}
+    for path in paths:
+        for row in read_manifest(path):
+            first = owner.setdefault(row[0], path)
+            if first != path:
+                bad_manifest(f"{path}: the gate {row[0]} is also in {first}: a gate has the rows of one manifest only")
+            rows.append(row)
+    return rows
+
+
 def read_manifest(path):
     rows = []
     for number, line in enumerate(Path(path).read_text().splitlines(), 1):
@@ -32,10 +52,10 @@ def read_manifest(path):
             continue
         cells = line.split("\t")
         if len(cells) != 4 or not all(c.strip() for c in cells):
-            sys.exit(f"{path}:{number}: want gate, job, kind and name separated by tabs, got {line!r}")
+            bad_manifest(f"{path}:{number}: want gate, job, kind and name separated by tabs, got {line!r}")
         gate, job, kind, name = (c.strip() for c in cells)
         if kind not in ("cargo", "vitest", "lab"):
-            sys.exit(f"{path}:{number}: unknown kind {kind!r}")
+            bad_manifest(f"{path}:{number}: unknown kind {kind!r}")
         rows.append((gate, job, kind, name))
     return rows
 
@@ -91,10 +111,14 @@ def main():
     ap.add_argument("--vitest-json", action="append", default=[])
     ap.add_argument("--lab-log", action="append", default=[])
     ap.add_argument("--kind", action="append", choices=["cargo", "vitest", "lab"], help="only the proofs of this kind (repeatable); default: all")
-    ap.add_argument("--manifest", default=str(Path(__file__).resolve().parent.parent / "lab/tests/gates-b5.tsv"))
+    ap.add_argument("--manifest", action="append", default=[], help="a manifest (repeatable); default: every lab/tests/gates-*.tsv")
     args = ap.parse_args()
 
-    rows = [r for r in read_manifest(args.manifest) if r[1] == args.job and (not args.kind or r[2] in args.kind)]
+    manifests = args.manifest or sorted(str(p) for p in (Path(__file__).resolve().parent.parent / "lab/tests").glob("gates-*.tsv"))
+    if not manifests:
+        print("check-gates: there is no manifest (lab/tests/gates-*.tsv)", file=sys.stderr)
+        return 2
+    rows = [r for r in read_manifests(manifests) if r[1] == args.job and (not args.kind or r[2] in args.kind)]
     if not rows:
         print(f"check-gates: the manifest has no proof for the job {args.job!r}", file=sys.stderr)
         return 2

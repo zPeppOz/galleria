@@ -123,8 +123,10 @@ jobs:
   # client through a bridge of the host (lab/tests/gui-daemon-relay.py, Q42 (b)): connects, disconnects and replaces with WireGuard and
   # OpenVPN, asks for the credentials, saves them in a real GNOME Keyring, shows the session of another user of the group. The window
   # writes the results of its proofs to target/gui-lab/vitest.json and t18 (crates/galleria-e2e/tests/t18_gui_connect.rs) reads what the
-  # client saw; the verb ends with scripts/check-gates.py, and so does this job, once more and alone: the 20 proofs of the manifest for
+  # client saw; the verb ends with scripts/check-gates.py, and so does this job, once more and alone: the 23 proofs of the manifests for
   # `lab-connect` must be in the log with `ok` or `passed`, none skipped or ignored. `lab` does not run t18 (lab/run.sh says so).
+  # G10, the real tunnel with the window closed (plan B6, T6): `G10g_the_tunnel_survives_the_closed_window` (the window) and
+  # `gui_closed_window_kept_the_tunnel` (t18) are among those 23, on each of the three clients.
   # No `continue-on-error`: a red proof is a red job. `ovpn` is not loaded here, as in `lab-g3`: `lab-dco` is the job that proves the module.
   lab-connect:
     runs-on: ubuntu-latest
@@ -171,7 +173,7 @@ jobs:
       - run: scripts/gui.sh check-here
       - run: scripts/tests/check-boundaries.sh
       - run: cargo deny check
-      # G7 and G9 of the level 2 (plan B5, T10): `check-here` keeps the output of `cargo test -p galleria-gui` in target/gates/gui-cargo.log, and
+      # G7 and G9 of the level 2 (plan B5, T10) and G11 (plan B6, T6: the four `update_*` tests, the version check against a server that counts): `check-here` keeps the output of `cargo test -p galleria-gui` in target/gates/gui-cargo.log, and
       # the proofs that close those gates must be in it with `ok`, not skipped or missing
       - run: scripts/check-gates.py --job gui --cargo-log target/gates/gui-cargo.log
 
@@ -198,4 +200,8 @@ jobs:
       # The tests are `#[ignore]` for `cargo test`, fail under the wrong case, and the check at the end wants each of them with
       # `ok` in the log: a round that ran nothing is red.
       - run: scripts/gui.sh keyring
-      - run: scripts/check-gates.py --job gui-smoke --kind cargo --cargo-log target/gates/keyring-unlocked.log --cargo-log target/gates/keyring-locked.log --cargo-log target/gates/keyring-absent.log
+      # The last step of the job: every proof of the manifests for `gui-smoke` must be in the output with `ok` or `passed`, none skipped or missing.
+      # The cargo ones are the keyring (G5, G6, the three logs above); the vitest ones are the smoke test of this very job, which kept its results in
+      # target/gates/smoke-vitest.json (plan B6, T6): G10a–G10f, the tray and the closing of the window, and G11a, the version check of the app built
+      # as for a release. No `--kind`: until B6 this step looked at the cargo ones only, and the proofs of the smoke test could be skipped unseen.
+      - run: scripts/check-gates.py --job gui-smoke --vitest-json target/gates/smoke-vitest.json --cargo-log target/gates/keyring-unlocked.log --cargo-log target/gates/keyring-locked.log --cargo-log target/gates/keyring-absent.log

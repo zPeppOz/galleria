@@ -6,7 +6,8 @@
 #   scripts/gui.sh check          the gui checks: ui tests, ui build, clippy and tests of galleria-gui
 #   scripts/gui.sh check-here     the same checks on this machine (used inside the image and by the `gui` CI job)
 #   scripts/gui.sh build          build ui/ and the app as for a release, without bundles: target/gui-image/release/galleria-gui
-#   scripts/gui.sh smoke          build the app, the fake daemon and the seed of the rubrica, then the WebDriver smoke test (lab/tests/gui-smoke.sh)
+#   scripts/gui.sh smoke          build the app, the fake daemon and the seed of the rubrica, then the WebDriver smoke test (lab/tests/gui-smoke.sh);
+#                                 it ends with scripts/check-gates.py on the results (G10, G11: a skipped test is not green)
 #   scripts/gui.sh a11y           the same build, then the screen reader check under Orca and AT-SPI (lab/tests/gui-a11y.sh);
 #                                 local only (Q22), writes target/gui-a11y/
 #   scripts/gui.sh lab-import     G3, the half in the image: the real window imports the profiles of the laboratory (lab/out) and leaves
@@ -127,7 +128,7 @@ lab_connect_here() { run_webdriver_here lab/tests/gui-lab-connect.sh; }
 lab_connect_window() {
   local client=$1 name="glab-client$1" run="$PWD/target/gui-lab/run" relay_pids=() user status=0
   mkdir -p target/gui-lab target/gates
-  rm -rf "$run" target/gui-lab/vitest.json target/gui-lab/used-otp
+  rm -rf "$run" target/gui-lab/vitest.json target/gui-lab/used-otp target/gui-lab/marks
   mkdir -m 700 "$run"
   docker exec "$name" bash -euc 'getent group galleria > /dev/null; id carla > /dev/null 2>&1 || useradd -m -G galleria carla'
   docker exec -d "$name" bash /lab/lab/tests/gui-lab-watch.sh
@@ -153,6 +154,9 @@ lab_connect_window() {
   docker exec "$name" pkill -f gui-lab-watch.sh || true
   sleep 0.5
   (( status == 0 )) || return "$status"
+  # With a filter (GALLERIA_SMOKE_FILTER, a vitest -t pattern) only some of the proofs ran: the run is for trying one of them on a client where
+  # the whole round is red for another reason (OpenVPN 2.7 and the DCO under rootless Docker), and says nothing about the gates.
+  if [[ -n ${GALLERIA_SMOKE_FILTER:-} ]]; then echo "lab-connect: GALLERIA_SMOKE_FILTER is set, the proofs of the gates were not checked" >&2; return 0; fi
   scripts/check-gates.py --job lab-connect --kind vitest --vitest-json target/gui-lab/vitest.json
 }
 
@@ -175,7 +179,11 @@ case "${1:-}" in
   check-here) check_here ;;
   build) run_in_image scripts/gui.sh build-here ;;
   build-here) build_here ;;
-  smoke) run_in_image scripts/gui.sh smoke-here ;;
+  smoke) run_in_image scripts/gui.sh smoke-here
+    # G10 and G11 (plan B6, T6): the proofs of the manifest for `gui-smoke` must have run and passed, none skipped. With a filter only some of
+    # them ran, so there is nothing to check: the run is for working on one test, and says nothing about the gates.
+    if [[ -z ${GALLERIA_SMOKE_FILTER:-} ]]; then scripts/check-gates.py --job gui-smoke --kind vitest --vitest-json target/gates/smoke-vitest.json
+    else echo "smoke: GALLERIA_SMOKE_FILTER is set, the proofs of the gates were not checked" >&2; fi ;;
   smoke-here) smoke_here ;;
   a11y) run_in_image scripts/gui.sh a11y-here ;;
   a11y-here) a11y_here ;;

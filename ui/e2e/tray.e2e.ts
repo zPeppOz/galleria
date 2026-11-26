@@ -158,9 +158,21 @@ describe("closing the window and quitting (plan B6, T3)", () => {
     expect(appRunning()).toBe(true);
     expect(cli("status")).toBe("connected");
     expect(trayTexts()[0]).toBe("Connected to «Ufficio Napoli»");
-    // G10d: «Open» brings it back, with the page as it was; «Quit» ends the app and the session stays
+  });
+
+  it("G10d_open_shows_the_window_and_quit_ends_the_app", async () => {
+    const b = await openWithTray("plain");
+    // a profile chosen in the page: «Open Galleria» must bring the page back as it was, not a new one
+    await choose(b, "Ufficio Napoli");
+    trayClick("Connect «Ufficio Napoli»");
+    await until(state, (text) => text === "Connected to «Ufficio Napoli»", "the session never came up");
+    requestClose();
+    await until(windowState, (shown) => shown === "false", "the window was not hidden by the request to close it");
     trayClick("Open Galleria");
     await until(windowState, (shown) => shown === "true", "«Open Galleria» did not show the window");
+    expect(await b.$("h1=Ufficio Napoli").isExisting(), "the page is not the one that was hidden").toBe(true);
+    expect(cli("status")).toBe("connected");
+    // «Quit» ends the process, and the session is not the app's to close
     trayClick("Quit (the VPN stays on)");
     await until(appRunning, (running) => !running, "«Quit» did not end the app", 5000);
     expect(cli("status")).toBe("connected");

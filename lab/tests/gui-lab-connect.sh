@@ -68,4 +68,4 @@ trap 'kill "$driver_pid" "$bus_pid" 2>/dev/null || true; wait "$driver_pid" 2>/d
 
 cd "$GALLERIA_SMOKE_REPO"
 # the results go where scripts/check-gates.py reads them (the path is relative to ui/)
-pnpm --dir ui test:e2e --reporter=default --reporter=json --outputFile.json=../target/gui-lab/vitest.json
+pnpm --dir ui test:e2e --reporter=default --reporter=json --outputFile.json=../target/gui-lab/vitest.json ${GALLERIA_SMOKE_FILTER:+-t "$GALLERIA_SMOKE_FILTER"}

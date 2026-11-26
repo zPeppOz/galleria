@@ -16,9 +16,12 @@ import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { answerFileWindow, barState, bodyText, cell, choose, closeApp, env, keyringItems, keyringLookup, openApp, profileId, TEN_SECONDS, waitFor, waitForBody, type Browser } from "./support";
+import { answerFileWindow, appRunning, barState, bodyText, cell, choose, closeApp, env, keyringItems, keyringLookup, openApp, profileId, requestClose, startTrayWatcher, stopTrayWatcher, TEN_SECONDS, trayClick, trayRegistered, trayTexts, until, waitFor, waitForBody, windowState, type Browser } from "./support";
 
-afterEach(closeApp);
+afterEach(async () => {
+  await closeApp();
+  stopTrayWatcher();
+});
 
 const CARLA = env("GALLERIA_LAB_SOCKET");
 const ALICE = env("GALLERIA_LAB_SOCKET_OTHER");
@@ -564,5 +567,63 @@ describe("G9: a session of another user of the group", () => {
     await waitFor(b, async () => (await cell(b, "strip.state")) === "Connected", "the profile of carla never connected after the replacement", THIRTY_SECONDS);
     expect(active(), "the session that is up is not the one of carla").toBe("wg-split");
     await disconnectFromWindow(b);
+  });
+});
+
+// ================================ G10 =======================================================================================
+
+/**
+ * What the window says to the watch of the client (lab/tests/gui-lab-watch.sh) and, through it, to t18 (`gui_closed_window_kept_the_tunnel`): a line
+ * `<ms> <name>` in `marks`, in the folder that the client sees as `/lab/target/gui-lab`. The watch copies it to its register as `mark <ms> <name>`;
+ * the time is the one of this machine, which the container of the client shares.
+ */
+const mark = (name: string): void => appendFileSync(join(RUN_OUT, "marks"), `${Date.now()} ${name}\n`);
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+describe("G10: the tunnel of the real daemon, with the window closed", () => {
+  it("G10g_the_tunnel_survives_the_closed_window", async () => {
+    await ensureDisconnected();
+    // the probe stands in for the desktop that shows the tray, and starts before the app: without it a closed window is a quit (Q53)
+    await startTrayWatcher();
+    const b = await openApp(true);
+    expect(trayRegistered(), "the app never registered a tray").toBe(true);
+    await connectProfile(b, "wg-split");
+    expect(carlaStatus()).toBe("connected");
+    await until(trayTexts, (texts) => texts[0] === "Connected to «wg-split»", "the menu of the tray never said the session of the real daemon");
+
+    mark("closed");
+    requestClose();
+    await until(windowState, (shown) => shown === "false", "the window was not hidden by the request to close it");
+    // ten seconds, looked at every second from three sides: the daemon says connected, the app is alive and hidden, the menu says so
+    for (let second = 1; second <= 10; second++) {
+      await sleep(1000);
+      expect(carlaStatus(), `the daemon lost the session ${second} s after the window was closed`).toBe("connected");
+      expect(appRunning(), `the app ended ${second} s after the window was closed`).toBe(true);
+      expect(windowState()).toBe("false");
+    }
+    expect(trayTexts()[0]).toBe("Connected to «wg-split»");
+
+    // the tunnel is a real one: with the window shown again the bytes of the strip grow (the watch of the client pings through it)
+    trayClick("Open Galleria");
+    await until(windowState, (shown) => shown === "true", "«Open Galleria» did not show the window");
+    const bytes = async () => {
+      const title = (await b.execute(() => document.querySelector('[data-cell="strip.traffic"] dd span')?.getAttribute("title") ?? "")) as string;
+      return title.split(" / ").map((side) => Number(side.replace(/\D/g, "")));
+    };
+    await waitFor(b, async () => (await bytes()).length === 2, "the traffic never showed numbers after the window was shown again");
+    const first = await bytes();
+    await waitFor(b, async () => {
+      const now = await bytes();
+      return now[0] + now[1] > first[0] + first[1];
+    }, `the bytes did not grow after the window came back: they stayed at ${first.join(" / ")}`, THIRTY_SECONDS);
+
+    // the end is the menu alone, with the window hidden again
+    requestClose();
+    await until(windowState, (shown) => shown === "false", "the window was not hidden the second time");
+    mark("disconnect");
+    trayClick("Disconnect «wg-split»");
+    await until(carlaStatus, (status) => status === "disconnected", "the session did not end from the menu of the tray", THIRTY_SECONDS);
+    mark("disconnected");
+    expect(appRunning()).toBe(true);
   });
 });

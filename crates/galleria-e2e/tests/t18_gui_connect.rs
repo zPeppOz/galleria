@@ -79,6 +79,9 @@ struct Watch {
     argv: Vec<String>,
     /// The same lines whole, with the time of the sample they belong to: `(ms, "<pid> <arguments>")`.
     argv_at: Vec<(String, String)>,
+    /// `mark <ms> <name>`: what the window wrote in the register of the watch (`<ms> <name>` in `target/gui-lab/marks`) to say what it
+    /// was doing, with the time it wrote it, as `date +%s%3N` would (plan B6, T6, G10g).
+    marks: Vec<(u64, String)>,
 }
 
 fn watch() -> Watch {
@@ -91,6 +94,7 @@ fn watch() -> Watch {
     let mut samples = Vec::new();
     let mut argv = Vec::new();
     let mut argv_at = Vec::new();
+    let mut marks = Vec::new();
     for line in text.lines() {
         if line == "residue-begin" {
             inside = true;
@@ -128,6 +132,14 @@ fn watch() -> Watch {
             argv.push(rest.splitn(3, ' ').nth(2).unwrap_or_default().to_owned());
             let (ms, process) = rest.split_once(' ').unwrap_or_default();
             argv_at.push((ms.to_owned(), process.to_owned()));
+        } else if let Some(rest) = line.strip_prefix("mark ") {
+            let (ms, name) = rest
+                .split_once(' ')
+                .unwrap_or_else(|| panic!("a mark of the watch is not understood: {line}"));
+            let ms = ms
+                .parse()
+                .unwrap_or_else(|_| panic!("a mark of the watch has no time: {line}"));
+            marks.push((ms, name.trim().to_owned()));
         }
     }
     Watch {
@@ -135,6 +147,7 @@ fn watch() -> Watch {
         samples,
         argv,
         argv_at,
+        marks,
     }
 }
 
@@ -332,6 +345,140 @@ fn the_observer_of_the_backends_leaves_out_only_the_probe_and_the_exiting() {
         0
     ));
     assert!(!two_backends_together(0, 1));
+}
+
+/// G10g as the client judges it (plan B6, T6): the window wrote three marks in the register, `closed` (it is about to be closed, with the
+/// tunnel up), `disconnect` (it is about to ask the tray to disconnect) and `disconnected` (the daemon said so). Between the first two
+/// **every** sample must have `glr-wg0` (the margin at the end is half a second: a sample is read a little after its time, and the click
+/// of the probe takes longer than that to reach the daemon), and there must be enough of them to be ten seconds; after the second, a
+/// sample without `glr-wg0` within five seconds. A mark that is missing is a failure, not a pass: the window did not do it.
+fn judge_closed_window(samples: &[Sample], marks: &[(u64, String)]) -> Result<usize, String> {
+    let mark = |name: &str| -> Result<u64, String> {
+        marks
+            .iter()
+            .find(|(_, n)| n == name)
+            .map(|(ms, _)| *ms)
+            .ok_or_else(|| format!("the register of the watch has no mark `{name}`: the window did not get as far as writing it (marks: {marks:?})"))
+    };
+    let (closed, disconnect, disconnected) =
+        (mark("closed")?, mark("disconnect")?, mark("disconnected")?);
+    if !(closed < disconnect && disconnect <= disconnected) {
+        return Err(format!(
+            "the marks are out of order: closed {closed}, disconnect {disconnect}, disconnected {disconnected}"
+        ));
+    }
+    let at = |s: &Sample| -> u64 { s.ms.parse().unwrap_or_default() };
+    let kept: Vec<&Sample> = samples
+        .iter()
+        .filter(|s| at(s) > closed && at(s) + 500 <= disconnect)
+        .collect();
+    if kept.len() < 30 {
+        return Err(format!(
+            "{} samples between `closed` and `disconnect` ({} ms apart): want at least 30, the watch was not looking for ten seconds",
+            kept.len(),
+            disconnect - closed
+        ));
+    }
+    if let Some(gone) = kept.iter().find(|s| s.wg != 1) {
+        return Err(format!(
+            "glr-wg0 was gone in the sample `sample {} openvpn={} wg={} ovpn_if={}`, {} ms after the window was closed: closing the window took the tunnel down",
+            gone.ms,
+            gone.openvpn,
+            gone.wg,
+            u8::from(gone.ovpn_if),
+            at(gone) - closed
+        ));
+    }
+    if !samples
+        .iter()
+        .any(|s| at(s) > disconnect && at(s) <= disconnect + 5000 && s.wg == 0)
+    {
+        return Err("glr-wg0 was still there 5 s after `disconnect`: the disconnect from the tray did not take the tunnel down".to_owned());
+    }
+    Ok(kept.len())
+}
+
+/// G10, the half that needs the real daemon: the window connected `wg-split`, was closed, and for ten seconds the tunnel of the client
+/// stayed up (ui/e2e/lab-connect.e2e.ts, `G10g_the_tunnel_survives_the_closed_window`, wrote the marks).
+#[test]
+#[ignore]
+fn gui_closed_window_kept_the_tunnel() {
+    let seen = watch();
+    if let Err(why) = judge_closed_window(&seen.samples, &seen.marks) {
+        panic!("{why}");
+    }
+}
+
+/// The judge itself, on made-up registers: the tunnel that stays, the one that goes with the window, a mark that is missing.
+#[test]
+#[ignore]
+fn the_judge_of_the_closed_window_fails_when_the_tunnel_goes_or_a_mark_is_missing() {
+    let sample = |ms: u64, wg: usize| Sample {
+        ms: ms.to_string(),
+        openvpn: 0,
+        wg,
+        ovpn_if: false,
+    };
+    let marks = |names: &[(&str, u64)]| -> Vec<(u64, String)> {
+        names.iter().map(|(n, ms)| (*ms, (*n).to_owned())).collect()
+    };
+    let all = marks(&[
+        ("closed", 1000),
+        ("disconnect", 12_000),
+        ("disconnected", 12_900),
+    ]);
+    // every 200 ms: up until the disconnect, down after it
+    let register = |down_at: u64| -> Vec<Sample> {
+        (0..80)
+            .map(|n| 1000 + n * 200)
+            .map(|ms| sample(ms, usize::from(ms < down_at)))
+            .collect()
+    };
+    assert!(judge_closed_window(&register(12_300), &all).is_ok());
+    // the tunnel went down two seconds after the window was closed
+    let early = judge_closed_window(&register(3000), &all).unwrap_err();
+    assert!(
+        early.contains("closing the window took the tunnel down"),
+        "{early}"
+    );
+    // the tunnel never went down after the disconnect
+    let stuck = judge_closed_window(&register(u64::MAX), &all).unwrap_err();
+    assert!(stuck.contains("still there 5 s after"), "{stuck}");
+    // a mark that was not written is a failure
+    let mut few = all.clone();
+    few.retain(|(_, n)| n != "disconnected");
+    assert!(
+        judge_closed_window(&register(12_300), &few)
+            .unwrap_err()
+            .contains("no mark `disconnected`")
+    );
+    assert!(
+        judge_closed_window(&register(12_300), &[])
+            .unwrap_err()
+            .contains("no mark `closed`")
+    );
+    // too short: the window was closed and the disconnect came at once
+    let quick = marks(&[
+        ("closed", 1000),
+        ("disconnect", 3000),
+        ("disconnected", 3500),
+    ]);
+    assert!(
+        judge_closed_window(&register(3200), &quick)
+            .unwrap_err()
+            .contains("want at least 30")
+    );
+    // out of order
+    let wrong = marks(&[
+        ("closed", 5000),
+        ("disconnect", 1000),
+        ("disconnected", 2000),
+    ]);
+    assert!(
+        judge_closed_window(&register(12_300), &wrong)
+            .unwrap_err()
+            .contains("out of order")
+    );
 }
 
 #[test]

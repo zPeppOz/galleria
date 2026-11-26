@@ -1,0 +1,27 @@
+# The proofs of the gates of block B6 (plan 2026-11-26-fase2-b6-tray-chiusura.md, «Dove gira ogni gate in CI»): G10, the tray and the
+# closing of the window; G11, the check for a newer version. Same format as gates-b5.tsv, and `scripts/check-gates.py` reads both: a gate
+# is in one manifest only.
+# gate <TAB> job <TAB> kind <TAB> name of the proof. `scripts/check-gates.py --job <job>` runs at the end of the job that declares the
+# gate and fails if a proof listed here for that job is missing from the output, skipped, ignored or red. A task that adds a proof adds
+# its row in the same commit; tests/config.rs (`every_gate_has_a_job`, `every_proof_of_the_manifests_is_a_test_that_exists`) keeps the
+# jobs of these files and the ones of ci.yml together, and the names with the tests.
+#
+# G10, the menu of the tray read and clicked from the session bus, the window hidden and the session left alone: the job `gui-smoke`
+# (ui/e2e/tray.e2e.ts, the app built as for a release, under Xvfb, with the probe of lab/tests/tray-probe.py as the desktop that shows it).
+G10	gui-smoke	vitest	G10a_the_menu_says_the_state_and_lists_the_favourites
+G10	gui-smoke	vitest	G10b_a_favourite_connects_and_disconnects_from_the_menu_alone
+G10	gui-smoke	vitest	G10c_closing_the_window_hides_it_and_the_session_stays
+G10	gui-smoke	vitest	G10d_open_shows_the_window_and_quit_ends_the_app
+G10	gui-smoke	vitest	G10e_without_a_tray_host_closing_quits_and_the_session_stays
+G10	gui-smoke	vitest	G10f_unsaved_changes_stop_the_close_and_the_quit
+# G10, the real tunnel of the real daemon, on the three clients: the window connects, is closed, and for ten seconds the tunnel stays up
+# (ui/e2e/lab-connect.e2e.ts); the client saw `glr-wg0` in every sample between the marks the window wrote (t18).
+G10	lab-connect	vitest	G10g_the_tunnel_survives_the_closed_window
+G10	lab-connect	cargo	gui_closed_window_kept_the_tunnel
+# G11, the check for a newer version: one request, no identifier, none when it is off, at most one a day, no redirect followed. Counted by a
+# server that is not GitHub: in Rust (`cargo test -p galleria-gui`, job `gui`) and with the app built as for a release (job `gui-smoke`).
+G11	gui	cargo	update_asks_once_and_sends_no_identifier
+G11	gui	cargo	update_disabled_asks_nothing
+G11	gui	cargo	update_asks_at_most_once_a_day
+G11	gui	cargo	update_never_follows_a_redirect
+G11	gui-smoke	vitest	G11a_the_built_app_asks_once_and_never_when_disabled

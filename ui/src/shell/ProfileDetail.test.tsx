@@ -169,6 +169,60 @@ describe("ProfileDetail", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it("a_locked_keyring_is_an_inline_notice_that_takes_the_focus_and_says_what_to_do", async () => {
+    const user = userEvent.setup();
+    const locked = () => Promise.reject({ code: "gui_keyring_locked", message: "The keyring is locked" });
+    const { onSelect, onDeleted, announce, actions } = setup(OFFICE, makeDetail(OFFICE), null, undefined, undefined, {
+      actions: { duplicate: locked, export: locked, remove: locked },
+    });
+    const notice = () => document.querySelector<HTMLElement>('[data-notice="keyring"]');
+    // duplicate
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+    await waitFor(() => expect(notice()).toBeTruthy());
+    expect(notice()?.textContent).toContain("The keyring is locked. Unlock the keyring and try again.");
+    expect(document.activeElement).toBe(notice());
+    // an alert in the page, and no toast: the focus is where it is read, and nothing is announced on top of it (Q27)
+    expect(within(notice()!).getByRole("alert")).toBeTruthy();
+    expect(alerts()?.textContent ?? "").toBe("");
+    expect(announce).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+    // export, after the question
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Export" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(actions.export).toHaveBeenCalled());
+    await waitFor(() => expect(document.activeElement).toBe(notice()));
+    // delete, after the question: the profile is kept
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Delete" }));
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(actions.remove).toHaveBeenCalled());
+    await waitFor(() => expect(document.activeElement).toBe(notice()));
+    expect(onDeleted).not.toHaveBeenCalled();
+    expect(notice()?.textContent).toContain("Unlock the keyring and try again");
+  });
+
+  it("the_keyring_notice_goes_when_another_profile_is_chosen_or_the_next_try_starts", async () => {
+    const user = userEvent.setup();
+    let calls = 0;
+    const { show } = setup(OFFICE, makeDetail(OFFICE), null, undefined, undefined, {
+      actions: { duplicate: async () => (++calls === 1 ? Promise.reject({ code: "gui_keyring_locked", message: "x" }) : makeSummary({ id: "c", name: "Copy" })) },
+    });
+    const notice = () => document.querySelector('[data-notice="keyring"]');
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+    await waitFor(() => expect(notice()).toBeTruthy());
+    // the second try is made with the notice gone, and when it works nothing is left of it
+    await openMore(user);
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+    await waitFor(() => expect(notice()).toBeNull());
+    // another profile: a new notice does not carry over
+    await openMore(user);
+    show(makeDetail(DATACENTER));
+    expect(notice()).toBeNull();
+  });
+
   it("export_asks_first_because_the_file_has_the_keys_and_cancel_exports_nothing", async () => {
     const user = userEvent.setup();
     const { actions } = setup();

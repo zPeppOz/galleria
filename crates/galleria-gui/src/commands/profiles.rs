@@ -54,6 +54,10 @@ impl From<RubricaError> for CmdError {
             }
             RubricaError::Store { dir, source } => match source {
                 StoreError::NotFound => ("gui_profile_not_found", None),
+                // The keyring is there but locked (or the unlocking was refused): nothing was written, and no file was used
+                // instead (spec §9, rule 2).
+                StoreError::KeyringLocked => ("gui_keyring_locked", None),
+                StoreError::Keyring(_) => ("gui_keyring_failed", None),
                 StoreError::InsecurePermissions { path, mode } => (
                     "gui_store_insecure",
                     Some(json!({

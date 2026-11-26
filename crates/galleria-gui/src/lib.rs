@@ -83,7 +83,8 @@ pub fn configure_with<R: Runtime>(
             commands::import::import_commit,
             commands::import::import_discard,
             commands::import::import_pick_file,
-            commands::import::import_pending
+            commands::import::import_pending,
+            commands::secrets::secret_store_status
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.

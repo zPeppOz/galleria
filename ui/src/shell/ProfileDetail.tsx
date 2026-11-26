@@ -390,11 +390,24 @@ export function ProfileDetail({ profile, detail, detailError, groups, names, inU
     }
   }, [shownId]);
 
+  // A keyring that is locked (or does not answer) stops a duplicate, an export or a delete: the notice is inline, it takes the
+  // focus and it says what to do, because the person has to do something before trying again (Q27: it is not announced).
+  const [keyring, setKeyring] = useState<CmdError | null>(null);
+  const keyringNotice = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (keyring) keyringNotice.current?.focus();
+  }, [keyring]);
+  useEffect(() => setKeyring(null), [shownId]);
   const failed = (failure: unknown) => {
     const error = failure as CmdError;
+    if (error.code === "gui_keyring_locked" || error.code === "gui_keyring_failed") {
+      setKeyring({ ...error });
+      return;
+    }
     toast(errorText(t, error.code, error.message), { tone: "error" });
   };
   const duplicate = async () => {
+    setKeyring(null);
     try {
       const copy = await actions.duplicate(profile.id, copyName(t, profile.name, names));
       toast(t("detail.duplicated", { name: copy.name }), { tone: "ok" });
@@ -406,6 +419,7 @@ export function ProfileDetail({ profile, detail, detailError, groups, names, inU
   };
   const exportFile = async () => {
     setAsking(null);
+    setKeyring(null);
     try {
       // a cancel of the window «Save» is not an outcome: nothing is said
       if (await actions.export(profile.id)) toast(t("detail.exported"), { tone: "ok" });
@@ -415,6 +429,7 @@ export function ProfileDetail({ profile, detail, detailError, groups, names, inU
   };
   const remove = async () => {
     setAsking(null);
+    setKeyring(null);
     try {
       await actions.remove(profile.id);
       toast(t("detail.deleted", { name: profile.name }), { tone: "ok" });
@@ -453,9 +468,16 @@ export function ProfileDetail({ profile, detail, detailError, groups, names, inU
     </>
   );
 
+  const keyringNoticeElement = keyring ? (
+    <div className="detail-keyring" ref={keyringNotice} tabIndex={-1} data-notice="keyring">
+      <InlineAlert tone="error" toneLabel={t("alert.error")}>{errorText(t, keyring.code, keyring.message)}</InlineAlert>
+    </div>
+  ) : null;
+
   if (detail) {
     return (
       <>
+        {keyringNoticeElement}
         <Form key={detail.id} detail={detail} groups={groups} update={update} validateRaw={validateRaw} reload={reload} guard={guard} menu={menu} />
         {dialogs}
       </>

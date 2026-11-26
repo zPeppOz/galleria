@@ -26,7 +26,7 @@ use uuid::Uuid;
 fn rubrica_in(root: &Path) -> (Rubrica, Arc<UiStateFile>) {
     let state = Arc::new(UiStateFile::new(root.join("state/galleria/state.toml")));
     (
-        Rubrica::new(root.join("galleria"), Arc::clone(&state)),
+        Rubrica::with_file_secrets(root.join("galleria"), Arc::clone(&state)),
         state,
     )
 }

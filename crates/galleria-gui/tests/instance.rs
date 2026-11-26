@@ -451,7 +451,7 @@ fn a_lock_without_a_socket_is_waited_for_a_moment_and_then_it_fails() {
 #[test]
 fn handed_files_get_the_same_checks_as_dropped_ones() {
     let root = tempfile::tempdir().unwrap();
-    let rubrica = Arc::new(Rubrica::new(
+    let rubrica = Arc::new(Rubrica::with_file_secrets(
         root.path().join("galleria"),
         Arc::new(UiStateFile::new(
             root.path().join("state/galleria/state.toml"),

@@ -29,6 +29,8 @@ pub const GUI_CODES: &[&str] = &[
     "gui_group_not_found",
     "gui_profile_in_use",
     "gui_export_failed",
+    "gui_keyring_locked",
+    "gui_keyring_failed",
     "import_syntax",
     "import_missing_file",
     "import_outside_folder",

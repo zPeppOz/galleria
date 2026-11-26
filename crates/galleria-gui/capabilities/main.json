@@ -27,6 +27,7 @@
     "allow-import-commit",
     "allow-import-discard",
     "allow-import-pick-file",
-    "allow-import-pending"
+    "allow-import-pending",
+    "allow-secret-store-status"
   ]
 }

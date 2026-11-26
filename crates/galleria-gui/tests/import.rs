@@ -53,7 +53,10 @@ impl World {
         let state = Arc::new(UiStateFile::new(
             root.path().join("state/galleria/state.toml"),
         ));
-        let rubrica = Arc::new(Rubrica::new(root.path().join("galleria"), state));
+        let rubrica = Arc::new(Rubrica::with_file_secrets(
+            root.path().join("galleria"),
+            state,
+        ));
         let files = write_fixtures(&root.path().join("files"));
         Self {
             root,
@@ -625,7 +628,7 @@ fn commit_is_all_or_nothing(#[case] writable: usize, #[case] block_the_profile: 
     let rubrica = Arc::new(Rubrica::with_secrets(
         world.dir(),
         Arc::new(UiStateFile::new(world.root.path().join("state.toml"))),
-        Arc::new(move |dir: &Path| {
+        Arc::new(move |dir: &Path, _name: &str| {
             Ok(Box::new(Failing {
                 inner: FileSecretStore::open(dir)?,
                 writes_left: Mutex::new(writable),

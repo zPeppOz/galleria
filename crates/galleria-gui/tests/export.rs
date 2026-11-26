@@ -42,7 +42,7 @@ fn state_in(root: &Path) -> Arc<UiStateFile> {
 fn rubrica_in(root: &Path) -> (Rubrica, Arc<UiStateFile>) {
     let state = state_in(root);
     (
-        Rubrica::new(root.join("galleria"), Arc::clone(&state)),
+        Rubrica::with_file_secrets(root.join("galleria"), Arc::clone(&state)),
         state,
     )
 }
@@ -209,7 +209,7 @@ fn duplicate_is_all_or_nothing(#[case] writable: usize) {
     let rubrica = Rubrica::with_secrets(
         root.path().join("galleria"),
         state,
-        Arc::new(move |dir: &Path| {
+        Arc::new(move |dir: &Path, _name: &str| {
             Ok(Box::new(Failing {
                 inner: FileSecretStore::open(dir)?,
                 writes_left: Mutex::new(writable),

@@ -2,6 +2,7 @@ import { useT, type Translate } from "../i18n";
 import { runsAScript } from "../rubrica/scripts";
 import { ProtocolTag } from "../shell/ProtocolTag";
 import { secretLabel } from "../shell/tabs/tab";
+import type { SecretStoreKind } from "../secrets/store";
 import "./Preview.css";
 import type { ImportNotice, ImportPreview } from "./types";
 
@@ -42,7 +43,7 @@ function peersOf(found: string[]): number {
  * preview has none) and where they will be kept, whether the credentials will be asked, and what the import dropped or
  * noticed, each with its line and the name of the directive. The name and the group are the fields below it.
  */
-export function Preview({ preview }: { preview: ImportPreview }) {
+export function Preview({ preview, store = null }: { preview: ImportPreview; /** Where the secrets will go: the keyring, or a file (`null`: not known yet, and the text is the general one). */ store?: SecretStoreKind | null }) {
   const t = useT();
   const peers = peersOf(preview.found);
   const names = preview.found.map((ref) => secretLabel(t, ref, peers)).join(", ");
@@ -53,7 +54,7 @@ export function Preview({ preview }: { preview: ImportPreview }) {
         {preview.file_name ? <span className="import-file">{t("import.preview.file", { name: preview.file_name })}</span> : null}
         {preview.server ? <span className="import-server">{preview.server}</span> : null}
       </p>
-      <p className="import-found">{preview.found.length > 0 ? t("import.found", { names }) : t("import.found.none")}</p>
+      <p className="import-found">{preview.found.length > 0 ? t(store === "keyring" ? "import.found.keyring" : store === "file" ? "import.found.file" : "import.found", { names }) : t("import.found.none")}</p>
       {preview.auth.user_pass ? <p className="import-found">{t("import.auth.user_pass")}</p> : null}
       {preview.notices.length > 0 ? (
         <>

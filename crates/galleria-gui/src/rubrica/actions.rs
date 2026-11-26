@@ -29,7 +29,7 @@ impl Rubrica {
         }
         let store = ProfileStore::open(&self.dir).map_err(|e| self.fail(e))?;
         let original = store.find(&id.to_string()).map_err(|e| self.fail(e))?;
-        let secrets = self.secrets()?;
+        let secrets = self.secrets(name)?;
         // Everything is read before anything is written.
         let mut values = vec![];
         for key in &original.secret_refs {
@@ -75,7 +75,7 @@ impl Rubrica {
     pub fn export(&self, id: Uuid, picker: &dyn SavePicker) -> Result<bool, RubricaError> {
         let store = ProfileStore::open(&self.dir).map_err(|e| self.fail(e))?;
         let profile = store.find(&id.to_string()).map_err(|e| self.fail(e))?;
-        let secrets = self.secrets()?;
+        let secrets = self.secrets(&profile.name)?;
         let text = export_config(&profile, &*secrets).map_err(|e| self.fail(e))?;
         let Some(path) = picker.pick(&suggested_name(&profile.name, profile.protocol)) else {
             return Ok(false);
@@ -98,7 +98,12 @@ impl Rubrica {
         }
         let store = ProfileStore::open(&self.dir).map_err(|e| self.fail(e))?;
         // `find` first: a profile that is not there is `NotFound`, whatever `delete` makes of a missing file
-        store.find(&id.to_string()).map_err(|e| self.fail(e))?;
+        let profile = store.find(&id.to_string()).map_err(|e| self.fail(e))?;
+        // The secrets go from both archives first: a keyring that is locked stops the delete, and the profile stays whole
+        // (`ProfileStore::delete` only knows the file).
+        self.secrets(&profile.name)?
+            .delete_all(&id)
+            .map_err(|e| self.fail(e))?;
         store.delete(&id).map_err(|e| self.fail(e))?;
         let _ = self.state.forget(id);
         Ok(())

@@ -15,6 +15,7 @@ import { ProfileDetail, type Guard } from "./ProfileDetail";
 import { ProfileList, type ListGroup } from "./ProfileList";
 import { RubricaNotices } from "./RubricaNotices";
 import { SearchBox } from "./SearchBox";
+import type { SecretStoreKind } from "../secrets/store";
 import { ServiceArea } from "./ServiceArea";
 import "./Shell.css";
 import { SortControl } from "./SortControl";
@@ -39,10 +40,12 @@ export function Shell(props: {
   incoming?: Incoming | null;
   /** A file is dragged over the window: only a hint to draw, with no path in it. */
   dropHover?: boolean;
+  /** Where a write of a secret goes (the keyring or a file), once the app knows; `null` until then. */
+  secretStore?: SecretStoreKind | null;
   sort: SortOrder;
   onSortChange: (sort: SortOrder) => void;
 }) {
-  const { view, info, onRetry, announce, rubrica, importer, incoming = null, dropHover = false, sort, onSortChange } = props;
+  const { view, info, onRetry, announce, rubrica, importer, incoming = null, dropHover = false, secretStore = null, sort, onSortChange } = props;
   const t = useT();
   const lang = useLang();
   const [query, setQuery] = useState("");
@@ -188,7 +191,7 @@ export function Shell(props: {
           </aside>
           <main className="shell-main">
             <ServiceArea view={view} info={info} onRetry={onRetry} />
-            <RubricaNotices rubrica={rubrica} onImport={() => setImporting(true)} />
+            <RubricaNotices rubrica={rubrica} onImport={() => setImporting(true)} secretStore={secretStore} />
             {selected ? (
               <ProfileDetail
                 profile={selected}
@@ -210,7 +213,7 @@ export function Shell(props: {
         </div>
         <StatusBar view={view} info={info} />
         <GroupsDialog open={managing} onClose={() => setManaging(false)} groups={rubrica.view?.groups ?? []} profiles={rubrica.view?.profiles ?? []} actions={rubrica.groups} />
-        <ImportDialog open={importing} onClose={closeImport} actions={importer} onImported={wasImported} incoming={incoming} />
+        <ImportDialog open={importing} onClose={closeImport} actions={importer} onImported={wasImported} incoming={incoming} secretStore={secretStore} />
         {dropHover ? (
           <div className="shell-drop" aria-hidden="true">
             <span>{t("import.drop_hover")}</span>

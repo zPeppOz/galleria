@@ -7,6 +7,7 @@ import { useLang } from "./i18n";
 import { useImportActions, useIncoming } from "./import/store";
 import { Preferences, type LangChoice } from "./prefs";
 import { displayOrder, useRubrica } from "./rubrica/store";
+import { useSecretStore } from "./secrets/store";
 import { Shell } from "./shell/Shell";
 
 function Screen({ initialSort }: { initialSort: SortOrder }) {
@@ -17,7 +18,8 @@ function Screen({ initialSort }: { initialSort: SortOrder }) {
   const rubrica = useRubrica((list) => displayOrder(list, sort, lang));
   const importer = useImportActions(rubrica.reload);
   const { incoming, hovering } = useIncoming();
-  return <Shell view={view} info={info} onRetry={retry} announce={announce} rubrica={rubrica} importer={importer} incoming={incoming} dropHover={hovering} sort={sort} onSortChange={setSort} />;
+  const secretStore = useSecretStore();
+  return <Shell view={view} info={info} onRetry={retry} announce={announce} rubrica={rubrica} importer={importer} incoming={incoming} dropHover={hovering} secretStore={secretStore} sort={sort} onSortChange={setSort} />;
 }
 
 /** `lang`, `theme` and `sort` are the initial choices (the saved ones, read by `main.tsx`; the tests give them); without them the app follows the system and sorts by name. */

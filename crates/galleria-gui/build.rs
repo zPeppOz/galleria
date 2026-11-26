@@ -23,6 +23,7 @@ const COMMANDS: &[&str] = &[
     "import_discard",
     "import_pick_file",
     "import_pending",
+    "secret_store_status",
 ];
 
 fn main() {

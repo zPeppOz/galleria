@@ -10,8 +10,9 @@ use crate::ui_state::UiStateFile;
 use galleria_ipc::Protocol;
 use galleria_profile::openvpn_text::Item;
 use galleria_profile::{
-    ConfigIssue, ConfigIssueKind, FileSecretStore, Profile, ProfileStore, SecretStore, Settings,
-    Skipped, StoreError, WireGuardProfile, check_openvpn_config, render_wireguard,
+    ConfigIssue, ConfigIssueKind, FileSecretStore, KeyringSecretStore, LayeredSecretStore, Profile,
+    ProfileStore, SecretStore, Settings, Skipped, StoreError, StoreKind, WireGuardProfile, Writes,
+    check_openvpn_config, keyring_present, render_wireguard,
 };
 use serde::Serialize;
 use std::{
@@ -176,13 +177,36 @@ mod actions;
 mod groups;
 mod imported;
 
-/// Opens the archive of the secrets of the folder of the rubrica: the one place that says which archive it is (B5 puts
-/// the layered one here), and what the tests replace to see a write fail.
+/// Opens the archive of the secrets of the folder of the rubrica, for a profile of this name (it is the label of the items
+/// the keyring gets): the one place that says which archive it is, and what the tests replace to see a write fail.
 pub type SecretFactory =
-    Arc<dyn Fn(&Path) -> Result<Box<dyn SecretStore>, StoreError> + Send + Sync>;
+    Arc<dyn Fn(&Path, &str) -> Result<Box<dyn SecretStore>, StoreError> + Send + Sync>;
 
-fn file_secrets(dir: &Path) -> Result<Box<dyn SecretStore>, StoreError> {
+/// Where a write of the secrets goes right now, without opening or reading anything: what `secret_store_status` says.
+pub type StoreProbe = Arc<dyn Fn() -> StoreKind + Send + Sync>;
+
+/// The archive of the window (spec §9, D25): the keyring when the session has one, the file when it has not, reading from
+/// both. It is the only place of the crate that builds a `FileSecretStore`.
+fn layered_secrets(dir: &Path, profile_name: &str) -> Result<Box<dyn SecretStore>, StoreError> {
+    let keyring = KeyringSecretStore::open()
+        .map(|keyring| Box::new(keyring.labelled(profile_name)) as Box<dyn SecretStore>);
+    Ok(Box::new(LayeredSecretStore::new(
+        keyring,
+        Box::new(FileSecretStore::open(dir)?),
+        Writes::Keyring,
+    )))
+}
+
+fn file_secrets(dir: &Path, _profile_name: &str) -> Result<Box<dyn SecretStore>, StoreError> {
     Ok(Box::new(FileSecretStore::open(dir)?))
+}
+
+fn keyring_or_file() -> StoreKind {
+    if keyring_present() {
+        StoreKind::Keyring
+    } else {
+        StoreKind::File
+    }
 }
 
 /// Now as the profiles keep their times; `None` only if the clock cannot be formatted, and then the old time stays.
@@ -196,26 +220,57 @@ pub struct Rubrica {
     dir: PathBuf,
     state: Arc<UiStateFile>,
     secrets: SecretFactory,
+    kind: StoreProbe,
 }
 
 impl Rubrica {
+    /// The rubrica of the app: the keyring and the file as one archive (B5).
     pub fn new(dir: PathBuf, state: Arc<UiStateFile>) -> Self {
+        Self::with_archive(
+            dir,
+            state,
+            Arc::new(layered_secrets),
+            Arc::new(keyring_or_file),
+        )
+    }
+
+    /// A rubrica whose secrets are in the file only, whatever the session has: the tests that are not about the keyring use
+    /// it, so that they never touch the keyring of whoever runs them.
+    pub fn with_file_secrets(dir: PathBuf, state: Arc<UiStateFile>) -> Self {
         Self::with_secrets(dir, state, Arc::new(file_secrets))
     }
 
-    /// A rubrica whose archive of the secrets is the one the factory opens (the tests make one that fails).
+    /// A rubrica whose archive of the secrets is the one the factory opens (the tests make one that fails); it says its
+    /// secrets are in the file.
     pub fn with_secrets(dir: PathBuf, state: Arc<UiStateFile>, secrets: SecretFactory) -> Self {
+        Self::with_archive(dir, state, secrets, Arc::new(|| StoreKind::File))
+    }
+
+    /// [`Rubrica::with_secrets`] with the answer to «where does a write go» given too.
+    pub fn with_archive(
+        dir: PathBuf,
+        state: Arc<UiStateFile>,
+        secrets: SecretFactory,
+        kind: StoreProbe,
+    ) -> Self {
         Self {
             dir,
             state,
             secrets,
+            kind,
         }
     }
 
-    /// The archive of the secrets: duplicate and export read it, and nothing else in the rubrica does. A secret never
-    /// goes into a view; what leaves this crate through a command has none.
-    fn secrets(&self) -> Result<Box<dyn SecretStore>, RubricaError> {
-        (self.secrets)(&self.dir).map_err(|e| self.fail(e))
+    /// The archive of the secrets for a profile of this name: import, duplicate, export and delete use it, and nothing else
+    /// in the rubrica does. A secret never goes into a view; what leaves this crate through a command has none.
+    fn secrets(&self, profile_name: &str) -> Result<Box<dyn SecretStore>, RubricaError> {
+        (self.secrets)(&self.dir, profile_name).map_err(|e| self.fail(e))
+    }
+
+    /// Where a write of a secret goes now: the keyring, or the file when the session has none. It opens no collection and
+    /// reads nothing, so it never makes the keyring ask to be unlocked.
+    pub fn secret_store_kind(&self) -> StoreKind {
+        (self.kind)()
     }
 
     /// The folder of the phase 1: `$XDG_CONFIG_HOME/galleria` or `$HOME/.config/galleria`.

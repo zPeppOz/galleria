@@ -31,6 +31,7 @@ const ALLOWED: &[&str] = &[
     "allow-import-discard",
     "allow-import-pick-file",
     "allow-import-pending",
+    "allow-secret-store-status",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

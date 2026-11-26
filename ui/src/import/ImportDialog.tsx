@@ -9,6 +9,7 @@ import type { CmdError, ProfileSummary } from "../rubrica/types";
 import { issueText } from "../shell/tabs/tab";
 import "./ImportDialog.css";
 import { Preview } from "./Preview";
+import type { SecretStoreKind } from "../secrets/store";
 import type { ImportActions, ImportPreview, Incoming } from "./types";
 
 type Focus = "text" | "choose" | "name" | "group" | "error";
@@ -44,8 +45,10 @@ export function ImportDialog(props: {
   onImported: (profile: ProfileSummary) => void;
   /** A file that came from outside (dropped, or given to the app): it opens the window with its preview or its error. */
   incoming?: Incoming | null;
+  /** Where the secrets of the profile will go, for the preview to say so. */
+  secretStore?: SecretStoreKind | null;
 }) {
-  const { open, onClose, actions, onImported, incoming } = props;
+  const { open, onClose, actions, onImported, incoming, secretStore = null } = props;
   const t = useT();
   const toast = useToast();
   const body = useRef<HTMLDivElement>(null);
@@ -247,7 +250,7 @@ export function ImportDialog(props: {
               void importIt();
             }}
           >
-            <Preview preview={preview} />
+            <Preview preview={preview} store={secretStore} />
             <Field name="import-name" label={t("import.name")} value={name} error={nameError || undefined} onChange={(value) => { setName(value); setNameError(""); }} />
             <Field
               as="select"

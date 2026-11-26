@@ -8,6 +8,7 @@ import { arrange } from "../rubrica/arrange";
 import type { ImportActions, Incoming } from "../import/types";
 import type { Rubrica } from "../rubrica/store";
 import type { CmdError, GroupActions, ProfileActions, ProfileDetail, ProfilePatch, ProfileSummary, RawCheck, RubricaView } from "../rubrica/types";
+import type { SecretStoreKind } from "../secrets/store";
 import { Shell } from "../shell/Shell";
 import { applyPatch, makeDetail, makeInfo, makePreview, makeRubricaView, makeSummary, makeView } from "./fixtures";
 
@@ -33,6 +34,8 @@ interface Options {
   /** A file that came from outside, and the hint of a file dragged over the window. */
   incoming?: Incoming | null;
   dropHover?: boolean;
+  /** Where a write of a secret goes, as the app reads it from Rust; by default it is not known. */
+  secretStore?: SecretStoreKind | null;
 }
 
 /** The shell with a rubrica that answers at once and keeps its own selection and sort order: no app behind it, nothing to wait for. */
@@ -102,7 +105,7 @@ function Harness({ view, options }: { view: DaemonView | null; options: Options 
     groups: options.groups ?? groupActions,
   };
   return (
-    <Shell view={view} info={view ? makeInfo() : null} onRetry={options.onRetry ?? (() => undefined)} announce={options.announce} rubrica={rubrica} importer={options.importer ?? importActions} incoming={options.incoming} dropHover={options.dropHover} sort={sort} onSortChange={setSort} />
+    <Shell view={view} info={view ? makeInfo() : null} onRetry={options.onRetry ?? (() => undefined)} announce={options.announce} rubrica={rubrica} importer={options.importer ?? importActions} incoming={options.incoming} dropHover={options.dropHover} secretStore={options.secretStore} sort={sort} onSortChange={setSort} />
   );
 }
 

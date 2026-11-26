@@ -37,7 +37,7 @@ impl Rubrica {
         profile.name = name.to_owned();
         profile.group = group.map(str::to_owned);
         let store = ProfileStore::open(&self.dir).map_err(|e| self.fail(e))?;
-        let secrets = self.secrets()?;
+        let secrets = self.secrets(name)?;
         for (key, value) in &imported.secrets {
             if let Err(error) = secrets.set(&profile.id, key, value) {
                 // best effort: the error that matters is the one that stopped the import

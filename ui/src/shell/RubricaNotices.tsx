@@ -2,19 +2,29 @@ import { InlineAlert } from "../design/InlineAlert";
 import { Button } from "../design/Button";
 import { errorText, hasKey, useT } from "../i18n";
 import type { Rubrica } from "../rubrica/store";
+import type { SecretStoreKind } from "../secrets/store";
 import { CommandRow } from "./CommandRow";
 import "./RubricaNotices.css";
 
 /**
  * What the rubrica has to say apart from the profiles: the store that cannot be read (with the command to fix it, when
- * there is one), the files that were skipped, and the empty rubrica with the button to import a profile.
+ * there is one), the files that were skipped, and the empty rubrica with the button to import a profile. When the session
+ * has no keyring the keys go to a file: a notice that stays says so (it cannot be dismissed, and the app reads it again when
+ * the window comes back to the front).
  */
-export function RubricaNotices({ rubrica, onImport }: { rubrica: Rubrica; onImport: () => void }) {
+export function RubricaNotices({ rubrica, onImport, secretStore = null }: { rubrica: Rubrica; onImport: () => void; secretStore?: SecretStoreKind | null }) {
   const t = useT();
   const { error, view } = rubrica;
   const skipped = view?.skipped ?? [];
   return (
     <>
+      {secretStore === "file" ? (
+        <div className="rubrica-notice" data-notice="secret-store-file">
+          <InlineAlert tone="warn" toneLabel={t("alert.warn")}>
+            {t("secrets.file_notice")}
+          </InlineAlert>
+        </div>
+      ) : null}
       {error ? (
         <div className="rubrica-notice">
           <InlineAlert tone="error" toneLabel={t("alert.error")} title={t("rubrica.error.title")}>

@@ -53,13 +53,27 @@ describe("Preview", () => {
     expect(document.body.textContent).not.toMatch(/\/tmp|\/usr/);
   });
 
-  it("found_secrets_are_named_and_go_to_the_secret_store", () => {
-    show({ found: ["openvpn.block.key", "openvpn.block.tls-crypt"] });
-    const text = document.body.textContent ?? "";
-    expect(text).toContain("Found: private key, TLS encryption key. They will be saved in the secrets archive.");
-    // the secrets are not in the system keyring until B5
-    expect(text).not.toMatch(/keyring|portachiavi/i);
-    expect(text).toContain("The credentials will be asked at the first connection.");
+  it("the_preview_says_where_the_keys_will_go", () => {
+    const found = ["openvpn.block.key", "openvpn.block.tls-crypt"];
+    const say = (store: "keyring" | "file" | null, lang: "en" | "it" = "en") => {
+      document.body.innerHTML = "";
+      render(
+        <I18n lang={lang}>
+          <main>
+            <Preview preview={makePreview({ found })} store={store} />
+          </main>
+        </I18n>,
+      );
+      return document.body.textContent ?? "";
+    };
+    expect(say("keyring")).toContain("Found: private key, TLS encryption key. They will be saved in the system keyring.");
+    expect(say("file")).toContain("Found: private key, TLS encryption key. They will be saved in a file only you can read.");
+    expect(say("keyring", "it")).toContain("Saranno salvati nel portachiavi di sistema.");
+    expect(say("file", "it")).toContain("Saranno salvati in un file leggibile solo da te.");
+    // not known yet: the general sentence, which promises nothing about where
+    const unknown = say(null);
+    expect(unknown).toContain("They will be saved in the secrets archive.");
+    expect(unknown).toContain("The credentials will be asked at the first connection.");
   });
 
   it("a_profile_without_secrets_says_so", () => {

@@ -46,3 +46,4 @@
 .detail-secrets { margin: 0; padding-left: var(--sp-7); display: grid; gap: var(--sp-2); }
 .detail-peer { display: flex; flex-direction: column; gap: var(--sp-5); }
 .detail-peer-title { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-strong); }
+.detail-keyring { max-width: 640px; }

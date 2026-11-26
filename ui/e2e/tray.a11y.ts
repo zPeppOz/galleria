@@ -50,8 +50,6 @@ async function openWithTray(scenario = "plain"): Promise<Browser> {
   await startTrayWatcher();
   const b = await openApp();
   await waitForBody(b, "Connected to the service", "the shell never showed the link");
-  // the form of the chosen profile is mounted again about 25 ms after the bar says the link (see connection.a11y.ts, `openWith`)
-  await settle(600);
   expect(trayRegistered(), "the app never registered a tray").toBe(true);
   return b;
 }

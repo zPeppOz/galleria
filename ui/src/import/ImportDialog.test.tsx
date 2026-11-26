@@ -32,9 +32,10 @@ function Opener({ actions, onImported }: { actions: ImportActions; onImported: P
   );
 }
 
-function fakeActions(over: Partial<ImportActions> = {}): ImportActions & { fromText: ReturnType<typeof vi.fn>; commit: ReturnType<typeof vi.fn>; discard: ReturnType<typeof vi.fn> } {
+function fakeActions(over: Partial<ImportActions> = {}): ImportActions & { fromText: ReturnType<typeof vi.fn>; pickFile: ReturnType<typeof vi.fn>; commit: ReturnType<typeof vi.fn>; discard: ReturnType<typeof vi.fn> } {
   return {
     fromText: vi.fn(async () => makePreview({ suggested_name: "" })),
+    pickFile: vi.fn(async () => makePreview({ origin: "picker", file_name: "separate.ovpn", suggested_name: "separate" })),
     commit: vi.fn(async (_id: string, name: string) => ({ id: "new", name, protocol: "openvpn" as const, group: null, favorite: false, server: null, last_used: null, modified: "m" })),
     discard: vi.fn(async () => undefined),
     ...over,
@@ -62,9 +63,50 @@ describe("ImportDialog", () => {
     const { dialog } = await openAlone(fakeActions());
     await waitFor(() => expect(document.activeElement).toBe(textbox()));
     expect(within(dialog).getByRole("button", { name: "Preview" })).toHaveProperty("disabled", true);
-    // no QR, and no button that answers nothing: the choice of a file comes with its task
+    // no QR; the file is chosen with the button, in a window that Rust opens
     expect(document.body.textContent).not.toMatch(/QR/);
-    expect(screen.queryByRole("button", { name: /Choose a file/ })).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Choose a file…" })).toHaveProperty("disabled", false);
+  });
+
+  it("choose_a_file_shows_the_preview", async () => {
+    const actions = fakeActions({ pickFile: vi.fn(async () => makePreview({ origin: "picker", file_name: "separate.ovpn", suggested_name: "separate" })) });
+    const { user, dialog } = await openAlone(actions);
+    await user.click(within(dialog).getByRole("button", { name: "Choose a file…" }));
+    const name = await screen.findByRole("textbox", { name: "Name" });
+    await waitFor(() => expect(document.activeElement).toBe(name));
+    expect((name as HTMLInputElement).value).toBe("separate");
+    expect(dialog.textContent).toContain("File: separate.ovpn");
+    expect(actions.pickFile).toHaveBeenCalledTimes(1);
+    // the page holds no path: the command took none, and the text box is not part of this step
+    expect(actions.fromText).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Import" }));
+    await waitFor(() => expect(actions.commit).toHaveBeenCalledWith("import-1", "separate", null));
+  });
+
+  it("a_cancelled_choice_keeps_the_focus_on_the_button", async () => {
+    const announce = vi.fn();
+    const actions = fakeActions({ pickFile: vi.fn(async () => null) });
+    const { user, dialog } = await openAlone(actions, { announce });
+    const choose = within(dialog).getByRole("button", { name: "Choose a file…" });
+    await user.click(choose);
+    await waitFor(() => expect(actions.pickFile).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(document.activeElement).toBe(choose));
+    // a cancel is not an outcome: still the first step, no alert, no notice, nothing sent to the screen reader
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
+    expect(document.querySelectorAll(".gx-toast")).toHaveLength(0);
+    expect(announce).not.toHaveBeenCalled();
+    expect(actions.discard).not.toHaveBeenCalled();
+  });
+
+  it("a_file_that_cannot_be_imported_is_an_alert_with_the_focus", async () => {
+    const actions = fakeActions({ pickFile: reject({ code: "gui_import_unsupported_file", message: "x", data: { file_name: "a.txt" } } as CmdError) });
+    const { user, dialog } = await openAlone(actions);
+    await user.click(within(dialog).getByRole("button", { name: "Choose a file…" }));
+    const alert = await within(dialog).findByRole("alert");
+    expect(alert.textContent).toContain("Only .ovpn and .conf files can be imported.");
+    await waitFor(() => expect(alert.closest(".import-error")?.contains(document.activeElement)).toBe(true));
+    expect(document.querySelectorAll(".gx-toast")).toHaveLength(0);
   });
 
   it("preview_step_focuses_the_name", async () => {

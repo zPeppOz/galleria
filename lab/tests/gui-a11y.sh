@@ -8,8 +8,8 @@
 # Inside the private session bus and Xvfb it: turns toolkit accessibility on, starts the AT-SPI bus, starts Orca with
 # a debug file (Orca writes every sentence it speaks there as a `SPEECH OUTPUT` line, so no audio device is needed),
 # starts tauri-driver and runs `pnpm --dir ui test:a11y` (ui/e2e/*.a11y.ts). The tests read the Orca log through
-# GALLERIA_A11Y_ORCA_LOG and the tree through lab/tests/atspi-dump.py (GALLERIA_A11Y_DUMP); the GTK «Save» window of «Export»,
-# which is not part of the page, is driven through lab/tests/atspi-save-window.py (GALLERIA_A11Y_SAVE_WINDOW). They write what they saw into
+# GALLERIA_A11Y_ORCA_LOG and the tree through lab/tests/atspi-dump.py (GALLERIA_A11Y_DUMP); the GTK «Save» window of «Export»
+# and the one of «Import» that asks for a file, which are not part of the page, are driven through lab/tests/atspi-file-window.py (GALLERIA_A11Y_FILE_WINDOW). They write what they saw into
 # GALLERIA_A11Y_OUT (default target/gui-a11y/): `transcript.txt` (speech and tree per check), `orca-speech.log` (every
 # `SPEECH OUTPUT` line of the run) and `orca-debug.log` (Orca's own debug file).
 set -euo pipefail
@@ -30,7 +30,7 @@ fi
 # Inner half: runs under the private bus and Xvfb.
 export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 WEBKIT_DISABLE_DMABUF_RENDERER=1
 export GALLERIA_A11Y_ORCA_LOG=$GALLERIA_A11Y_OUT/orca-debug.log GALLERIA_A11Y_DUMP=$GALLERIA_SMOKE_REPO/lab/tests/atspi-dump.py
-export GALLERIA_A11Y_SAVE_WINDOW=$GALLERIA_SMOKE_REPO/lab/tests/atspi-save-window.py
+export GALLERIA_A11Y_FILE_WINDOW=$GALLERIA_SMOKE_REPO/lab/tests/atspi-file-window.py
 
 # The toolkits only talk to the AT-SPI bus when this setting is on, and the bus has to be up before Orca.
 gsettings set org.gnome.desktop.interface toolkit-accessibility true
@@ -55,4 +55,5 @@ gui_start_driver
 trap 'collect; kill "$driver_pid" 2>/dev/null || true; wait "$driver_pid" 2>/dev/null || true' EXIT
 
 cd "$GALLERIA_SMOKE_REPO"
-pnpm --dir ui test:a11y
+# GALLERIA_A11Y_FILTER runs only the checks whose name matches (a vitest -t pattern), to work on one of them.
+pnpm --dir ui test:a11y ${GALLERIA_A11Y_FILTER:+-t "$GALLERIA_A11Y_FILTER"}

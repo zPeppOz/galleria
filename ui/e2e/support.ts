@@ -97,29 +97,46 @@ export function atspiTree(): AtNode[] {
     });
 }
 
-export interface SaveWindowAnswer {
-  /** The name the window proposed in its name field. */
+export interface FileWindowAnswer {
+  /** What the field of the name (or of the path) held when the probe found it: in «Save», the name the window proposed. */
   offered: string;
-  pressed: "Save" | "Cancel";
+  pressed: "Save" | "Open" | "Cancel";
   /** The window was gone a moment after the button was pressed. */
   closed: boolean;
 }
 
-/**
- * The GTK «Save» window of «Export» is opened by Rust, not by the page, so WebDriver cannot see it: it is driven over
- * AT-SPI by lab/tests/atspi-save-window.py. `save` puts a full path in its name field and activates «Save» (the folder
- * must be there); `cancel` activates «Cancel». Throws when the window never appears. It does not block the event loop
- * (`spawnSync` would): the key that opened the window is still waiting for its answer on it.
- */
-export async function answerSaveWindow(answer: { save: string } | "cancel"): Promise<SaveWindowAnswer> {
-  const args = answer === "cancel" ? ["cancel"] : ["save", answer.save];
+export interface FileWindowDump {
+  entries: string[];
+  buttons: string[];
+  /** The combo box of the filters and what it offers. */
+  filters: string[];
+}
+
+/** Runs the probe of the GTK window of Rust and answers with what it printed. It does not block the event loop (`spawnSync` would): the key that opened the window is still waiting for its answer on it. */
+async function fileWindow(args: string[]): Promise<string> {
   const done = await new Promise<{ status: number | null; out: string }>((resolve) => {
-    execFile("python3", [env("GALLERIA_A11Y_SAVE_WINDOW"), ...args], { encoding: "utf8" }, (error, stdout, stderr) =>
+    execFile("python3", [env("GALLERIA_A11Y_FILE_WINDOW"), ...args], { encoding: "utf8" }, (error, stdout, stderr) =>
       resolve({ status: error ? ((error.code as number | undefined) ?? 1) : 0, out: `${stdout}${stderr}` }),
     );
   });
-  if (done.status !== 0) throw new Error(`the Save window could not be answered (${done.status}): ${done.out}`);
-  return JSON.parse(done.out) as SaveWindowAnswer;
+  if (done.status !== 0) throw new Error(`the file window could not be answered (${done.status}): ${done.out}`);
+  return done.out;
+}
+
+/**
+ * The GTK windows «Save» (of «Export») and «Open» (of «Import») are opened by Rust, not by the page, so WebDriver cannot
+ * see them: they are driven over AT-SPI by lab/tests/atspi-file-window.py. `save` puts a full path in the name field and
+ * activates «Save» (the folder must be there); `open` brings up the field of the path, puts a full path in it and
+ * activates «Open»; `cancel` activates «Cancel». Throws when the window never appears.
+ */
+export async function answerFileWindow(answer: { save: string } | { open: string } | "cancel"): Promise<FileWindowAnswer> {
+  const args = answer === "cancel" ? ["cancel"] : "save" in answer ? ["save", answer.save] : ["open", answer.open];
+  return JSON.parse(await fileWindow(args)) as FileWindowAnswer;
+}
+
+/** What the window has: the fields, the buttons and the filters, without touching it. */
+export async function dumpFileWindow(): Promise<FileWindowDump> {
+  return JSON.parse(await fileWindow(["dump"])) as FileWindowDump;
 }
 
 export function descendants(tree: AtNode[], root: AtNode): AtNode[] {

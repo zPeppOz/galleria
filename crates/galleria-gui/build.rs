@@ -21,6 +21,7 @@ const COMMANDS: &[&str] = &[
     "import_from_text",
     "import_commit",
     "import_discard",
+    "import_pick_file",
 ];
 
 fn main() {

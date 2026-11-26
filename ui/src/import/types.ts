@@ -35,13 +35,15 @@ export interface ImportPreview {
 }
 
 /**
- * What the window can do with an import (`import_from_text`, `import_commit`, `import_discard`). Each one throws the
+ * What the window can do with an import (`import_from_text`, `import_pick_file`, `import_commit`, `import_discard`). Each one throws the
  * error of the command. Nothing is written before `commit`; a `commit` that worked reads the rubrica again before it
  * answers, so whoever asked finds the new profile in the list.
  */
 export interface ImportActions {
   /** The preview of the text the user pasted. */
   fromText: (text: string) => Promise<ImportPreview>;
+  /** The preview of the file the user chooses in the window «Open» that Rust opens (it takes no path: the page never has one); `null` when the window is cancelled. */
+  pickFile: () => Promise<ImportPreview | null>;
   /** Saves the preview as a profile with this name, in this group (`null`: none); answers with the row of the new profile. */
   commit: (id: string, name: string, group: string | null) => Promise<ProfileSummary>;
   /** Lets the preview go; a preview that is not there any more is not an error, and neither is any other failure. */

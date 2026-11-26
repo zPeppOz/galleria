@@ -11,7 +11,7 @@ import "./ImportDialog.css";
 import { Preview } from "./Preview";
 import type { ImportActions, ImportPreview } from "./types";
 
-type Focus = "text" | "name" | "group" | "error";
+type Focus = "text" | "choose" | "name" | "group" | "error";
 
 /** The text of an error of the import: the codes that carry something the catalogue text lacks (the line, the file) say it. */
 function problemText(t: Translate, error: CmdError): string {
@@ -30,7 +30,8 @@ function outcomeText(t: Translate, name: string, removed: number): string {
 
 /**
  * «Import profile» (spec §7): a modal window with two steps. First the source, here the text of the profile; then the preview
- * with what was found and what was dropped, the name and the group, and «Import». Nothing is written before «Import»: the
+ * with what was found and what was dropped, the name and the group, and «Import». The source is a file, chosen in the
+ * window «Open» that Rust opens (the page never has a path), or the text. Nothing is written before «Import»: the
  * preview waits in Rust, and «Cancel», `Esc`, the close button and «Back» let it go. An error of the import is an alert
  * inside the window and takes the focus (Q27: it is not announced, it is read where the focus is); a name Rust refuses puts
  * the focus on the field, with the reason as its description. The text is emptied as soon as the preview arrives.
@@ -54,6 +55,8 @@ export function ImportDialog(props: {
   const [nameError, setNameError] = useState("");
   const [groupError, setGroupError] = useState("");
   const [busy, setBusy] = useState(false);
+  // The window «Open» is up: the button that asked says so, and keeps the focus.
+  const [choosing, setChoosing] = useState(false);
   // Where the focus goes once the step has been drawn; `turn` makes the same place count again.
   const [focus, setFocus] = useState<{ on: Focus; turn: number } | null>(null);
   const ask = (on: Focus) => setFocus((was) => ({ on, turn: (was?.turn ?? 0) + 1 }));
@@ -69,6 +72,7 @@ export function ImportDialog(props: {
     setNameError("");
     setGroupError("");
     setBusy(false);
+    setChoosing(false);
     ask("text");
   }, [open]);
 
@@ -78,7 +82,7 @@ export function ImportDialog(props: {
     const timer = setTimeout(() => {
       const root = body.current;
       if (!root) return;
-      const target: Record<Focus, string> = { text: "textarea", name: 'input[name="import-name"]', group: 'select[name="import-group"]', error: ".import-error" };
+      const target: Record<Focus, string> = { text: "textarea", choose: ".import-choose button", name: 'input[name="import-name"]', group: 'select[name="import-group"]', error: ".import-error" };
       root.querySelector<HTMLElement>(target[focus.on])?.focus();
     }, 0);
     return () => clearTimeout(timer);
@@ -124,24 +128,44 @@ export function ImportDialog(props: {
     ask("error");
   };
 
+  /** The second step, for a preview that came from the text or from the file. */
+  const showPreview = (made: ImportPreview) => {
+    // The text is the one thing of a profile that went through the page: it goes as soon as it has been read.
+    setText("");
+    setPreview(made);
+    setName(made.suggested_name || t("import.default_name"));
+    setGroup("");
+    setNameError("");
+    setGroupError("");
+    ask("name");
+  };
+
   const makePreview = async () => {
-    if (busy) return;
+    if (busy || choosing) return;
     setBusy(true);
     setError(null);
     try {
-      const made = await actions.fromText(text);
-      // The text is the one thing of a profile that went through the page: it goes as soon as it has been read.
-      setText("");
-      setPreview(made);
-      setName(made.suggested_name || t("import.default_name"));
-      setGroup("");
-      setNameError("");
-      setGroupError("");
-      ask("name");
+      showPreview(await actions.fromText(text));
     } catch (failure) {
       fail(failure, "source");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const chooseFile = async () => {
+    if (busy || choosing) return;
+    setChoosing(true);
+    setError(null);
+    try {
+      const made = await actions.pickFile();
+      // A cancelled window is not an outcome: nothing is said, and the focus goes back to the button that asked.
+      if (made) showPreview(made);
+      else ask("choose");
+    } catch (failure) {
+      fail(failure, "source");
+    } finally {
+      setChoosing(false);
     }
   };
 
@@ -173,7 +197,7 @@ export function ImportDialog(props: {
   ) : (
     <>
       <Button onClick={close}>{t("import.cancel")}</Button>
-      <Button variant="primary" busy={busy} disabled={text.trim() === ""} onClick={() => void makePreview()}>{t("import.preview.button")}</Button>
+      <Button variant="primary" busy={busy} disabled={text.trim() === "" || choosing} onClick={() => void makePreview()}>{t("import.preview.button")}</Button>
     </>
   );
 
@@ -215,7 +239,12 @@ export function ImportDialog(props: {
             />
           </form>
         ) : (
-          <Field as="textarea" mono rows={10} spellCheck={false} name="import-text" label={t("import.text.label")} value={text} onChange={(value) => { setText(value); }} />
+          <>
+            <div className="import-choose">
+              <Button busy={choosing} disabled={busy} onClick={() => void chooseFile()}>{t("import.choose")}</Button>
+            </div>
+            <Field as="textarea" mono rows={10} spellCheck={false} name="import-text" label={t("import.text.label")} value={text} onChange={(value) => { setText(value); }} />
+          </>
         )}
       </div>
     </Dialog>

@@ -23,6 +23,13 @@ export function useImportActions(reload: () => Promise<void>): ImportActions {
           throw asError(failure);
         }
       },
+      pickFile: async () => {
+        try {
+          return await invoke<ImportPreview | null>("import_pick_file");
+        } catch (failure) {
+          throw asError(failure);
+        }
+      },
       commit: async (id, name, group) => {
         let saved: ProfileSummary;
         try {

@@ -76,6 +76,7 @@ function Harness({ view, options }: { view: DaemonView | null; options: Options 
   const imports = useRef(0);
   const importActions: ImportActions = {
     fromText: async () => makePreview({ id: `import-${(imports.current += 1)}` }),
+    pickFile: async () => makePreview({ id: `import-${(imports.current += 1)}`, origin: "picker", file_name: "separate.ovpn", suggested_name: "separate" }),
     commit: async (_id, name, group) => {
       const made: ProfileSummary = makeSummary({ id: `imported-${imports.current}`, name, protocol: "openvpn", group, server: "vpn.fixture.example:1194", modified: "2026-11-26T10:00:00Z" });
       setKept((now) => (now ? { ...now, profiles: [...now.profiles, made] } : now));

@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  answerSaveWindow, atspiTree, bodyText, closeApp, daemon, env, findNode, focusedNode, openApp, orcaDebugLines, record, speechMark, speechSince, waitForBody, waitForSpeech, waitForTree,
+  answerFileWindow, atspiTree, bodyText, closeApp, daemon, env, findNode, focusedNode, openApp, orcaDebugLines, record, speechMark, speechSince, waitForBody, waitForSpeech, waitForTree,
   type AtNode, type Browser,
 } from "./support";
 
@@ -187,7 +187,7 @@ describe("the form of a profile under a screen reader", () => {
   });
 
   // «Export» ends in the GTK window «Save», which belongs to Rust and is not in the page: it is driven over AT-SPI
-  // (lab/tests/atspi-save-window.py). The key that confirms is not awaited, because the command answers when that window closes.
+  // (lab/tests/atspi-file-window.py). The key that confirms is not awaited, because the command answers when that window closes.
   async function askExport(): Promise<void> {
     await openActionsMenu();
     await key("ArrowDown");
@@ -204,7 +204,7 @@ describe("the form of a profile under a screen reader", () => {
     await askExport();
     const mark = speechMark();
     // the window proposes the name of the profile and the extension of its protocol; the full path is typed over it
-    expect(await answerSaveWindow({ save: target })).toEqual({ offered: "Ufficio Napoli.ovpn", pressed: "Save", closed: true });
+    expect(await answerFileWindow({ save: target })).toEqual({ offered: "Ufficio Napoli.ovpn", pressed: "Save", closed: true });
     const DONE = "Exported.";
     await waitForSpeech(mark, DONE, 5000);
     await settle(1500);
@@ -235,7 +235,7 @@ describe("the form of a profile under a screen reader", () => {
     const mark = speechMark();
     // Orca's debug file holds the whole run (R4e's «Exported.» is in it): only what comes after this point counts
     const announced = orcaDebugLines(/Dequeued object:announcement/).length;
-    expect(await answerSaveWindow("cancel")).toEqual({ offered: "Ufficio Napoli.ovpn", pressed: "Cancel", closed: true });
+    expect(await answerFileWindow("cancel")).toEqual({ offered: "Ufficio Napoli.ovpn", pressed: "Cancel", closed: true });
     // a cancel is not an outcome: no notice, no error, and nothing said by the page
     await settle(2000);
     const tree = atspiTree();

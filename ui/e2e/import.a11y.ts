@@ -1,0 +1,166 @@
+// Plan B4 T3, the window «Open» of the import under a screen reader (Q22 (a): Orca and the AT-SPI tree in the real window, run
+// locally by lab/tests/gui-a11y.sh, i.e. `scripts/gui.sh a11y`). «Choose a file…» ends in the GTK window «Open», which belongs
+// to Rust and is not in the page: it is driven over AT-SPI (lab/tests/atspi-file-window.py), like «Save» of «Export».
+//   I5a  the window is a file chooser with its two buttons and its two filters
+//   I5b  a file chosen in the real window is previewed and imported: one notice, polite, nothing of the folder in the page
+//   I5c  «Cancel» in the real window changes nothing: no notice, no preview, the focus on the button
+//   I5d  the preview is read as a dialog: its name, and the focus on «Name»
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  answerFileWindow, atspiTree, bodyText, closeApp, daemon, dumpFileWindow, env, findNode, focusedNode, importFixtures, openApp, orcaDebugLines, record, speechMark, speechSince,
+  waitForBody, waitForSpeech, waitForTree,
+  type AtNode, type Browser,
+} from "./support";
+
+let b: Browser;
+
+const key = (...keys: string[]) => b.keys(keys);
+const focusedIs = (name: string | RegExp) => (tree: AtNode[]) => {
+  const got = focusedNode(tree)?.name ?? "";
+  return typeof name === "string" ? got === name : name.test(got);
+};
+const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const configDir = () => join(env("XDG_CONFIG_HOME"), "galleria");
+
+/** Presses `keys` until the focus is on the node called `name`; fails after `limit` presses. */
+async function reach(name: string | RegExp, keys: string[], limit = 8): Promise<AtNode[]> {
+  for (let step = 0; step < limit; step++) {
+    const tree = atspiTree();
+    if (focusedIs(name)(tree)) return tree;
+    await key(...keys);
+    await settle(150);
+  }
+  return waitForTree(focusedIs(name), `${String(name)} focused after ${limit} presses of ${keys.join("+")}`, 3000);
+}
+
+/** Every file under the folder of the profiles, with its bytes: what must stay as it is until «Import». */
+function onDisk(): string {
+  const walk = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true })
+      .sort((x, y) => x.name.localeCompare(y.name))
+      .flatMap((entry) => (entry.isDirectory() ? walk(join(dir, entry.name)) : [`${join(dir, entry.name)}\n${readFileSync(join(dir, entry.name), "utf8")}`]));
+  return walk(configDir()).join("\n---\n");
+}
+
+/** «Import…» with the keyboard, then the button «Choose a file…» (the first stop of the window is the text box, below it). */
+async function openTheWindowOfTheImport(): Promise<AtNode[]> {
+  await key("Tab");
+  await waitForTree(focusedIs("Import…"), "the Import button focused");
+  await key("Enter");
+  await waitForTree((t) => !!findNode(t, "dialog", "Import profile"), "the window «Import profile» open");
+  return reach("Choose a file…", ["Shift", "Tab"], 6);
+}
+
+/** The key that asks is not awaited: the command answers when the window of Rust closes. */
+async function askForTheFile(): Promise<void> {
+  void key("Enter").catch(() => undefined);
+}
+
+beforeEach(async () => {
+  daemon("start");
+  b = await openApp();
+  await waitForBody(b, "Connected to the service", "the shell never showed the link");
+});
+
+afterEach(closeApp);
+
+describe("the window «Open» of the import under a screen reader", () => {
+  it("I5a_the_open_window_is_a_file_chooser_with_the_two_filters", async () => {
+    await openTheWindowOfTheImport();
+    await askForTheFile();
+    const shown = await dumpFileWindow();
+    record("I5a the window «Open», dumped", [JSON.stringify(shown)], atspiTree());
+    // «Open» and «Cancel» are GTK's own words, in the language of the system
+    expect(shown.buttons).toEqual(expect.arrayContaining(["Open", "Cancel"]));
+    expect(shown.buttons, "it is not a window «Save»").not.toContain("Save");
+    // the two filters have no translated name: they are the patterns themselves (D22)
+    expect(shown.filters).toEqual(expect.arrayContaining(["*.ovpn, *.conf"]));
+    await answerFileWindow("cancel");
+  });
+
+  it("I5b_a_file_picked_in_the_real_window_is_previewed_and_imported", async () => {
+    const files = importFixtures();
+    const folder = files.separate.slice(0, files.separate.lastIndexOf("/"));
+    const secrets = () => readdirSync(join(configDir(), "secrets")).length;
+    const secretsBefore = secrets();
+    const profilesBefore = readdirSync(join(configDir(), "profiles")).length;
+    await openTheWindowOfTheImport();
+    await askForTheFile();
+    const answered = await answerFileWindow({ open: files.separate });
+    expect(answered, JSON.stringify(answered)).toMatchObject({ pressed: "Open", closed: true });
+    // the preview is the second step: the file name, the secrets by name, and nothing written yet
+    await waitForBody(b, "File: separate.ovpn", "the preview of the file never showed");
+    const preview = await bodyText(b);
+    expect(preview).toContain("Found: private key, TLS encryption key. They will be saved in the secrets archive.");
+    expect(preview, "the folder of the file is not in the page").not.toContain(folder);
+    expect(preview, "the secrets are named and never shown").not.toContain("SEED-SECRET-");
+    expect(readdirSync(join(configDir(), "profiles")).length, "nothing is written before «Import»").toBe(profilesBefore);
+    await waitForTree(focusedIs("Name"), "the field «Name» focused");
+    const mark = speechMark();
+    await key("Enter");
+    const DONE = "Imported “separate”.";
+    await waitForSpeech(mark, DONE, 5000);
+    await settle(1500);
+    const times = speechSince(mark).filter((line) => line.includes(DONE)).length;
+    const tree = atspiTree();
+    record("I5b the import of a file chosen in the real window", speechSince(mark), tree);
+    expect(times, `Orca said the notice ${times} times: ${JSON.stringify(speechSince(mark))}`).toBe(1);
+    // the window sent it as *polite*: `(urgency, 0, text)` for an `object:announcement`, 1 is polite
+    const lines = orcaDebugLines(/Dequeued object:announcement/).filter((line) => line.includes(DONE));
+    expect(lines.length, "Orca dequeued an object:announcement carrying the notice").toBeGreaterThan(0);
+    for (const line of lines) expect(line).toContain(`(1, 0, ${DONE})`);
+    // the files are on the disk: private, with the keys in the archive of the secrets
+    const profiles = readdirSync(join(configDir(), "profiles"));
+    expect(profiles).toHaveLength(profilesBefore + 1);
+    const saved = profiles.map((name) => join(configDir(), "profiles", name)).find((path) => readFileSync(path, "utf8").includes('name = "separate"'));
+    expect(saved, "the profile «separate» is on the disk").toBeTruthy();
+    expect(statSync(saved as string).mode & 0o777).toBe(0o600);
+    expect(secrets()).toBe(secretsBefore + 1);
+    // the page never learned the folder, and the new profile is the one chosen, with the focus on its row
+    expect(await bodyText(b)).not.toContain(folder);
+    expect(findNode(tree, "list item", "separate"), "the profile is in the list").toBeTruthy();
+    expect(focusedNode(tree)?.name, "the focus is on the row of the new profile").toBe("separate");
+  });
+
+  it("I5c_cancel_in_the_real_window_changes_nothing", async () => {
+    const before = onDisk();
+    await openTheWindowOfTheImport();
+    const mark = speechMark();
+    const announced = orcaDebugLines(/Dequeued object:announcement/).length;
+    await askForTheFile();
+    expect(await answerFileWindow("cancel")).toMatchObject({ pressed: "Cancel", closed: true });
+    // a cancel is not an outcome: no notice, no error, no preview
+    await settle(2000);
+    const tree = atspiTree();
+    record("I5c the choice of a file, cancelled in the real window", speechSince(mark), tree);
+    expect(orcaDebugLines(/Dequeued object:announcement/).slice(announced), "no announcement was sent").toEqual([]);
+    const body = await bodyText(b);
+    expect(body).not.toMatch(/Imported “|could not|not imported/i);
+    expect(body).not.toContain("File: ");
+    expect(findNode(tree, "dialog", "Import profile"), "the window of the import is still the first step").toBeTruthy();
+    expect(tree.some((n) => n.role === "alert"), "no alert").toBe(false);
+    expect(onDisk()).toBe(before);
+    expect(focusedIs("Choose a file…")(tree), "the focus is back on the button that asked").toBe(true);
+    expect(existsSync(join(configDir(), "profiles"))).toBe(true);
+  });
+
+  it("I5d_the_preview_is_read_as_a_dialog", async () => {
+    const files = importFixtures();
+    const mark = speechMark();
+    await openTheWindowOfTheImport();
+    await askForTheFile();
+    await answerFileWindow({ open: files.separate });
+    await waitForBody(b, "File: separate.ovpn", "the preview of the file never showed");
+    const tree = await waitForTree(focusedIs("Name"), "the field «Name» focused");
+    // the words Orca uses for the fields are recorded, not asserted (S4b: Orca 46.1 in the image does not say the name of a text field)
+    record("I5d the preview of a file, as a dialog", speechSince(mark), tree);
+    expect(findNode(tree, "dialog", "Import profile"), "a dialog named «Import profile»").toBeTruthy();
+    expect(speechSince(mark).some((line) => line.includes("Import profile")), `Orca said the name of the window: ${JSON.stringify(speechSince(mark))}`).toBe(true);
+    // the other fields of the step are there, named
+    expect(findNode(tree, "combo box", "Group") ?? findNode(tree, "menu", "Group") ?? findNode(tree, "list box", "Group"), "the field «Group»").toBeTruthy();
+    expect(tree.some((n) => n.role === "push button" && n.name === "Import")).toBe(true);
+    expect(tree.some((n) => n.role === "push button" && n.name === "Back")).toBe(true);
+  });
+});

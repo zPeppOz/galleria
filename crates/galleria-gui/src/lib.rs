@@ -14,6 +14,9 @@ pub mod export;
 pub mod export_gtk;
 pub mod import;
 pub mod link;
+pub mod picker;
+#[cfg(target_os = "linux")]
+pub mod picker_gtk;
 pub mod rubrica;
 pub mod supervisor;
 pub mod ui_state;
@@ -23,6 +26,7 @@ use announce::Announcer;
 use commands::app::AppInfo;
 use export::SavePicker;
 use import::Imports;
+use picker::FilePicker;
 use rubrica::Rubrica;
 use std::{path::PathBuf, sync::Arc};
 use supervisor::RelinkPolicy;
@@ -73,7 +77,8 @@ pub fn configure_with<R: Runtime>(
             commands::groups::groups_reorder,
             commands::import::import_from_text,
             commands::import::import_commit,
-            commands::import::import_discard
+            commands::import::import_discard,
+            commands::import::import_pick_file
         ])
         .setup(move |app| {
             // The supervisor runs on the async runtime of Tauri; setup itself is not inside it.
@@ -99,6 +104,8 @@ pub fn configure_with<R: Runtime>(
             app.manage(default_announcer(app.handle()));
             // The same for the window «Save» of «Export»: the tests of level 2 cannot drive a native window and manage theirs.
             app.manage(default_picker(app.handle()));
+            // And the window «Open» of «Import».
+            app.manage(default_file_picker(app.handle()));
             if let Some(main) = app.get_webview_window("main") {
                 window::restore(&main, &state);
             }
@@ -126,6 +133,17 @@ fn default_picker<R: Runtime>(app: &tauri::AppHandle<R>) -> Arc<dyn SavePicker> 
 #[cfg(not(target_os = "linux"))]
 fn default_picker<R: Runtime>(_app: &tauri::AppHandle<R>) -> Arc<dyn SavePicker> {
     Arc::new(export::NoPicker)
+}
+
+/// The window «Open» of the running app: the one of GTK on Linux, none elsewhere (a choice is then a cancel).
+#[cfg(target_os = "linux")]
+fn default_file_picker<R: Runtime>(app: &tauri::AppHandle<R>) -> Arc<dyn FilePicker> {
+    Arc::new(picker_gtk::GtkFilePicker(app.clone()))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn default_file_picker<R: Runtime>(_app: &tauri::AppHandle<R>) -> Arc<dyn FilePicker> {
+    Arc::new(picker::NoFilePicker)
 }
 
 /// Builds the Tauri application from `tauri.conf.json` and runs it until the last window closes. The daemon

@@ -29,6 +29,7 @@ const ALLOWED: &[&str] = &[
     "allow-import-from-text",
     "allow-import-commit",
     "allow-import-discard",
+    "allow-import-pick-file",
 ];
 
 fn crate_file(name: &str) -> PathBuf {

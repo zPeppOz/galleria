@@ -22,6 +22,22 @@ describe("useImportActions", () => {
     expect(calls).toEqual([{ cmd: "import_from_text", args: { text: "client\n" } }]);
   });
 
+  it("pick_file_sends_nothing_and_answers_with_the_preview_or_null", async () => {
+    const calls: { cmd: string; args: unknown }[] = [];
+    let answer: ImportPreview | null = preview;
+    mockIPC((cmd, args) => {
+      calls.push({ cmd, args });
+      return answer;
+    });
+    const { result } = renderHook(() => useImportActions(async () => undefined));
+    expect(await result.current.pickFile()).toEqual(preview);
+    answer = null;
+    expect(await result.current.pickFile()).toBeNull();
+    // no path goes out: the window is Rust's
+    expect(calls.map((c) => c.cmd)).toEqual(["import_pick_file", "import_pick_file"]);
+    expect(calls.every((c) => c.args === undefined || Object.keys(c.args as object).length === 0)).toBe(true);
+  });
+
   it("commit_reads_the_rubrica_again_before_it_answers", async () => {
     const order: string[] = [];
     mockIPC((cmd) => {
@@ -47,6 +63,7 @@ describe("useImportActions", () => {
     );
     await expect(result.current.commit("i1", "", null)).rejects.toMatchObject({ code: "gui_invalid_field" });
     await expect(result.current.fromText("x")).rejects.toMatchObject({ code: "gui_invalid_field" });
+    await expect(result.current.pickFile()).rejects.toMatchObject({ code: "gui_invalid_field" });
     expect(reloaded).toBe(false);
   });
 

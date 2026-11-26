@@ -4,7 +4,8 @@
 
 use crate::{
     error::CmdError,
-    import::{ImportFailure, ImportPreview, Imports},
+    import::{ImportFailure, ImportPreview, Imports, Origin},
+    picker::FilePicker,
     rubrica::ProfileSummary,
 };
 use serde_json::json;
@@ -71,4 +72,17 @@ pub fn import_commit(
 #[tauri::command(async)]
 pub fn import_discard(imports: State<'_, Arc<Imports>>, id: Uuid) {
     imports.discard(id);
+}
+
+/// The preview of the file the user chooses in the window «Open» of the system, which Rust opens (the page never sees a
+/// path, and the command takes none). `None` is a cancel: the window was closed, and that is not an error.
+#[tauri::command(async)]
+pub fn import_pick_file(
+    imports: State<'_, Arc<Imports>>,
+    picker: State<'_, Arc<dyn FilePicker>>,
+) -> Result<Option<ImportPreview>, CmdError> {
+    let Some(path) = picker.pick() else {
+        return Ok(None);
+    };
+    Ok(Some(imports.offer_path(&path, Origin::Picker)?))
 }

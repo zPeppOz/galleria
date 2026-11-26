@@ -63,6 +63,9 @@ run_in_image() {
     -e CARGO_TARGET_DIR=/work/target/gui-image -e GUI_INSIDE_IMAGE=1
     -e PATH=/opt/cargo/bin:/opt/node/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin)
   [[ -z ${GUI_CONTAINER_NAME:-} ]] || opts+=(--name "$GUI_CONTAINER_NAME")
+  # one test or one check at a time (lab/tests/gui-smoke.sh, lab/tests/gui-a11y.sh)
+  [[ -z ${GALLERIA_SMOKE_FILTER:-} ]] || opts+=(-e "GALLERIA_SMOKE_FILTER=$GALLERIA_SMOKE_FILTER")
+  [[ -z ${GALLERIA_A11Y_FILTER:-} ]] || opts+=(-e "GALLERIA_A11Y_FILTER=$GALLERIA_A11Y_FILTER")
   docker run "${opts[@]}" "$IMAGE" bash -euc \
     'mkdir -p "$CARGO_HOME"; ln -sfn /cargo-registry "$CARGO_HOME/registry"; exec "$@"' gui-run "$@"
 }

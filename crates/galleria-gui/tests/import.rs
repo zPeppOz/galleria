@@ -14,6 +14,7 @@ use galleria_gui::{
     import::{
         ImportFailure, ImportPreview, Imports, MAX_PREVIEWS, NoticeKind, Origin, PREVIEW_TTL,
     },
+    picker::FilePicker,
     rubrica::{Rubrica, RubricaError},
     supervisor::RelinkPolicy,
     ui_state::UiStateFile,
@@ -824,10 +825,49 @@ struct Gui {
     window: WebviewWindow<MockRuntime>,
 }
 
-/// The app of the tests of level 2, with the rubrica of the world and **no daemon**: nothing here talks to one.
+/// The window «Open» of the tests: it answers with the file it is given, or cancels, and counts how often it was asked.
+struct FakeFilePicker {
+    answer: Option<PathBuf>,
+    asked: Mutex<usize>,
+}
+
+impl FakeFilePicker {
+    fn new(answer: Option<PathBuf>) -> Arc<Self> {
+        Arc::new(Self {
+            answer,
+            asked: Mutex::new(0),
+        })
+    }
+}
+
+impl FilePicker for FakeFilePicker {
+    fn pick(&self) -> Option<PathBuf> {
+        *self.asked.lock().unwrap() += 1;
+        self.answer.clone()
+    }
+}
+
+/// The app of the tests of level 2, with the rubrica of the world and **no daemon**: nothing here talks to one. The window
+/// «Open» is the one the test gives (`None`: it is cancelled).
+fn gui_picking(world: &World, picked: Option<PathBuf>) -> (Gui, Arc<FakeFilePicker>) {
+    let picker = FakeFilePicker::new(picked);
+    let dynamic: Arc<dyn FilePicker> = picker.clone();
+    let gui = build_gui(
+        world,
+        mock_builder()
+            .manage(Arc::clone(&world.rubrica))
+            .manage(dynamic),
+    );
+    (gui, picker)
+}
+
 fn gui(world: &World) -> Gui {
+    build_gui(world, mock_builder().manage(Arc::clone(&world.rubrica)))
+}
+
+fn build_gui(world: &World, builder: tauri::Builder<MockRuntime>) -> Gui {
     let mut app = configure_with(
-        mock_builder().manage(Arc::clone(&world.rubrica)),
+        builder,
         world.root.path().join("no-daemon.sock"),
         RelinkPolicy {
             delays: vec![Duration::from_millis(20)],
@@ -938,6 +978,83 @@ fn the_imported_text_is_the_one_the_cli_would_import() {
         !shown.contains(SECRET_MARK) && !shown.contains("PRIVATE KEY"),
         "{shown}"
     );
+}
+
+// ---- the window «Open» ----------------------------------------------------------------------------------------------
+
+#[test]
+fn pick_file_returns_the_preview_of_the_picked_file() {
+    let world = World::seeded();
+    let (gui, picker) = gui_picking(&world, Some(world.files.inline.clone()));
+    let preview = invoke(&gui.window, "import_pick_file", json!({})).unwrap();
+    assert_eq!(preview["origin"], "picker");
+    assert_eq!(preview["file_name"], "inline.ovpn");
+    assert_eq!(preview["suggested_name"], "inline");
+    assert_eq!(*picker.asked.lock().unwrap(), 1);
+    // it waits to be confirmed like any other: nothing was written
+    let listed = invoke(&gui.window, "profiles_list", json!({})).unwrap();
+    assert_eq!(listed["profiles"].as_array().unwrap().len(), 5);
+    let saved = invoke(
+        &gui.window,
+        "import_commit",
+        json!({ "id": preview["id"], "name": "inline", "group": null }),
+    )
+    .unwrap();
+    assert_eq!(saved["name"], "inline");
+}
+
+#[test]
+fn pick_file_cancelled_is_null_and_not_an_error() {
+    let world = World::seeded();
+    let before = snapshot(&world.dir());
+    let (gui, picker) = gui_picking(&world, None);
+    assert_eq!(
+        invoke(&gui.window, "import_pick_file", json!({})).unwrap(),
+        Value::Null
+    );
+    assert_eq!(*picker.asked.lock().unwrap(), 1);
+    assert_eq!(snapshot(&world.dir()), before);
+}
+
+#[test]
+fn the_response_never_holds_the_folder() {
+    let world = World::seeded();
+    let (gui, _) = gui_picking(&world, Some(world.files.separate.clone()));
+    let preview = invoke(&gui.window, "import_pick_file", json!({})).unwrap();
+    assert_eq!(preview["file_name"], "separate.ovpn");
+    assert_clean(
+        &preview,
+        &[world.root.path(), world.files.separate.parent().unwrap()],
+    );
+    // nor does an error: the file that is not there is named, the folder is not
+    let (gui, _) = gui_picking(
+        &world,
+        Some(world.files.separate.with_file_name("nothing.ovpn")),
+    );
+    let error = invoke(&gui.window, "import_pick_file", json!({})).unwrap_err();
+    assert_clean(&error, &[world.root.path()]);
+}
+
+#[test]
+fn a_picked_file_gets_the_same_checks_as_a_dropped_one() {
+    let world = World::new();
+    let fifo = world.files.separate.with_file_name("fifo.ovpn");
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let (gui, _) = gui_picking(&world, Some(fifo.clone()));
+    let picked = invoke(&gui.window, "import_pick_file", json!({})).unwrap_err();
+    assert_eq!(picked["code"], "gui_import_unsupported_file");
+    let dropped = error_of(offer_error(world.imports().offer_path(&fifo, Origin::Drop)));
+    assert_eq!(picked["code"], dropped["code"]);
+    // the file that points outside of its folder is refused the same way too
+    let (gui, _) = gui_picking(&world, Some(world.files.outside.clone()));
+    let error = invoke(&gui.window, "import_pick_file", json!({})).unwrap_err();
+    assert_eq!(error["code"], "import_outside_folder");
 }
 
 // ---- the fixtures ---------------------------------------------------------------------------------------------------

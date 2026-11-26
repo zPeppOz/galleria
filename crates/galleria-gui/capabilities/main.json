@@ -25,6 +25,7 @@
     "allow-groups-reorder",
     "allow-import-from-text",
     "allow-import-commit",
-    "allow-import-discard"
+    "allow-import-discard",
+    "allow-import-pick-file"
   ]
 }

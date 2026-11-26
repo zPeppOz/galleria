@@ -38,20 +38,23 @@ fn is_version_probe(process: &str) -> bool {
 }
 
 /// An `openvpn` that is exiting: `pgrep -a` shows `<pid> [openvpn]` (or `[openvpn] <defunct>`) for a process whose command line is
-/// already gone, that is, one that has let go of its memory and its files, the tunnel included. It is the state in which the
-/// watch also catches the probe above: 24 times in about 280 samples of `openvpn --version` run in a loop in the image of the
-/// client (`pgrep -a` printed `[openvpn]` 18 times and `[openvpn] <defunct>` 6). It is not a tunnel alive.
+/// already gone, that is, one that has let go of its memory and its files. It is the state in which the watch also catches the
+/// probe above: 24 times in about 280 samples of `openvpn --version` run in a loop in the image of the client (`pgrep -a` printed
+/// `[openvpn]` 18 times and `[openvpn] <defunct>` 6). That is only the text of the line: Q48 leaves such a process out of the
+/// backends **only if** `glr-ovpn0` is gone in the same sample too (`ovpn_if=0`); with the interface still there it is a second
+/// backend still alive.
 fn is_exiting(process: &str) -> bool {
     let words: Vec<&str> = process.split_whitespace().skip(1).collect();
     matches!(words.as_slice(), ["[openvpn]"] | ["[openvpn]", "<defunct>"])
 }
 
-/// The backends in a sample: its `openvpn` processes (`<pid> <arguments>`) that can hold a tunnel: not the probe, not a process
-/// that is exiting. Every other one counts, with whatever arguments it has.
-fn openvpn_backends(processes: &[&str]) -> usize {
+/// The backends in a sample: its `openvpn` processes (`<pid> <arguments>`) that can hold a tunnel: not the probe, and not a process
+/// that is exiting **while `glr-ovpn0` is gone in that sample** (`ovpn_if` false). Every other one counts, with whatever arguments
+/// it has; so does an exiting one when the tunnel interface is still there.
+fn openvpn_backends(processes: &[&str], ovpn_if: bool) -> usize {
     processes
         .iter()
-        .filter(|p| !is_version_probe(p) && !is_exiting(p))
+        .filter(|p| !is_version_probe(p) && (!is_exiting(p) || ovpn_if))
         .count()
 }
 
@@ -65,6 +68,8 @@ struct Sample {
     ms: String,
     openvpn: usize,
     wg: usize,
+    /// `ovpn_if=` of the sample: `glr-ovpn0` was there (in at least one of the two readings of the watch).
+    ovpn_if: bool,
 }
 
 struct Watch {
@@ -105,7 +110,20 @@ fn watch() -> Watch {
             };
             let openvpn = count(fields.next(), "openvpn=");
             let wg = count(fields.next(), "wg=");
-            samples.push(Sample { ms, openvpn, wg });
+            // a sample without `ovpn_if=` is a register that is not whole: it does not parse, so the run is red
+            let ovpn_if = match count(fields.next(), "ovpn_if=") {
+                0 => false,
+                1 => true,
+                other => {
+                    panic!("a sample of the watch is not understood (ovpn_if={other}): {line}")
+                }
+            };
+            samples.push(Sample {
+                ms,
+                openvpn,
+                wg,
+                ovpn_if,
+            });
         } else if let Some(rest) = line.strip_prefix("argv ") {
             argv.push(rest.splitn(3, ' ').nth(2).unwrap_or_default().to_owned());
             let (ms, process) = rest.split_once(' ').unwrap_or_default();
@@ -180,42 +198,47 @@ fn gui_session_never_had_two_backends() {
     // D5, as the plan has it: not one sample with an `openvpn` backend and `glr-wg0` together, nor two `openvpn` backends. The watch
     // reads `glr-wg0` twice around the processes (see `lab/tests/gui-lab-watch.sh`), so a tunnel that is going away is not counted;
     // what is left is a fact of one sample, and the message says which one and which processes it saw. The probe of the version
-    // (`<path>/openvpn --version`) is not a backend (Q48); nothing else is left out.
-    for sample in &seen.samples {
-        let processes: Vec<&str> = seen
-            .argv_at
+    // (`<path>/openvpn --version`) is not a backend (Q48); an `openvpn` that is exiting (`[openvpn]`) is left out only when
+    // `glr-ovpn0` is gone in that same sample (`ovpn_if=0`); nothing else is left out.
+    let processes_of = |sample: &Sample| -> Vec<&str> {
+        seen.argv_at
             .iter()
             .filter(|(ms, _)| *ms == sample.ms)
             .map(|(_, process)| process.as_str())
-            .collect();
+            .collect()
+    };
+    for sample in &seen.samples {
+        let processes = processes_of(sample);
         assert_eq!(
             processes.len(),
             sample.openvpn,
-            "the sample `sample {} openvpn={} wg={}` has {} `argv` lines: the register of the watch is not whole",
+            "the sample `sample {} openvpn={} wg={} ovpn_if={}` has {} `argv` lines: the register of the watch is not whole",
             sample.ms,
             sample.openvpn,
             sample.wg,
+            u8::from(sample.ovpn_if),
             processes.len()
         );
-        if two_backends_together(openvpn_backends(&processes), sample.wg) {
+        if two_backends_together(openvpn_backends(&processes, sample.ovpn_if), sample.wg) {
             let lines: Vec<String> = processes
                 .iter()
                 .map(|p| format!("argv {} {p}", sample.ms))
                 .collect();
             panic!(
-                "two backends alive together (an `openvpn` process and glr-wg0, or two `openvpn`), D5, in the sample `sample {} openvpn={} wg={}`; the `argv` lines of that instant:\n{}",
+                "two backends alive together (an `openvpn` process and glr-wg0, or two `openvpn`), D5, in the sample `sample {} openvpn={} wg={} ovpn_if={}`; the `argv` lines of that instant:\n{}",
                 sample.ms,
                 sample.openvpn,
                 sample.wg,
+                u8::from(sample.ovpn_if),
                 lines.join("\n")
             );
         }
     }
     assert!(
-        seen.argv_at
+        seen.samples
             .iter()
-            .any(|(_, process)| !is_version_probe(process) && !is_exiting(process)),
-        "the watch never saw an `openvpn` backend (only the probe of the version or a process that was exiting, if that): the window did not connect an OpenVPN profile"
+            .any(|s| openvpn_backends(&processes_of(s), s.ovpn_if) > 0),
+        "the watch never saw an `openvpn` backend (only the probe of the version or a process that was exiting with `glr-ovpn0` gone, if that): the window did not connect an OpenVPN profile"
     );
     assert!(
         seen.samples.iter().any(|s| s.wg == 1),
@@ -239,20 +262,38 @@ fn the_observer_of_the_backends_leaves_out_only_the_probe_and_the_exiting() {
     ] {
         assert!(!is_exiting(not_exiting), "{not_exiting}");
     }
-    // an exiting process with a tunnel of the other kind: green (what round 3 of Q48 saw); with a backend and glr-wg0: red; a backend
-    // and an exiting process at once are one backend (round 2 of Q48), two backends and an exiting process are two
+    // an exiting process with a tunnel of the other kind: green only if `glr-ovpn0` is gone in the sample (`ovpn_if=0`; what round 3 of
+    // Q48 saw), red with `ovpn_if=1` (a second backend still alive); with a backend and glr-wg0: red; a backend and an exiting
+    // process at once are one backend when `ovpn_if=0` (round 2 of Q48) and two when `ovpn_if=1`; two backends and an exiting
+    // process are two
     let backend = "2292 /usr/sbin/openvpn --config /dev/stdin";
-    assert!(!two_backends_together(openvpn_backends(&[exiting]), 1));
     assert!(!two_backends_together(
-        openvpn_backends(&[backend, exiting]),
+        openvpn_backends(&[exiting], false),
+        1
+    ));
+    assert!(two_backends_together(openvpn_backends(&[exiting], true), 1));
+    assert!(two_backends_together(
+        openvpn_backends(&["4852 [openvpn] <defunct>"], true),
+        1
+    ));
+    assert!(!two_backends_together(
+        openvpn_backends(&["4852 [openvpn] <defunct>"], false),
+        1
+    ));
+    assert!(!two_backends_together(
+        openvpn_backends(&[backend, exiting], false),
         0
     ));
     assert!(two_backends_together(
-        openvpn_backends(&[backend, exiting]),
+        openvpn_backends(&[backend, exiting], true),
+        0
+    ));
+    assert!(two_backends_together(
+        openvpn_backends(&[backend, exiting], false),
         1
     ));
     assert!(two_backends_together(
-        openvpn_backends(&[backend, backend, exiting]),
+        openvpn_backends(&[backend, backend, exiting], false),
         0
     ));
     let probe = "1641 /usr/sbin/openvpn --version";
@@ -271,19 +312,25 @@ fn the_observer_of_the_backends_leaves_out_only_the_probe_and_the_exiting() {
         assert!(!is_version_probe(not_a_probe), "{not_a_probe}");
     }
     // the probe with glr-wg0: green; a `--config` with glr-wg0: red
-    assert!(!two_backends_together(openvpn_backends(&[probe]), 1));
-    assert!(two_backends_together(openvpn_backends(&[config]), 1));
-    assert!(two_backends_together(openvpn_backends(&[probe, config]), 1));
+    assert!(!two_backends_together(openvpn_backends(&[probe], false), 1));
+    assert!(two_backends_together(openvpn_backends(&[config], false), 1));
+    assert!(two_backends_together(
+        openvpn_backends(&[probe, config], false),
+        1
+    ));
     // two backends: red; a backend with the probe: green
     assert!(two_backends_together(
-        openvpn_backends(&[config, config]),
+        openvpn_backends(&[config, config], false),
         0
     ));
     assert!(!two_backends_together(
-        openvpn_backends(&[probe, config]),
+        openvpn_backends(&[probe, config], false),
         0
     ));
-    assert!(!two_backends_together(openvpn_backends(&[probe, probe]), 0));
+    assert!(!two_backends_together(
+        openvpn_backends(&[probe, probe], false),
+        0
+    ));
     assert!(!two_backends_together(0, 1));
 }
 

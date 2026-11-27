@@ -39,6 +39,9 @@ Il server `dns-option` usa DNS `10.9.0.1`; quello base usa `10.8.0.1`.
 Il build in container usa uid/gid dell'utente e HOME nel worktree, così target e
 cache Cargo restano rimovibili dall'utente. Con Docker rootless il build gira come
 root del container, che corrisponde già all'utente sull'host. PKI/profili sono generati root 0600.
+Gli artefatti intermedi di Cargo dei build in container (`lab/build.sh` e `scripts/gui.sh`: dipendenze, incrementale) vanno in
+`$GALLERIA_BUILD_CACHE/<lab-build|gui-image>` oppure, senza la variabile, in `<git common dir>/galleria-build/<lab-build|gui-image>`,
+la stessa per tutti i worktree della repo; i binari restano in `target/` di ogni worktree. Per svuotarli: `rm -rf` di quella cartella.
 
 T13 prova credenziali, errori e riconnessione; T14 misura IPv6 (controlli inclusi);
 T16 usa la CLI come alice e verifica anche il rifiuto di mallory. SYS_PTRACE serve

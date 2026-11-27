@@ -22,10 +22,15 @@
 #
 # GUI_UID / GUI_GID set the user of the container (default: the invoking user), to try a uid the image does not know.
 #
+# The intermediate artifacts of cargo (deps, incremental) go to $GALLERIA_BUILD_CACHE/gui-image or, by default, to
+# <git common dir>/galleria-build/gui-image, shared by all the worktrees; the binaries stay in target/gui-image of each one.
+#
 # Like lab/build.sh: the host Rust toolchain is mounted read-only, the build runs as the invoking user (rootless
 # Docker maps container root to that user), and nothing is written outside the repository and the cargo registry.
 set -euo pipefail
 cd -- "$(dirname -- "$0")/.."
+# shellcheck source=scripts/build-cache.sh
+source scripts/build-cache.sh
 
 IMAGE=galleria-gui-dev
 DOCKERFILE=lab/images/gui.Dockerfile
@@ -56,7 +61,10 @@ run_in_image() {
   # GUI_UID / GUI_GID force the user of the container, to try a runner whose user is not in the image (CI: 1001).
   user="${GUI_UID:-${user%%:*}}:${GUI_GID:-${user##*:}}"
   mkdir -p "$HOME/.cargo/registry" target/gui-home target/gui-etc
-  local -a opts=(--rm --user "$user" -v "$PWD:/work" -w /work)
+  # the intermediate artifacts of cargo (build-dir) live in a host folder shared by the worktrees, see scripts/build-cache.sh
+  local build_cache
+  build_cache=$(build_cache_dir gui-image)
+  local -a opts=(--rm --user "$user" -v "$PWD:/work" -v "$build_cache:/cargo-build" -w /work)
   # dbus-run-session (and so the smoke test) refuses to start for a user missing from /etc/passwd, and the uid of a
   # CI runner (1001) is not in the image: give the container a passwd and a group with an entry for the user it runs as.
   if [[ ${user%%:*} != 0 ]]; then
@@ -69,7 +77,7 @@ run_in_image() {
     -v "${RUSTUP_HOME:-$HOME/.rustup}:/opt/rustup:ro"
     -v "$HOME/.cargo/bin:/opt/cargo/bin:ro" -v "$HOME/.cargo/registry:/cargo-registry"
     -e HOME=/work/target/gui-home -e RUSTUP_HOME=/opt/rustup -e CARGO_HOME=/work/target/gui-home/cargo
-    -e CARGO_TARGET_DIR=/work/target/gui-image -e GUI_INSIDE_IMAGE=1
+    -e CARGO_TARGET_DIR=/work/target/gui-image -e CARGO_BUILD_BUILD_DIR=/cargo-build -e GUI_INSIDE_IMAGE=1
     -e PATH=/opt/cargo/bin:/opt/node/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin)
   [[ -z ${GUI_CONTAINER_NAME:-} ]] || opts+=(--name "$GUI_CONTAINER_NAME")
   # one test or one check at a time (lab/tests/gui-smoke.sh, lab/tests/gui-a11y.sh)

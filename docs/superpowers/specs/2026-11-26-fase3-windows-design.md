@@ -1,8 +1,13 @@
 # Fase 3 — Galleria su Windows: design
 
-Versione 0.1 — 2026-11-26 — stato: **proposta di Nello, solo documenti, per decidere se fare la fase 3**. Non c'è
-codice e non è stato scaricato né installato niente. Il piano a blocchi con le ore è
-`docs/superpowers/plans/2026-11-26-fase3-windows.md`.
+Versione 0.2 — 2026-11-28 — stato: **approvato il solo blocco P1** (Q60 = (a), Peppe, 2026-11-27); dopo P1 Peppe
+decide se andare avanti, e su P2–P8 non si lavora. Non c'è codice e non è stato scaricato né installato niente. Il
+piano a blocchi con le ore è `docs/superpowers/plans/2026-11-26-fase3-windows.md`; il piano di dettaglio di P1 è
+`docs/superpowers/plans/2026-11-27-fase3-p1.md`.
+
+Cosa cambia dalla 0.1 (2026-11-26): le decisioni Q58, Q59, Q60 e Q68 (§18); la correzione sull'host degli agenti,
+che **non è WSL**: è il server di casa, Linux nativo con KVM (§13, §19). Dove resta scritto «WSL» si parla dello
+spike del 10/11, che fu pilotato da WSL sulla macchina di Peppe.
 
 ## Riassunto per Peppe (una pagina)
 
@@ -16,10 +21,12 @@ decidono dopo.
 
 | | Ore stimate | Card | Soldi |
 |---|---|---|---|
-| Solo il primo blocco (ambiente e tre prove di rischio) | 32 h | 2 | 0 € |
-| Essenziale, blocchi P1–P6 | **181 h** (forchetta 160–240) | 13 | 0 € |
+| Solo il primo blocco (ambiente e tre prove di rischio) | 32 h | 3 | 0 € |
+| Essenziale, blocchi P1–P6 | **181 h** (forchetta 160–240) | 14 | 0 € |
 | Rifinitura, blocchi P7–P8 | 56 h | 5 | 0 €, oppure la firma (sotto) |
-| Tutto | 237 h | 18 | |
+| Tutto | 237 h | 19 | |
+
+Le card di P1 sono 3 e non 2 perché il gruppo A si esegue in due (in un run entra una VM sola): le ore non cambiano.
 
 Per confronto, i piani della fase 2 sommavano 275 h e sono stati eseguiti in due giorni di calendario (25 e 26/11,
 144 commit): l'essenziale di Windows è circa due terzi di quella fase. Le ore sono la stessa unità dei piani
@@ -32,9 +39,10 @@ a parità di ore.
 1. **La rete su Windows non l'abbiamo mai fatta noi.** Nello spike il server era su `127.0.0.1` (dietro il relay) e il
    DNS lo metteva OpenVPN da solo. «Tutto nel tunnel» verso un server vero, e il DNS messo dal nostro demone, su
    Windows sono supposizioni. Per questo il primo blocco le prova con il codice dello spike prima di spendere il resto.
-2. **L'ambiente di prova.** La VM Windows girerebbe dentro WSL su un disco meccanico: può essere lenta. La licenza
-   di valutazione dura 90 giorni ed è pensata per chi valuta Windows, non per chi prova un suo programma: la scelta
-   è tua (Q59). Il ripiego è la Sandbox dello spike, che funziona ma non ha UAC, riavvio né rete verso il laboratorio.
+2. **L'ambiente di prova.** La VM Windows gira con KVM sul server di casa, su un disco meccanico (`/mnt/b`): quindi
+   è lenta. La licenza di valutazione dura 90 giorni ed è pensata per chi valuta Windows, non per chi prova un suo
+   programma: la scelta era tua ed è presa (Q59). La Sandbox dello spike non è più un ripiego alla portata degli
+   agenti: sta sulla tua macchina Windows, e gli agenti girano sul server (Q75, nel piano di P1).
 3. **Senza firma del codice** l'MSI mostra l'avviso di SmartScreen, e dove è acceso Smart App Control, o un
    antivirus aziendale severo, MSI e servizio non firmati possono essere bloccati del tutto. La firma costa soldi o
    passa da Addway (Q61).
@@ -45,9 +53,19 @@ a parità di ore.
 
 **Cosa mi serve da te.**
 
-- Il sì o il no, e fin dove: solo P1 (32 h, per sapere se i rischi 1 e 2 sono veri), l'essenziale, o tutto (Q60).
-- Per la VM: registrarti tu sull'Evaluation Center di Microsoft e scaricare la ISO di Windows 11 Enterprise (o dirmi
-  di farlo a tuo nome), e un `sudo apt install swtpm` su WSL per il TPM che Windows 11 chiede (Q58, Q59).
+Già deciso il 2026-11-27: si fa solo P1 (Q60); runner, VM di valutazione, e la tua macchina solo alla fine (Q58);
+ISO e `swtpm` li metti tu (Q59). Resta da fare, **prima che parta la card della VM** (P1-A1):
+
+- **La ISO.** Scaricare dall'Evaluation Center di Microsoft la ISO di Windows 11 Enterprise 26H2 x64 di valutazione
+  e metterla in `/mnt/b/vm`, con il nome che ha (basta che finisca in `.iso` e che lì ce ne sia una sola).
+- **Il TPM emulato.** Sul server: `sudo apt install swtpm swtpm-tools`. Gli agenti non hanno `sudo`.
+- La card controlla le due cose all'avvio (`ls /mnt/b/vm/*.iso`, `which swtpm swtpm_setup`) e se ne manca una si
+  chiude senza lavorare. Il gruppo B di P1 (il workspace che compila su Windows) non le aspetta.
+- Le risposte alle questioni nate scrivendo il piano di P1 (Q74–Q78, in quel piano). La più importante è Q74:
+  senza, la prova R-A resta «non concludente».
+
+Per dopo P1, se si va avanti:
+
 - Due fatti sui colleghi: sono amministratori del loro PC? I PC sono gestiti dall'azienda (antivirus, criteri sulle
   applicazioni)? Cambiano Q61 e Q67.
 - La decisione sulla firma (Q61). La mia raccomandazione è niente firma in fase 3.
@@ -315,7 +333,7 @@ Se no, serve un annuncio via UIA. Come su Linux (Q56), si legge il registro del 
 | 1 · Frontend | non si riesegue | — |
 | 2 · Comandi Rust | demone vero con `FakeBackend` su una pipe con nome casuale; le prove che usano permessi e utenti Unix restano di Linux | runner |
 | 3 · Fumo | l'app costruita, pilotata con `tauri-driver` e `msedgedriver`: su `windows-latest` le prove WebDriver girano senza schermo finto **[V: Tauri, «WebDriver · Continuous Integration»]** e il driver di Edge è nell'immagine **[V: `Windows2025-Readme.md`]**. Fumo **ridotto**: avvio, primo avvio, import da testo, connessione al demone finto. Il menu della tray non si legge (su Linux si leggeva dal bus) | runner |
-| Laboratorio | tunnel veri, UAC, riavvio, MSI: i server Docker del laboratorio su WSL, il client nella VM | VM (§13) |
+| Laboratorio | tunnel veri, UAC, riavvio, MSI: i server Docker del laboratorio sul server di casa, il client nella VM | VM (§13) |
 
 ## 11. Pacchetto MSI e aggiornamenti (D16)
 
@@ -370,7 +388,9 @@ Tre strade. Non ho scaricato niente e non ho creato VM.
 
 ### 13.1 VM Windows 11 di valutazione in `/mnt/b/vm`
 
-Come le VM Linux della fase 2: qemu con KVM dentro WSL, comandata da `vmctl.sh` **[V: `lab/vm/vmctl.sh`]**.
+Come le VM Linux della fase 2: qemu con KVM diretto sul server di casa, che è Linux nativo **[V il 28/11:
+`/dev/kvm` c'è, `systemd-detect-virt` dice `none`, kernel `7.3.0-11-generic`]**, comandata da `vmctl.sh`
+**[V: `lab/vm/vmctl.sh`]**.
 
 - **Costo.** 0 €. Sul disco c'è posto: 1,7 TB liberi **[V: `df`]**. Una ISO di alcuni GB e un disco di almeno 64 GB.
 - **Licenza.** Windows 11 Enterprise di valutazione, 90 giorni, senza codice prodotto, dopo una registrazione
@@ -380,22 +400,27 @@ Come le VM Linux della fase 2: qemu con KVM dentro WSL, comandata da `vmctl.sh` 
   Q&A dice che la documentazione pubblica non basta a confermarlo **[V]**. Valgono i termini mostrati al download,
   che non ho letto perché chiedono la registrazione. La registrazione è a nome di chi scarica: decide Peppe (Q59).
 - **Limiti.**
-  - Windows 11 vuole TPM 2.0 e Secure Boot (requisiti noti, non riletti oggi). Il firmware c'è (`/mnt/b/vm/ovmf`); il TPM emulato no: `swtpm` non è
-    installato **[V: `which`]** e serve un `sudo apt install`. L'alternativa è saltare il controllo
-    nell'installazione, che Microsoft non supporta.
+  - Windows 11 vuole TPM 2.0 e Secure Boot (requisiti noti, non riletti oggi). Il firmware con Secure Boot c'è
+    **[V il 28/11: `/usr/share/OVMF/OVMF_CODE_4M.secboot.fd` e `OVMF_VARS_4M.ms.fd`]**; il TPM emulato no: `swtpm`
+    non è installato **[V il 28/11: `which`]**, e lo installa Peppe con `sudo apt install swtpm swtpm-tools` (Q59).
+    L'alternativa è saltare il controllo nell'installazione, che Microsoft non supporta.
   - La pagina dice che la 26H2 chiede un account Microsoft per entrare **[V]**; la LTSC 2024 è l'altra ISO offerta.
     Quale somiglia di più ai PC dei colleghi lo sa Peppe (Q59).
-  - Virtualizzazione annidata in WSL su disco meccanico **[V: `lsblk`, `ROTA=1`]**: le VM Linux ci girano, ma lì
-    il primo avvio a freddo della finestra aveva dato 4,3 s e i due dopo 0,4 s **[V: docs/08, G13]**. Windows sarà più lento. Tetto in P1: 8 h per
-    averla installata e comandabile, altrimenti si ripiega sulla Sandbox.
+  - Disco meccanico **[V: `lsblk`, `sdb`, `ROTA=1`]**, quindi lenta: le VM Linux ci girano, ma lì il primo avvio a
+    freddo della finestra aveva dato 4,3 s e i due dopo 0,4 s **[V: docs/08, G13]**. Windows sarà più lento. La
+    virtualizzazione non è annidata: è KVM diretto. Tetto in P1: 8 h per averla installata e comandabile; se
+    scade ci si ferma e si torna da Peppe (Q75).
   - La scadenza dei 90 giorni: la VM si rifà dalla ISO. Reinstallare per allungare la valutazione è una domanda di
     licenza, non tecnica.
 - **Cosa dà che le altre non danno.** UAC vero e utenti normali, riavvio, uno snapshot a cui tornare, e una via di
-  rete verso i server Docker del laboratorio con le porte girate da qemu **[S]**: niente relay su file. Si comanda via
-  SSH (OpenSSH è un componente di Windows) e con il monitor di qemu.
+  rete verso i server Docker del laboratorio: niente relay su file. Docker sul server è «rootless» **[V il 28/11:
+  `docker info`]**, quindi gli indirizzi dei container non si raggiungono dall'host: i server pubblicano le loro
+  porte sull'host e la VM le raggiunge dalla rete utente di qemu **[S]**. Così però il server sta sulla stessa
+  rete della VM, e la prova R-A vuole un server che non lo sia (Q74, nel piano di P1). Si comanda via SSH (OpenSSH
+  è un componente di Windows) e con il monitor di qemu.
 - **Compilazione.** L'MSI di riferimento è quello costruito sul runner (`msvc`). Per il giro veloce in VM si
-  compila da WSL con l'immagine `xbuild` dello spike (`windows-gnu`) **[V: `spikes/windows-lab/xbuild`]**; le prove
-  finali si fanno sull'MSI scaricato dal runner (Q68).
+  compila dal server con l'immagine `xbuild` dello spike (`windows-gnu`) **[V: `spikes/windows-lab/xbuild`;
+  l'immagine sul server non è ancora costruita]**; le prove finali si fanno sull'MSI scaricato dal runner (Q68).
 
 ### 13.2 Runner di GitHub (`windows-latest`)
 
@@ -415,9 +440,9 @@ Tre modi diversi di usarla.
 
 | Modo | Costo e licenza | Limiti |
 |---|---|---|
-| **Windows Sandbox**, come nello spike | 0 €, è una funzione del Windows di Peppe | provata e funziona **[V: docs/05]**; ma utente amministratore senza UAC, niente riavvio, nessuna rete verso WSL (relay su file, 18 ms), VBScript assente, si rifà da capo a ogni avvio, e a volte non parte. Lo spike ha rotto una volta l'interoperabilità di WSL **[V: spike §7]** |
-| **Installata davvero**, da Peppe | 0 € | è il solo Windows 11 vero con una rete vera e con il profilo di Addway. Ma è la macchina di lavoro, e WSL, dove girano gli agenti, dipende da lei: un driver, un servizio di sistema e i filtri di rete si installano solo quando la VM è verde, e li installa Peppe a mano con una lista (Q73) |
-| **VM Hyper-V** | — | **esclusa**: `/mnt/b` è un disco ext4 montato in WSL **[V: `mount`]**, e Hyper-V non può tenerci un disco virtuale. L'unico disco ammesso per le VM non è utilizzabile da Hyper-V |
+| **Windows Sandbox**, come nello spike | 0 €, è una funzione del Windows di Peppe | provata e funziona **[V: docs/05]**, il 10/11, pilotata da WSL su quella macchina; ma utente amministratore senza UAC, niente riavvio, nessuna rete verso il laboratorio (relay su file, 18 ms), VBScript assente, si rifà da capo a ogni avvio, e a volte non parte. Quello spike ruppe una volta l'interoperabilità di WSL **[V: spike §7]**. **Oggi gli agenti girano sul server di casa e non la possono avviare** (`/mnt/c` lì non c'è **[V il 28/11]**): la può usare solo chi lavora sulla macchina di Peppe (Q75) |
+| **Installata davvero**, da Peppe | 0 € | è il solo Windows 11 vero con una rete vera e con il profilo di Addway. Ma è la macchina di lavoro di Peppe: un driver, un servizio di sistema e i filtri di rete si installano solo quando la VM è verde, e li installa Peppe a mano con una lista (Q73) |
+| **VM Hyper-V** | — | **esclusa**: starebbe sulla macchina di Peppe, fuori da `/mnt/b/vm`, che è il solo posto ammesso per le VM, e fuori dalla portata degli agenti |
 
 ### 13.4 Proposta (Q58)
 
@@ -425,7 +450,7 @@ Tre gradini, ognuno per ciò che sa fare:
 
 1. **Runner** per tutto ciò che è automatico e non chiede un tunnel: a ogni push, gratis.
 2. **VM in `/mnt/b/vm`** per tunnel, DNS, IPv6, UAC, riavvio e MSI: è il laboratorio della fase 3. Se in 8 h non è
-   usabile, **Sandbox** con il relay, e W10 con UAC resta «non verificato» fino al gradino 3.
+   usabile ci si ferma e si torna da Peppe: la Sandbox dello spike non è alla portata degli agenti (Q75).
 3. **La macchina di Peppe**, alla fine, un'ora, da Peppe: il profilo vero.
 
 ## 14. Gate e job di CI
@@ -506,7 +531,7 @@ Il dettaglio, con i task, i gruppi e le ore, è nel piano. Ogni blocco finisce c
 | # | Supposizione | Task | Se è falsa |
 |---|---|---|---|
 | S61 | R-A, R-B, R-C (§7) | P1-T3 | §7 |
-| S62 | La VM Windows 11 gira sotto KVM dentro WSL, su `/mnt/b/vm`, e si comanda via SSH; qemu gira le porte verso il laboratorio | P1-T1, T2 | Sandbox con il relay |
+| S62 | La VM Windows 11 gira sotto KVM sul server di casa, su `/mnt/b/vm`, e si comanda via SSH; dalla rete utente di qemu raggiunge le porte che i server del laboratorio pubblicano sull'host | P1-T1, T2 | ci si ferma e si torna da Peppe (Q75): la Sandbox con il relay non è alla portata degli agenti |
 | S63 | Voce INTERACTIVE senza il diritto di creare istanze; un utente normale entra, un logon di rete no | P2-T1, T2 | gruppo locale dedicato, che D18 prevede come ripiego |
 | S64 | Il proprietario di una pipe creata da LocalSystem si legge come SYSTEM o Administrators | P2-T1 | controllo dell'identità del processo servente |
 | S65 | Sul runner si installano MSI e servizio e si crea un utente normale per la prova delle ACL | P2-T2 | la prova delle ACL solo in VM |
@@ -521,16 +546,23 @@ Il dettaglio, con i task, i gruppi e le ore, è nel piano. Ogni blocco finisce c
 | S74 | WebView2 fa dire le regioni vive a Narratore e NVDA | P8-T1 | annuncio via UIA |
 | S75 | Driver di WireGuardNT, OpenVPN e un server del laboratorio sul runner | P8-T2, tetto 3 h | i tunnel restano solo in VM |
 
+Le supposizioni che riguardano solo l'esecuzione di P1 (S76–S86: installazione non presidiata, TPM, OpenSSH,
+snapshot, rete utente, cattura, compilazione incrociata) stanno nel piano di dettaglio di P1, con i loro ripieghi.
+
 ## 18. Questioni aperte nuove
 
 La numerazione continua Q12–Q57. Ognuna ha la mia raccomandazione, che vale come predefinito se nessuno decide prima
 del blocco indicato. **Q58–Q61, Q67 e Q73 chiedono una risposta di Peppe; le altre sono tecniche.**
 
+**Decise, e non si riaprono:** Q58, Q59 e Q60, approvate da Peppe il 2026-11-27; Q68, adottata come predefinito da
+Aitano il 2026-11-27. Le altre restano aperte e, con Q60 = (a), non servono prima che Peppe decida su P2. Le
+questioni nate scrivendo il piano di P1 (Q74–Q78) stanno in quel piano.
+
 | # | Questione | Alternative | Raccomandazione | Serve entro |
 |---|---|---|---|---|
-| Q58 | Dove si prova Windows | (a) runner, VM di valutazione in `/mnt/b/vm`, macchina di Peppe alla fine · (b) runner e Sandbox, come lo spike · (c) solo runner | **(a)**: è la sola che prova UAC, riavvio e tunnel senza toccare la macchina di lavoro. (b) è il ripiego se la VM non regge. (c) non prova nessun tunnel | prima di P1 |
-| Q59 | La ISO e il TPM | chi si registra e scarica; 26H2 Enterprise o LTSC 2024; `swtpm` o saltare il controllo | **Si registra Peppe**, perché la licenza è a suo nome e la lettura dei termini è sua; **26H2 Enterprise x64**, la più vicina ai PC dei colleghi; **`sudo apt install swtpm`**. Se i termini non lo convincono: Sandbox | prima di P1 |
-| Q60 | Fin dove si fa | (a) solo P1, poi si decide · (b) essenziale P1–P6 · (c) tutto | **(a), poi (b)**: 32 h dicono se i rischi 1 e 2 sono veri. La rifinitura si decide quando i colleghi lo usano | subito |
+| Q58 | Dove si prova Windows | (a) runner, VM di valutazione in `/mnt/b/vm`, macchina di Peppe alla fine · (b) runner e Sandbox, come lo spike · (c) solo runner | **(a)**: è la sola che prova UAC, riavvio e tunnel senza toccare la macchina di lavoro. (c) non prova nessun tunnel. (b) era il ripiego se la VM non regge: per gli agenti non lo è più (Q75). **Approvata da Peppe il 2026-11-27: (a)**; la macchina di Peppe solo alla fine, non in P1 | prima di P1 |
+| Q59 | La ISO e il TPM | chi si registra e scarica; 26H2 Enterprise o LTSC 2024; `swtpm` o saltare il controllo | **Si registra Peppe**, perché la licenza è a suo nome e la lettura dei termini è sua; **26H2 Enterprise x64**, la più vicina ai PC dei colleghi; **`sudo apt install swtpm`**. **Approvata da Peppe il 2026-11-27:** la ISO di Windows 11 Enterprise 26H2 x64 di valutazione la scarica Peppe e la mette in `/mnt/b/vm`; `swtpm` e `swtpm-tools` li installa Peppe con `sudo`, perché gli agenti non lo hanno | prima di P1 |
+| Q60 | Fin dove si fa | (a) solo P1, poi si decide · (b) essenziale P1–P6 · (c) tutto | **(a), poi (b)**: 32 h dicono se i rischi 1 e 2 sono veri. La rifinitura si decide quando i colleghi lo usano. **Approvata da Peppe il 2026-11-27: (a)**, solo P1; dopo P1 decide Peppe, e su P2+ non si lavora | subito |
 | Q61 | Firma Authenticode | (a) nessuna · (b) Artifact Signing con Addway · (c) certificato di una CA · (d) SignPath, in fase 4 | **(a)** in fase 3. Diventa **(b)** se i PC dei colleghi bloccano i non firmati | prima di P6 |
 | Q62 | Aggiornamenti | (a) avviso nell'essenziale, updater nella rifinitura · (b) updater subito, come dice D16 alla lettera | **(a)**: l'avviso c'è già; l'updater porta chiave, flusso di rilascio e il caso UAC ancora da provare. D16 resta la destinazione | P5 |
 | Q63 | Archivio dei segreti | (a) file cifrato con DPAPI · (b) Credential Manager, con le chiavi lunghe spezzate · (c) tutti e due a strati, come su Linux | **(a)**: un solo archivio, senza il limite di 2560 byte e senza i casi limite di D25 | P5 |
@@ -538,19 +570,22 @@ del blocco indicato. **Q58–Q61, Q67 e Q73 chiedono una risposta di Peppe; le a
 | Q65 | Rete su Windows | (a) comandi `netsh` nel piano di `galleria-net` · (b) interfaccia di programmazione di Windows | **(a)**: riusa piano, giornale e prove. (b) se `netsh` non basta (S66) | P3 |
 | Q66 | `--up` di OpenVPN su Windows | (a) nessun programma `--up`: si decide su `PUSH_REPLY` e `CONNECTED` · (b) portare `hook.rs` | **(a)**: su Windows quel canale non porta il DNS e la riga di comando ha un problema aperto | P4 |
 | Q67 | Chi installa | MSI per macchina, con un amministratore a ogni installazione e aggiornamento | **Si accetta**: un servizio non si installa altrimenti. Serve sapere se i colleghi sono amministratori; se no, la guida è per chi lo è | prima di P6 |
-| Q68 | Toolchain | (a) `msvc` sul runner per ciò che si consegna, `windows-gnu` da WSL per il giro in VM · (b) solo `msvc`, con gli strumenti di Visual Studio nella VM | **(a)**: niente strumenti di Microsoft da installare e da licenziare nella VM. Le prove finali si fanno sull'MSI del runner | P1 |
+| Q68 | Toolchain | (a) `msvc` sul runner per ciò che si consegna, `windows-gnu` dal server di casa per il giro in VM · (b) solo `msvc`, con gli strumenti di Visual Studio nella VM | **(a)**: niente strumenti di Microsoft da installare e da licenziare nella VM. Le prove finali si fanno sull'MSI del runner. **Adottata come predefinito da Aitano il 2026-11-27: (a)** | P1 |
 | Q69 | Se il filtro WFP via FFI sfora il tetto | (a) la regola `advfirewall` dello spike, tolta dal giornale · (b) insistere | **(a)**, con il limite scritto | P3 |
 | Q70 | Il client controlla il proprietario della pipe | (a) sì · (b) no | **(a)**: senza, a servizio fermo un programma dell'utente riceve chiave e password | P2 |
 | Q71 | Tunnel veri in CI su Windows | (a) no nell'essenziale, tentativo in P8 con un tetto · (b) subito | **(a)**: tre supposizioni in fila (driver, OpenVPN, un server sul runner) | P8 |
 | Q72 | Lettore di schermo su Windows | (a) rifinitura, dal registro del parlato di NVDA, non blocca · (b) nell'essenziale | **(a)**, come Q56 | P8 |
-| Q73 | La macchina di Peppe | (a) solo Peppe, a mano, alla fine, con una lista · (b) anche gli agenti · (c) mai | **(a)**: è la sola prova con il profilo vero, e un errore lì ferma anche WSL | P6 |
+| Q73 | La macchina di Peppe | (a) solo Peppe, a mano, alla fine, con una lista · (b) anche gli agenti · (c) mai | **(a)**: è la sola prova con il profilo vero, e un errore lì ferma il lavoro di Peppe | P6 |
 
 ## 19. Cosa non ho verificato
 
 - **Niente è stato eseguito su Windows per questo documento.** Tutto ciò che riguarda Windows viene da `docs/05`
   (del 10/11) e dalla documentazione letta oggi.
 - I termini di licenza della ISO di valutazione, e la sua grandezza.
-- Che una VM Windows 11 giri sotto KVM dentro WSL su questa macchina.
+- Che una VM Windows 11 giri sotto KVM sul server di casa. Il 28/11 ho solo guardato l'host: `/dev/kvm`,
+  `qemu-system-x86_64` 11.0.3, `virt-install`, il firmware con Secure Boot, 31 GB di RAM, 16 core, 1,7 TB liberi su
+  `/mnt/b`, Docker «rootless»; `swtpm` manca. Nessuna VM è stata creata o accesa.
+- Che la rete utente di qemu porti la VM fino alle porte pubblicate dai container di Docker «rootless» (S62).
 - La pagina dei prezzi di Azure Artifact Signing: il prezzo viene da due fonti secondarie.
 - La voce di ACL per INTERACTIVE, il bit del diritto di creare istanze, il proprietario della pipe, la tabella delle
   porte con il processo, il «job» di Windows: li conosco, non li ho riletti né provati (§17).

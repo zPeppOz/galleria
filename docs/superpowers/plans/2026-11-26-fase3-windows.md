@@ -1,6 +1,11 @@
 # Fase 3 — Galleria su Windows: piano a blocchi
 
-Versione 0.1 — 2026-11-26 — stato: **proposta di Nello, per decidere**. Nessun task è partito.
+Versione 0.2 — 2026-11-28 — stato: **approvato il solo blocco P1** (Q60 = (a), Peppe, 2026-11-27). Dopo P1 decide
+Peppe; su P2–P8 non si lavora, e ciò che segue per quei blocchi resta una proposta. Nessun task è partito. Il piano di
+dettaglio di P1 è `docs/superpowers/plans/2026-11-27-fase3-p1.md`.
+
+Dalla 0.1: le decisioni del 27/11 e la correzione sull'host degli agenti, che non è WSL ma il server di casa (Linux
+nativo con KVM).
 
 **Spec:** `docs/superpowers/specs/2026-11-26-fase3-windows-design.md` («spec §n»). In testa alla spec c'è il riassunto
 di una pagina per Peppe.
@@ -13,8 +18,11 @@ avuto il doppio dei task stimati dalla spec.
 
 ## Prima di partire
 
-- La decisione di Peppe su Q60 (fin dove) e le risposte a Q58 e Q59 (ambiente, ISO, `swtpm`). Senza la ISO, P1 parte
-  dal gruppo B e il gruppo A usa la Sandbox.
+- **Deciso il 2026-11-27:** Q60 = (a), solo P1; Q58 = (a), runner e VM di valutazione, la macchina di Peppe solo
+  alla fine; Q59, la ISO di Windows 11 Enterprise 26H2 x64 la scarica Peppe e la mette in `/mnt/b/vm`, e `swtpm` con
+  `swtpm-tools` li installa Peppe con `sudo`; Q68 = (a), adottata come predefinito da Aitano.
+- Finché ISO e `swtpm` non ci sono parte solo il gruppo B di P1; il gruppo A aspetta, e non ripiega sulla Sandbox,
+  che gli agenti da questo host non possono avviare (Q75, nel piano di P1).
 - I due fatti sui colleghi (amministratori del PC? PC gestiti?) servono prima di P6, non prima.
 - Le altre questioni Q62–Q72 hanno la raccomandazione come predefinito.
 - Worktree dedicato da `main` per ogni card. Niente push senza l'ok di Peppe.
@@ -25,8 +33,13 @@ avuto il doppio dei task stimati dalla spec.
    a quello di Linux, non al suo posto.
 2. **L'IPC non cambia**: `PROTOCOL_VERSION` 1, nessun metodo o campo nuovo.
 3. **Niente sulla macchina di Peppe.** Tutto ciò che installa driver, servizi o regole gira nella VM o sul runner
-   (Q73). In WSL il laboratorio Docker per le prove Windows si avvia senza i client: `CLIENTS= bash lab/up.sh`, per
-   l'incidente di `binfmt_misc` dello spike (spike §7).
+   (Q73). Per le prove Windows il laboratorio Docker si avvia **senza i client Linux**, perché il client è la VM, e
+   con nomi `t_<id>-*` (il come è nel piano di P1). L'incidente di `binfmt_misc` dello spike (spike §7) **su questo
+   host non vale**: lì i client del laboratorio avevano tolto a WSL la voce `WSLInterop`, e qui quella voce non
+   esiste e nessun `.exe` parte dall'host **[V il 28/11: in `/proc/sys/fs/binfmt_misc` c'è solo `python3.14`,
+   ancora attiva dopo i giri locali di `lab-connect` del 26/11 (docs/08); `lab/check-wsl.sh` esce subito su un kernel che
+   non è di WSL]**. In più Docker qui è «rootless» **[V: `docker info`]** e le immagini del laboratorio hanno le
+   unità `binfmt` mascherate **[V: `lab/images/client*.Dockerfile`]**.
 4. **Le VM solo in `/mnt/b/vm`.**
 5. Un tetto di ore su ogni supposizione: quando scade si prende il ripiego scritto nella spec §17 e lo si annota.
 6. La review è una per gruppo. Ogni card riporta i comandi verdi sull'ultimo commit e aggiorna
@@ -43,7 +56,12 @@ Chiude le tre supposizioni che decidono la fase (spec §7) e porta il workspace 
 | **A · VM e prove di rischio** | T1, T2, T3 | **T1** (8 h, tetto) VM Windows 11 in `/mnt/b/vm`: installazione non presidiata, TPM emulato, OpenSSH, snapshot, `vmctl.sh win11`. **T2** (5 h) rete tra la VM e i server Docker del laboratorio; nello snapshot OpenVPN 2.6 e 2.7, un utente normale e un amministratore. **T3** (6 h) le tre prove R-A, R-B, R-C con il codice di `spikes/`, con le catture | `main`; Q58, Q59 | 19 h | **si sa se la fase regge.** Se una prova cade, si torna da Peppe con il costo nuovo |
 | **B · Il workspace compila** | T4, T5 | **T4** (7 h) `cfg` sul codice Unix di tutti i crate, risposte «non supportato» dove manca la parte Windows, job `win-check` con build `msvc`, `clippy` e le prove dei crate indipendenti dal sistema. **T5** (6 h) percorsi (`%APPDATA%`, `%LOCALAPPDATA%`, `%PROGRAMDATA%`) e protezione dei file in `galleria-profile` e in `ui_state.rs` | `main` (non dipende da A) | 13 h | la CI compila e prova su Windows a ogni push |
 
-I gruppi A e B possono andare in parallelo: A tocca solo `lab/vm/` e `/mnt/b/vm`.
+I gruppi A e B possono andare in parallelo: A tocca solo `lab/vm/`, `spikes/` e `/mnt/b/vm`.
+
+**Si esegue in tre card**, non in due: il gruppo A si spezza in A1 (T1 e T2, 13 h) e A2 (T3, 6 h), perché in un run
+entra una VM sola; il gruppo B (13 h) resta una card. Le ore non cambiano: 13 + 6 + 13 = 32. Il dettaglio è in
+`docs/superpowers/plans/2026-11-27-fase3-p1.md`. Il ripiego di T1 a tetto scaduto non è più la Sandbox: ci si ferma
+e si torna da Peppe (Q75).
 
 ### P2 · Servizio e named pipe — 24 h (W1)
 
@@ -83,7 +101,7 @@ I gruppi A e B possono andare in parallelo: A tocca solo `lab/vm/` e `/mnt/b/vm`
 
 Poi, fuori dalle ore: **l'ora di Peppe** sulla sua macchina con il profilo di Addway, con la lista scritta in T4.
 
-**Totale dell'essenziale: 32 + 24 + 29 + 26 + 43 + 27 = 181 h, in 13 card.**
+**Totale dell'essenziale: 32 + 24 + 29 + 26 + 43 + 27 = 181 h, in 14 card** (erano 13: P1 ne ha una in più).
 
 ## Rifinitura: si decide dopo, blocco per blocco
 
@@ -108,16 +126,18 @@ Poi, fuori dalle ore: **l'ora di Peppe** sulla sua macchina con il profilo di Ad
 
 | | Ore | Card |
 |---|---|---|
-| P1, da solo | 32 | 2 |
-| Essenziale (P1–P6) | 181 | 13 |
+| P1, da solo | 32 | 3 |
+| Essenziale (P1–P6) | 181 | 14 |
 | Rifinitura (P7–P8) | 56 | 5 |
-| **Tutto** | **237** | **18** |
+| **Tutto** | **237** | **19** |
 
 **Forchetta dell'essenziale: 160–240 h.** In basso se le tre prove di P1 passano, `netsh` basta e i tetti non si
 consumano (in 181 h i tetti sono contati per intero). In alto se cade
-R-A (+6 h), se serve l'interfaccia di programmazione per la rete (+6 h), se la VM non regge e si lavora con la
-Sandbox e il relay (ogni giro di prova più lento: stimo +20 h sui blocchi P3, P4 e P6), più i giri di correzione
-dopo le review, che in fase 2 ci sono stati quasi a ogni blocco. Se cade R-B, P4 va ristimato e la forchetta non vale.
+R-A (+6 h), se serve l'interfaccia di programmazione per la rete (+6 h), se la VM sul disco meccanico rende ogni
+giro di prova più lento del previsto (stimo fino a +20 h sui blocchi P3, P4 e P6), più i giri di correzione dopo le
+review, che in fase 2 ci sono stati quasi a ogni blocco. Se cade R-B, P4 va ristimato e la forchetta non vale. Se
+la VM non regge affatto la forchetta non vale nemmeno: da questo host la Sandbox dello spike non si può usare, e si
+torna da Peppe (Q75).
 
 Non sono nelle ore: le review (una per gruppo, 18 in tutto), il tempo di Peppe (registrazione e ISO, `sudo`, le
 risposte, l'ora finale: due o tre ore), le attese esterne della firma.

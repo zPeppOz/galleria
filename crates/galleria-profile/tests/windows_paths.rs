@@ -2,8 +2,10 @@
 //! T5: the profiles under `%APPDATA%`, the folder of the service under `%PROGRAMDATA%` is in `galleriad`, and the files
 //! are for the user alone. Windows only: on Linux the same is said by `profiles.rs` and `import_file.rs`.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+use galleria_ipc::Secret;
 use galleria_profile::{
-    ImportFileError, Profile, ProfileStore, import_file, windows_paths::profiles_dir,
+    FileSecretStore, ImportFileError, Profile, ProfileStore, SecretStore, import_file,
+    windows_paths::profiles_dir,
 };
 use std::{ffi::OsString, fs, path::Path, process::Command};
 
@@ -72,8 +74,11 @@ fn sddl(path: &Path) -> String {
     );
     let bytes = fs::read(&out).unwrap();
     fs::remove_file(&out).unwrap();
-    if bytes.starts_with(&[0xff, 0xfe]) {
-        let units: Vec<u16> = bytes[2..]
+    // `icacls /save` writes UTF-16LE; the sources differ on the BOM, so both are read (no BOM: the second byte of the
+    // first ASCII character is 0). UTF-8 only when it is neither.
+    let bom = bytes.starts_with(&[0xff, 0xfe]);
+    if bom || bytes.get(1) == Some(&0) {
+        let units: Vec<u16> = bytes[if bom { 2 } else { 0 }..]
             .chunks_exact(2)
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
             .collect();
@@ -89,28 +94,37 @@ fn a_saved_profile_is_not_readable_by_other_users() {
     let store = ProfileStore::open(&dir.path().join("galleria")).unwrap();
     let p = profile();
     store.save(&p).unwrap();
-    let file = dir.path().join(format!("galleria/profiles/{}.toml", p.id));
-    let acl = sddl(&file);
-    assert!(acl.contains("D:"), "no DACL in {acl:?}");
-    assert!(
-        acl.contains("(A;"),
-        "a DACL with no entry is not the case to check: {acl:?}"
-    );
-    for (sid, name) in [
-        ("S-1-1-0", "Everyone"),
-        ("S-1-5-32-545", "BUILTIN\\Users"),
-        ("S-1-5-11", "Authenticated Users"),
+    // the secrets of Windows are in `FileSecretStore` (plain file until P5): the file that matters for M1
+    FileSecretStore::open(&dir.path().join("galleria"))
+        .unwrap()
+        .set(&p.id, "password", &Secret::new("hunter2"))
+        .unwrap();
+    for (what, file) in [
+        ("profile", format!("galleria/profiles/{}.toml", p.id)),
+        ("secret", format!("galleria/secrets/{}.toml", p.id)),
     ] {
-        let alias = match sid {
-            "S-1-1-0" => "WD",
-            "S-1-5-32-545" => "BU",
-            _ => "AU",
-        };
-        for trustee in [sid, alias] {
-            assert!(
-                !acl.contains(&format!(";;;{trustee})")),
-                "{name} has an entry on the profile: {acl:?}"
-            );
+        let acl = sddl(&dir.path().join(file));
+        assert!(acl.contains("D:"), "no DACL on the {what} in {acl:?}");
+        assert!(
+            acl.contains("(A;"),
+            "a DACL with no entry is not the case to check ({what}): {acl:?}"
+        );
+        for (sid, name) in [
+            ("S-1-1-0", "Everyone"),
+            ("S-1-5-32-545", "BUILTIN\\Users"),
+            ("S-1-5-11", "Authenticated Users"),
+        ] {
+            let alias = match sid {
+                "S-1-1-0" => "WD",
+                "S-1-5-32-545" => "BU",
+                _ => "AU",
+            };
+            for trustee in [sid, alias] {
+                assert!(
+                    !acl.contains(&format!(";;;{trustee})")),
+                    "{name} has an entry on the {what}: {acl:?}"
+                );
+            }
         }
     }
 }

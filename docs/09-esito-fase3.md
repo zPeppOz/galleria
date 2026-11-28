@@ -51,6 +51,7 @@ Card `t_4faef896` (T4a) e `t_227bc768` (T5, T4b). **Stato: T4a, T5 e T4b fatti i
   `cargo test --workspace --exclude galleria-e2e --exclude galleria-gui` sotto wine: **468 passate, 0 fallite, 0 `ignored`**.
   I binari della finestra sotto wine non partono (stato 53: `WebView2Loader.dll`, che nel build `msvc` è statico); la DLL
   sta in `webview2-com-sys-0.39.1/x64/` nel registro di Cargo e si può mettere nel `WINEPATH`: **non provato**.
+  Come rifarle: `spikes/windows-lab/xbuild-wine/run.sh` e il `README.md` accanto.
   Wine non è Windows: dice che il codice parte e che le prove portabili passano, niente sul sistema vero.
 - Linux: 598 passate / 0 fallite / 103 `ignored` (host, **stessi nomi di prima**: la prova di `galleriad` del server è rimasta `server::tests::…`,
   il modulo non è stato spostato); `scripts/gui.sh check` 493/0 (finestra, Vitest
@@ -153,6 +154,17 @@ Prove scritte (tutte `cfg(windows)`):
 permessi: noi non scriviamo ACL, quindi proteggiamo quanto la cartella già protegge; (2) il valore delle variabili lo
 decide chi lancia il programma, come `XDG_CONFIG_HOME` su Linux.
 
+**Tre limiti di T5 da non perdere (da rivedere in P5, con l'archivio DPAPI, Q63):**
+
+1. Su Windows, fino a P5, i segreti stanno in un file **in chiaro** sotto `%APPDATA%\galleria\secrets\<id>.toml`
+   (`FileSecretStore`), protetto solo dall'ACL ereditata: non c'è il portachiavi (`rubrica.rs`, `cfg(not(target_os = "linux"))`).
+2. Su Windows non c'è l'equivalente del controllo di Linux su proprietario e permessi: `check` rifiuta solo collegamenti e
+   giunzioni, quindi una cartella con un'ACL larga **non viene rifiutata**. È la scelta del piano (spec §8); va rivista in P5
+   insieme a DPAPI.
+3. `a_saved_profile_is_not_readable_by_other_users` (che guarda l'SDDL sia del file del profilo sia di quello dei segreti) gira
+   in `%TEMP%` del runner: prova che non aggiungiamo voci e che l'eredità regge, **non** che `%APPDATA%` di una macchina vera sia
+   privato.
+
 **Non fatto in T5:** rimettere in gioco con `cfg` sulle singole prove i file oggi esclusi a intero (`galleria-profile/tests/*`,
 `rubrica`, `ui_state`): sono ancora le 131 + 362 della tabella qui sopra, e N di `win-check` le conta come escluse.
 
@@ -219,9 +231,10 @@ Job `win-check` (`windows-latest`, `shell: bash`). Passi, nell'ordine, e cosa pu
 4. **`cargo build --workspace --all-targets` e `clippy -D warnings` per `msvc`**: finora solo `gnu` (xcheck). Le differenze possibili
    sono lint che solo `msvc` fa scattare e il link statico di `WebView2Loader` (serve l'SDK di Windows, che il runner ha).
 5. **`cargo test --workspace --exclude galleria-e2e`**, log in `target/gates/win-check-cargo.log`: cosa non è stato visto sotto
-   wine e che qui gira per la prima volta: `a_saved_profile_is_not_readable_by_other_users` (legge la DACL con `icacls /save`: se `icacls`
-   scrive in un'altra codifica o se la cartella temporanea del runner ha una voce per `Users` ereditata, è rossa — **leggere l'SDDL
-   nel messaggio**), `a_link_is_not_imported` (serve il diritto di creare collegamenti: l'utente del runner è amministratore **[S]**; se non lo
+   wine e che qui gira per la prima volta: `a_saved_profile_is_not_readable_by_other_users` (legge la DACL con `icacls /save`, per il file del profilo e per quello dei
+   segreti; la codifica del file di `icacls` è gestita nei due casi, UTF-16LE con o senza BOM, UTF-8 altrimenti, ma non è mai stata
+   vista su Windows vero: se la cartella temporanea del runner ha una voce per `Users` ereditata, è rossa — **leggere l'SDDL nel
+   messaggio**), `a_link_is_not_imported` (serve il diritto di creare collegamenti: l'utente del runner è amministratore **[S]**; se non lo
    è, la prova **fallisce** invece di saltarsi), e tutta la finestra sul runtime WebView2 vero invece che su wine.
 6. **Ultimo passo**: `python scripts/check-gates.py --job win-check --cargo-log target/gates/win-check-cargo.log --no-ignored --min-passed 605`.
    Deve stampare **`check-gates: win-check: 605 passed; 0 ignored`** (o più di 605 passate) e una riga `ok` per ognuna delle dieci
@@ -234,6 +247,11 @@ Job `win-check` (`windows-latest`, `shell: bash`). Passi, nell'ordine, e cosa pu
 7. **La durata del job**: oggi nessuno la conosce. Annotarla.
 
 ## Per chi viene dopo
+
+- **In P5 (DPAPI, Q63) rivedere i limiti di T5**: i segreti su Windows sono in un file in chiaro sotto `%APPDATA%\galleria\secrets`,
+  protetto solo dall'ACL ereditata; non c'è un controllo su proprietario e permessi come quello di Linux (una cartella con ACL
+  larga non è rifiutata); la prova dell'ACL gira in `%TEMP%` del runner e non dice niente sull'`%APPDATA%` di una macchina vera.
+- **Le prove sotto wine si rifanno dal repo**: `spikes/windows-lab/xbuild-wine/run.sh` (vedi il `README.md` accanto; `ui/dist` deve esistere).
 
 - **Aitano fa il primo push** e guarda «Cosa guardare al primo run di `win-check`»: finché non c'è un run verde, U6 e U7 sono
   «non verificati in CI», e il resto di P1 (A1, A2) non è in questa sezione.

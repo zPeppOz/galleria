@@ -61,8 +61,11 @@ ISO e `swtpm` li metti tu (Q59). Resta da fare, **prima che parta la card della 
 - **Il TPM emulato.** Sul server: `sudo apt install swtpm swtpm-tools`. Gli agenti non hanno `sudo`.
 - La card controlla le due cose all'avvio (`ls /mnt/b/vm/*.iso`, `which swtpm swtpm_setup`) e se ne manca una si
   chiude senza lavorare. Il gruppo B di P1 (il workspace che compila su Windows) non le aspetta.
-- Le risposte alle questioni nate scrivendo il piano di P1 (Q74–Q78, in quel piano). La più importante è Q74:
-  senza, la prova R-A resta «non concludente».
+- Due risposte nuove, nate scrivendo il piano di P1 (in fondo a quel piano). **Q74**: per la prova R-A serve un
+  server che la VM raggiunga passando dal gateway; la via più corta è pubblicare per meno di un'ora il server
+  WireGuard di prova sull'indirizzo Tailscale del server di casa. Senza il tuo sì non si pubblica niente e R-A
+  rischia di restare «non concludente». **Q75**: cosa si fa se la VM non è usabile in 8 h, ora che la Sandbox non è
+  alla portata degli agenti (la mia raccomandazione: ci si ferma e si torna da te).
 
 Per dopo P1, se si va avanti:
 
@@ -546,7 +549,7 @@ Il dettaglio, con i task, i gruppi e le ore, è nel piano. Ogni blocco finisce c
 | S74 | WebView2 fa dire le regioni vive a Narratore e NVDA | P8-T1 | annuncio via UIA |
 | S75 | Driver di WireGuardNT, OpenVPN e un server del laboratorio sul runner | P8-T2, tetto 3 h | i tunnel restano solo in VM |
 
-Le supposizioni che riguardano solo l'esecuzione di P1 (S76–S86: installazione non presidiata, TPM, OpenSSH,
+Le supposizioni che riguardano solo l'esecuzione di P1 (S76–S87: installazione non presidiata, TPM, OpenSSH,
 snapshot, rete utente, cattura, compilazione incrociata) stanno nel piano di dettaglio di P1, con i loro ripieghi.
 
 ## 18. Questioni aperte nuove
@@ -556,7 +559,7 @@ del blocco indicato. **Q58–Q61, Q67 e Q73 chiedono una risposta di Peppe; le a
 
 **Decise, e non si riaprono:** Q58, Q59 e Q60, approvate da Peppe il 2026-11-27; Q68, adottata come predefinito da
 Aitano il 2026-11-27. Le altre restano aperte e, con Q60 = (a), non servono prima che Peppe decida su P2. Le
-questioni nate scrivendo il piano di P1 (Q74–Q78) stanno in quel piano.
+questioni nate scrivendo il piano di P1 (Q74–Q80) stanno in quel piano: **Q74 e Q75 chiedono una risposta di Peppe**.
 
 | # | Questione | Alternative | Raccomandazione | Serve entro |
 |---|---|---|---|---|

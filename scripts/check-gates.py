@@ -12,6 +12,14 @@ job kept:
   lab     `name` is the name of a test in a log that has lines `ok <name>`; for the lab jobs, see the later tasks.
 
     check-gates.py --job <job> [--kind K]... [--cargo-log FILE]... [--vitest-json FILE]... [--lab-log FILE]... [--manifest FILE]...
+                   [--no-ignored] [--min-passed N]
+
+`--no-ignored` is for a job that must not leave a test out (plan P1, T4b: `win-check`, where a test of Linux does not exist
+instead of being ignored). A `test ... ignored` line anywhere in the cargo logs, or a `test result:` line that has `ignored`
+or `filtered out` other than 0, is an error, and the last line is `check-gates: <job>: <n> passed; 0 ignored`. `--min-passed N`
+is the floor of the tests that passed (the sum of the `test result:` lines of the cargo logs): fewer is an error, so a
+test binary that was dropped from the run cannot go unseen. Without them the check is the one of the other jobs
+(the job `check` has 103 legitimate `ignored`).
 
 Prints one line per proof and exits with 1 at the first gate that is not proved (the others are still printed), 2 on a bad
 call or a bad manifest.
@@ -23,6 +31,9 @@ import sys
 from pathlib import Path
 
 CARGO_LINE = re.compile(r"^test (\S+) \.\.\. (\w+)")
+RESULT_LINE = re.compile(
+    r"^test result: \w+\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out"
+)
 LAB_LINE = re.compile(r"^\s*(ok|FAIL|SKIP|skipped)\s+(\S+)")
 
 
@@ -71,6 +82,24 @@ def cargo_results(files):
     return results
 
 
+def cargo_totals(files):
+    """What the `test result:` lines and the test lines of the cargo logs say, summed: passed, ignored, filtered out."""
+    totals = {"passed": 0, "ignored_in_results": 0, "filtered_out": 0, "ignored_lines": []}
+    for file in files:
+        for line in Path(file).read_text(errors="replace").splitlines():
+            m = RESULT_LINE.match(line)
+            if m:
+                passed, _failed, ignored, _measured, filtered = (int(n) for n in m.groups())
+                totals["passed"] += passed
+                totals["ignored_in_results"] += ignored
+                totals["filtered_out"] += filtered
+                continue
+            m = CARGO_LINE.match(line)
+            if m and m.group(2) == "ignored":
+                totals["ignored_lines"].append(m.group(1))
+    return totals
+
+
 def vitest_results(files):
     results = {}
     for file in files:
@@ -112,6 +141,8 @@ def main():
     ap.add_argument("--lab-log", action="append", default=[])
     ap.add_argument("--kind", action="append", choices=["cargo", "vitest", "lab"], help="only the proofs of this kind (repeatable); default: all")
     ap.add_argument("--manifest", action="append", default=[], help="a manifest (repeatable); default: every lab/tests/gates-*.tsv")
+    ap.add_argument("--no-ignored", action="store_true", help="a cargo test that is ignored or filtered out is an error; prints the total")
+    ap.add_argument("--min-passed", type=int, metavar="N", help="fewer than N cargo tests passed is an error")
     args = ap.parse_args()
 
     manifests = args.manifest or sorted(str(p) for p in (Path(__file__).resolve().parent.parent / "lab/tests").glob("gates-*.tsv"))
@@ -144,10 +175,30 @@ def main():
         if verdict != "ok":
             unproved += 1
         print(f"{gate} {kind} {name}: {verdict}")
+    problems = []
+    totals = None
+    if args.no_ignored or args.min_passed is not None:
+        totals = cargo_totals(args.cargo_log)
+    if args.no_ignored:
+        if totals["ignored_lines"]:
+            problems.append(f"{len(totals['ignored_lines'])} test(s) ignored, first: {totals['ignored_lines'][0]}")
+        if totals["ignored_in_results"]:
+            problems.append(f"{totals['ignored_in_results']} ignored in the `test result:` lines")
+        if totals["filtered_out"]:
+            problems.append(f"{totals['filtered_out']} filtered out in the `test result:` lines")
+    if args.min_passed is not None and totals["passed"] < args.min_passed:
+        problems.append(f"{totals['passed']} passed, below the floor of {args.min_passed}")
     if unproved:
         print(f"check-gates: {unproved} of {len(rows)} proofs of {args.job} are not proved", file=sys.stderr)
+    for problem in problems:
+        print(f"check-gates: {args.job}: {problem}", file=sys.stderr)
+    if unproved or problems:
         return 1
     print(f"check-gates: {len(rows)} proofs of {args.job} ran and passed")
+    if args.no_ignored:
+        print(f"check-gates: {args.job}: {totals['passed']} passed; 0 ignored")
+    elif totals is not None:
+        print(f"check-gates: {args.job}: {totals['passed']} passed (floor {args.min_passed})")
     return 0
 
 

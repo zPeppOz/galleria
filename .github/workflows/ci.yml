@@ -177,6 +177,42 @@ jobs:
       # the proofs that close those gates must be in it with `ok`, not skipped or missing
       - run: scripts/check-gates.py --job gui --cargo-log target/gates/gui-cargo.log
 
+  # Phase 3, block P1 (plan 2026-11-27-fase3-p1.md, T4b): the workspace builds for Windows, `clippy` is clean and the tests that do not
+  # depend on the system pass on `windows-latest`, with no test ignored or filtered out. On Windows a test of Linux does not exist
+  # (`cfg(unix)` / `cfg(target_os = "linux")`), it is not ignored: `scripts/check-gates.py --no-ignored` refuses an ignored one, and
+  # `--min-passed` is the count the plan reaches (docs/09-esito-fase3.md, «Il conto di N»): fewer means a test binary left out of the run.
+  # `core.autocrlf` is off before the checkout: `crates/galleria-gui/tests/config.rs` reads this file and the manifests line by line.
+  # The window needs `ui/dist` to compile (Q76 (a)), so Node and pnpm are here too.
+  win-check:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install toolchain from rust-toolchain.toml
+        run: |
+          toolchain=$(python -c 'import tomllib; print(tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])')
+          rustup toolchain install "$toolchain" --profile minimal --component rustfmt,clippy,llvm-tools-preview
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: npm install --global "pnpm@$(scripts/gui.sh pnpm-version)"
+      - run: pnpm install --frozen-lockfile && pnpm --dir ui build
+      - run: cargo build --workspace --all-targets
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      # the output is kept for scripts/check-gates.py (the last step)
+      - name: cargo test
+        run: |
+          set -o pipefail
+          mkdir -p target/gates
+          cargo test --workspace --exclude galleria-e2e 2>&1 | tee target/gates/win-check-cargo.log
+      - run: python scripts/check-gates.py --job win-check --cargo-log target/gates/win-check-cargo.log --no-ignored --min-passed 605
+
   # Level 3 (spec §14, Q13): the real app in a WebKitGTK window under Xvfb, driven by tauri-driver and
   # WebKitWebDriver, against a fake daemon.
   # It runs in the same image as locally (`scripts/gui.sh smoke`, lab/images/gui.Dockerfile, Ubuntu 24.04), not on

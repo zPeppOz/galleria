@@ -87,5 +87,36 @@ smoke "$tmp/smoke-skipped.json"; got=$?
 smoke "$tmp/smoke-left-out.json"; got=$?
 [[ $got == 1 ]] && grep -q 'G10 vitest G10b_.*MISSING' "$tmp/out" && echo "ok   a_smoke_test_that_is_not_in_the_json_fails_the_gate" || { echo "FAIL a smoke test missing from the JSON did not fail the gate (exit $got)" >&2; cat "$tmp/out" "$tmp/err" >&2; failures=$((failures + 1)); }
 
+# Plan P1, T4b: a job that has no ignored test at all (`win-check`: on Windows a test of Linux does not exist, it is not ignored).
+result='test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s'
+printf 'running 2 tests\ntest first_proof ... ok\ntest second_proof ... ok\n\n%s\n' "$result" > "$tmp/none-ignored.log"
+printf 'test first_proof ... ok\ntest second_proof ... ok\ntest other ... ignored, needs a bus\n\n%s\n' "$result" > "$tmp/ignored-outside.log"
+printf 'test first_proof ... ok\ntest second_proof ... ok\n\ntest result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s\n' > "$tmp/ignored-in-result.log"
+printf 'test first_proof ... ok\ntest second_proof ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s\n' > "$tmp/filtered.log"
+printf 'test first_proof ... ok\ntest second_proof ... ok\n\n%s\n\n%s\n' "$result" "$result" > "$tmp/two-binaries.log"
+check no_ignored_is_green_when_nothing_is_ignored 0 --job job-a --kind cargo --cargo-log "$tmp/none-ignored.log" --no-ignored
+grep -q '^check-gates: job-a: 2 passed; 0 ignored$' "$tmp/out" || { echo "FAIL the total line is not 'check-gates: job-a: 2 passed; 0 ignored'" >&2; cat "$tmp/out" >&2; failures=$((failures + 1)); }
+check the_total_adds_up_the_result_lines_of_every_binary 0 --job job-a --kind cargo --cargo-log "$tmp/two-binaries.log" --no-ignored
+grep -q '^check-gates: job-a: 4 passed; 0 ignored$' "$tmp/out" || { echo "FAIL the total of two binaries is not 4" >&2; cat "$tmp/out" >&2; failures=$((failures + 1)); }
+check no_ignored_fails_on_an_ignored_test_outside_the_manifest 1 --job job-a --kind cargo --cargo-log "$tmp/ignored-outside.log" --no-ignored
+check no_ignored_fails_on_a_result_line_that_counts_an_ignored_test 1 --job job-a --kind cargo --cargo-log "$tmp/ignored-in-result.log" --no-ignored
+check no_ignored_fails_on_a_result_line_with_filtered_out_tests 1 --job job-a --kind cargo --cargo-log "$tmp/filtered.log" --no-ignored
+check min_passed_fails_below_the_floor 1 --job job-a --kind cargo --cargo-log "$tmp/none-ignored.log" --no-ignored --min-passed 3
+grep -q 'below the floor' "$tmp/err" || { echo "FAIL the floor is not named in the error" >&2; cat "$tmp/err" >&2; failures=$((failures + 1)); }
+check min_passed_is_green_at_the_floor 0 --job job-a --kind cargo --cargo-log "$tmp/none-ignored.log" --no-ignored --min-passed 2
+check without_the_flag_an_ignored_test_outside_the_manifest_is_fine 0 --job job-a --kind cargo --cargo-log "$tmp/ignored-outside.log"
+check without_the_flag_a_filtered_result_line_is_fine 0 --job job-a --kind cargo --cargo-log "$tmp/filtered.log"
+# the floor and the flag do not make a proof that is missing green
+check a_missing_proof_is_red_with_the_flag_too 1 --job job-a --kind cargo --cargo-log "$tmp/missing.log" --no-ignored --min-passed 1
+# a floor that is not a number is a bad call
+check a_floor_that_is_not_a_number_is_an_error 2 --job job-a --kind cargo --cargo-log "$tmp/none-ignored.log" --min-passed many
+# a log with no result line at all passes nothing: the floor sees 0
+printf 'test first_proof ... ok\ntest second_proof ... ok\n' > "$tmp/no-result.log"
+check a_log_without_result_lines_has_no_passed_tests 1 --job job-a --kind cargo --cargo-log "$tmp/no-result.log" --no-ignored --min-passed 1
+# the manifest of P1 is read with the others
+scripts/check-gates.py --job win-check --cargo-log /dev/null > "$tmp/out" 2> /dev/null
+grep -q '^WP1 cargo the_client_says_unsupported_without_a_transport: MISSING' "$tmp/out" && grep -q '^WP2 cargo a_link_is_not_imported: MISSING' "$tmp/out" \
+  && echo "ok   the_default_reads_the_manifest_of_win_check" || { echo "FAIL the default did not read lab/tests/gates-w.tsv" >&2; cat "$tmp/out" >&2; failures=$((failures + 1)); }
+
 (( failures == 0 )) || { echo "$failures check(s) failed" >&2; exit 1; }
 echo "check-gates: all checks passed"

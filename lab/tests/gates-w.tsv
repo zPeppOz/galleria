@@ -1,0 +1,14 @@
+# The proofs of the gates of block P1 of phase 3 (plan 2026-11-27-fase3-p1.md, «Dove gira ogni gate in CI»).
+# gate <TAB> job <TAB> kind <TAB> name of the proof. Read by scripts/check-gates.py like gates-b5.tsv and gates-b6.tsv; the job `win-check` ends with it
+# and with `--no-ignored --min-passed N`. WP1 is the client that says «unsupported» (P2 replaces it with the transport), WP2 is U7: the profiles and the state in
+# the folders of the user, kept private.
+WP1	win-check	cargo	the_client_says_unsupported_without_a_transport
+WP2	win-check	cargo	profiles_live_under_appdata
+WP2	win-check	cargo	an_empty_or_relative_folder_is_refused
+WP2	win-check	cargo	a_saved_profile_is_not_readable_by_other_users
+WP2	win-check	cargo	the_temporary_file_is_made_next_to_the_final_one
+WP2	win-check	cargo	a_link_is_not_imported
+WP2	win-check	cargo	the_state_file_lives_in_localappdata
+WP2	win-check	cargo	a_saved_profile_reads_back_and_replaces_the_old_one
+WP2	win-check	cargo	the_service_folder_is_under_programdata
+WP2	win-check	cargo	the_state_is_written_and_read_back_on_windows

@@ -898,7 +898,13 @@ fn invoke(window: &WebviewWindow<MockRuntime>, cmd: &str, body: Value) -> Result
             cmd: cmd.into(),
             callback: CallbackFn(0),
             error: CallbackFn(1),
-            url: "tauri://localhost".parse().unwrap(),
+            url: if cfg!(windows) {
+                "http://tauri.localhost"
+            } else {
+                "tauri://localhost"
+            }
+            .parse()
+            .unwrap(),
             body: InvokeBody::Json(body),
             headers: Default::default(),
             invoke_key: INVOKE_KEY.to_string(),
@@ -1042,6 +1048,8 @@ fn the_response_never_holds_the_folder() {
     assert_clean(&error, &[world.root.path()]);
 }
 
+// `mkfifo`: a FIFO is a thing of Unix
+#[cfg(unix)]
 #[test]
 fn a_picked_file_gets_the_same_checks_as_a_dropped_one() {
     let world = World::new();
@@ -1120,6 +1128,8 @@ fn two_dropped_files_are_refused_and_nothing_is_previewed() {
     assert!(imports.take_pending().is_none());
 }
 
+// `mkfifo`: a FIFO is a thing of Unix
+#[cfg(unix)]
 #[test]
 fn a_dropped_folder_or_fifo_is_refused() {
     let world = World::new();

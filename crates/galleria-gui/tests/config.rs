@@ -270,10 +270,10 @@ fn repo_file(name: &str) -> PathBuf {
     crate_file("../..").join(name)
 }
 
-/// The gates that have proofs: the ones of B5 in `lab/tests/gates-b5.tsv` and the ones of B6 in `gates-b6.tsv`. A task that closes a gate adds
-/// it here in the same commit as its first row in its manifest.
-const GATES_WITH_PROOFS: &[&str] = &["G4", "G5", "G6", "G7", "G9", "G10", "G11"];
-const ALL_GATES: &[&str] = &["G4", "G5", "G6", "G7", "G9", "G10", "G11"];
+/// The gates that have proofs: the ones of B5 in `lab/tests/gates-b5.tsv`, the ones of B6 in `gates-b6.tsv` and the ones of P1 (phase 3) in
+/// `gates-w.tsv`. A task that closes a gate adds it here in the same commit as its first row in its manifest.
+const GATES_WITH_PROOFS: &[&str] = &["G4", "G5", "G6", "G7", "G9", "G10", "G11", "WP1", "WP2"];
+const ALL_GATES: &[&str] = &["G4", "G5", "G6", "G7", "G9", "G10", "G11", "WP1", "WP2"];
 
 /// Every manifest of the gates, as `scripts/check-gates.py` reads them: `lab/tests/gates-*.tsv`.
 fn manifests() -> Vec<PathBuf> {
@@ -377,7 +377,7 @@ fn every_gate_has_a_job() {
     for [gate, job, kind, name] in &rows {
         assert!(
             ALL_GATES.contains(&gate.as_str()),
-            "{gate} is not a gate of B5 or B6 ({name})"
+            "{gate} is not a gate of B5, B6 or P1 ({name})"
         );
         assert!(
             ["cargo", "vitest", "lab"].contains(&kind.as_str()),

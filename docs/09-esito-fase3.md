@@ -37,7 +37,7 @@ Card `t_5d2dccab`. Da scrivere.
 ## P1-B · Il workspace compila su Windows (T4a, T5, T4b)
 
 Card `t_4faef896` (T4a) e `t_227bc768` (T5, T4b). **Stato: T4a, T5 e T4b fatti in locale, niente push.** Il job `win-check`
-è scritto ma **mai eseguito**: U6 e U7 sono «non verificati in CI».
+è scritto (`actionlint` pulito) ma **mai eseguito**: U6 e U7 sono «non verificati in CI».
 
 ### T4a · cosa è stato fatto e come è stato provato
 
@@ -107,13 +107,15 @@ Su Windows (wine, a T4a) stesso comando senza `galleria-e2e` e senza la finestra
 
 Finestra (`galleria-gui`, 493 su Linux): file di Linux con `#![cfg(unix)]`: `closing` 17, `commands` 8, `connection` 23,
 `credentials` 12, `export` 30, `foreign` 4, `groups` 18, `instance` 28, `link` 10, `logs` 11, `rubrica` 72, `supervisor` 11,
-`tray` 42, `ui_state` 20, `update` 56 = **362 escluse**; restano compilate per Windows `announce` 23 (di cui alcune solo
-Linux, **da contare**), `catalogs` 7, `config` 19, `import` 47, `raw` 10, `secrets` 12 e le 13 di `src/lib.rs`. Queste **non
-sono state eseguite** (wine non le avvia). Le escluse della finestra e di `galleria-profile` sono molte: una parte
-(`rubrica`, `ui_state`, i `galleria-profile/tests/*`) si può far rientrare con `cfg` sulle singole prove quando il T5 ha
-scritto il corpo Windows, e provarla sotto wine. **Non fatto.**
+`tray` 42, `ui_state` 20, `update` 56 = **362 escluse**. Dentro i file che restano: `announce::atk::*` 3 (ATK, `cfg(target_os = "linux")`) e,
+in `import.rs`, `a_picked_file_gets_the_same_checks_as_a_dropped_one` e `a_dropped_folder_or_fifo_is_refused` (usano `mkfifo`,
+`cfg(unix)`, T4b) = **5 escluse**. Restano per Windows: `src/lib.rs` 13, `announce` 20, `catalogs` 7, `config` 19, `import` 45,
+`raw` 10, `secrets` 12 = **126**. Le escluse della finestra e di `galleria-profile` sono molte: una parte (`rubrica`,
+`ui_state`, i `galleria-profile/tests/*`) si può far rientrare con `cfg` sulle singole prove ora che il corpo Windows c'è, e
+provarla sotto wine. **Non fatto.**
 
-**Solo Windows:** `galleria-ipc/tests/client_windows.rs::the_client_says_unsupported_without_a_transport` (1, passa sotto wine).
+**Solo Windows:** `galleria-ipc/tests/client_windows.rs::the_client_says_unsupported_without_a_transport` (1), le 8 di T5
+(vedi sotto: 6 con wine + 2 solo su Windows) e `galleria-gui/tests/ui_state_windows.rs` (3).
 
 ### T5 · percorsi e protezione dei file su Windows
 
@@ -138,17 +140,14 @@ Prove scritte (tutte `cfg(windows)`):
 
 | Prova | File | Dove è stata eseguita |
 |---|---|---|
-| `profiles_live_under_appdata`, `an_empty_or_relative_folder_is_refused` (6 casi), `a_saved_profile_reads_back_and_replaces_the_old_one` | `galleria-profile/tests/windows_paths.rs` | wine: passano |
+| `profiles_live_under_appdata`, `an_empty_or_relative_folder_is_refused` (una prova sola, sei valori: il gate cerca il nome, e un `rstest` darebbe `nome::case_1`), `a_saved_profile_reads_back_and_replaces_the_old_one`, `a_folder_is_not_imported_as_a_file` (non nel piano: una cartella rilasciata dà `NotAFile` come su Linux; ha richiesto `FILE_FLAG_BACKUP_SEMANTICS`, senza il quale una cartella non si apre) | `galleria-profile/tests/windows_paths.rs` | wine: passano |
 | `the_temporary_file_is_made_next_to_the_final_one` | `galleria-profile/src/sys/windows.rs` (prova unitaria: ha bisogno di vedere il temporaneo prima del rinomina, quindi di una cucitura privata `atomic_with`; il piano la voleva in `tests/`) | wine: passa |
 | `the_service_folder_is_under_programdata` | `galleriad/tests/windows_paths.rs` (nel piano stava in `galleria-profile`: `galleriad` non dipende da `galleria-profile` e un'altra dipendenza avrebbe cambiato `Cargo.lock`) | wine: passa |
 | `a_saved_profile_is_not_readable_by_other_users` | `galleria-profile/tests/windows_paths.rs`: legge la DACL con `icacls /save` (SDDL, indipendente dalla lingua) e cerca `WD`/`BU`/`AU` e i SID `S-1-1-0`/`S-1-5-32-545`/`S-1-5-11` | **mai eseguita**: sotto wine non direbbe niente (come da piano) |
 | `a_link_is_not_imported` | stesso file; se non può creare il collegamento **fallisce** | **mai eseguita**: wine crea il collegamento ma poi non lo vede (`symlink_metadata` dà «File not found»), quindi non prova niente; il primo run è `win-check` |
-| `the_state_file_lives_in_localappdata`, `the_state_is_written_and_read_back_on_windows`, `an_unusable_variable_is_named_by_the_error_of_the_write` | `galleria-gui/tests/ui_state_windows.rs` | **compilate** (xcheck), **mai eseguite**: i binari della finestra sotto wine non partono (`WebView2Loader.dll`) |
+| `the_state_file_lives_in_localappdata`, `the_state_is_written_and_read_back_on_windows`, `an_unusable_variable_is_named_by_the_error_of_the_write` | `galleria-gui/tests/ui_state_windows.rs` | wine, con `WebView2Loader.dll` nel `WINEPATH` (vedi T4b): passano |
 
-Sotto wine: `cargo test --workspace --exclude galleria-e2e --exclude galleria-gui -- --skip a_saved_profile_is_not_readable_by_other_users --skip a_link_is_not_imported`
-= **478 passate, 0 fallite, 0 `ignored`, 2 filtrate** (le due saltate a mano: sono le due che qui sopra non provano niente).
-478 = 468 di T4a + 10 prove nuove eseguite. «xcheck» (`cargo clippy --workspace --all-targets -- -D warnings`,
-`x86_64-pc-windows-gnu`) verde.
+«xcheck» (`cargo clippy --workspace --all-targets -- -D warnings`, `x86_64-pc-windows-gnu`) verde. Il conto sotto wine è nel T4b.
 
 **Due limiti da portare nella guida di P6:** (1) chi sposta `%APPDATA%` su una condivisione di rete ne eredita i
 permessi: noi non scriviamo ACL, quindi proteggiamo quanto la cartella già protegge; (2) il valore delle variabili lo
@@ -157,17 +156,87 @@ decide chi lancia il programma, come `XDG_CONFIG_HOME` su Linux.
 **Non fatto in T5:** rimettere in gioco con `cfg` sulle singole prove i file oggi esclusi a intero (`galleria-profile/tests/*`,
 `rubrica`, `ui_state`): sono ancora le 131 + 362 della tabella qui sopra, e N di `win-check` le conta come escluse.
 
-### Note per chi scrive `win-check` (T4b, non fatto)
+### T4b · il job `win-check` e il controllo che rifiuta le prove ignorate
 
-Il job **non è stato scritto** (T4b non fatto). Per chi lo scrive: `N` non è calcolabile senza contare le prove di `announce`
-solo Linux; stima di partenza 468 (wine) + prove della finestra eseguibili (≤ 131) + quelle del T5. Sul runner
-`windows-latest` il checkout ha `core.autocrlf=true`: `git config --global core.autocrlf false` prima di `checkout`, perché
-`tests/config.rs` legge `ci.yml` e i `.tsv` riga per riga.
+Commit «add the win-check job and refuse ignored tests in its gate check». Fatto: `scripts/check-gates.py` impara
+`--no-ignored` (una riga `test … ignored`, o una riga `test result:` con `ignored` o `filtered out` diversi da 0, è un errore;
+ultima riga `check-gates: <job>: <n> passed; 0 ignored`) e `--min-passed N` (somma dei `passed` delle righe `test result:`);
+`scripts/tests/check-gates.sh` ha i casi del piano più alcuni (la somma di due binari, un limite non numerico, un log senza
+righe `test result:`, il manifesto letto di default); `lab/tests/gates-w.tsv` ha `WP1` e le prove di `WP2` (le sette del piano
+più `a_saved_profile_reads_back_and_replaces_the_old_one`, `the_service_folder_is_under_programdata` e
+`the_state_is_written_and_read_back_on_windows`); `config.rs` conosce `WP1` e `WP2`; il job sta in `ci.yml` dopo `gui`.
+Il job `check` di Linux non è cambiato di una riga. **`actionlint`** (immagine `rhysd/actionlint`, l'host non lo ha): nessun
+avviso su `ci.yml` (provato che segnala un errore su un file sbagliato).
+
+**Scostamenti dal piano (T4b):**
+
+1. **Le prove della finestra girano sotto wine**, che a T4a non era riuscito: la `WebView2Loader.dll` del build `gnu` sta in
+   `webview2-com-sys-*/x64/` del registro di Cargo, e messa nel `WINEPATH` basta. Questo ha trovato due difetti **dei
+   test** (non del prodotto) che il job avrebbe mostrato al primo run, e sono corretti: (a) i test della finestra invocano i
+   comandi con l'origine `tauri://localhost`, che su Windows è `http://tauri.localhost`: i comandi rispondevano «not allowed.
+   Plugin not found» (10 file di prova toccati, Linux identico: `if cfg!(windows) {…} else {…}`); (b) due prove di
+   `import.rs` usano `mkfifo` e ora sono `cfg(unix)`. In più il prodotto: aprire una cartella con `File::open` su Windows dà
+   «accesso negato» e non «non è un file» (`FILE_FLAG_BACKUP_SEMANTICS`, in `sys/windows.rs`).
+2. `N` = 605, non quello del piano (598 + 493 − escluse + solo Windows, che è lo stesso calcolo): il conto è sotto.
+3. Le prove di `win-check` si cercano per **nome intero**: una prova `rstest` si chiama `nome::case_1` e il gate la darebbe
+   «mancante». `an_empty_or_relative_folder_is_refused` è quindi una prova sola con sei valori.
+
+#### Il conto di N
+
+| Voce | Prove |
+|---|---|
+| Linux, `cargo test --workspace --exclude galleria-gui` (host, `8aef4f1`) | 598 |
+| − escluse (tabella «Prove che restano di Linux») | − 131 |
+| + solo Windows: `the_client_says_unsupported_without_a_transport` | + 1 |
+| = misurato sotto wine a T4a | 468 |
+| + T5 eseguite sotto wine: `profiles_live_under_appdata`, `an_empty_or_relative_folder_is_refused`, `a_saved_profile_reads_back_and_replaces_the_old_one`, `a_folder_is_not_imported_as_a_file`, `the_temporary_file_is_made_next_to_the_final_one`, `the_service_folder_is_under_programdata` | + 6 |
+| + T5 solo su Windows (wine non le prova): `a_saved_profile_is_not_readable_by_other_users`, `a_link_is_not_imported` | + 2 |
+| **Crate che non sono la finestra** | **476** |
+| Finestra, Linux (`scripts/gui.sh check`) | 493 |
+| − file `cfg(unix)` (362) − `announce::atk` (3) − due prove con `mkfifo` (2) | − 367 |
+| + `ui_state_windows.rs` | + 3 |
+| **Finestra** | **129** (13 + 20 + 7 + 19 + 45 + 10 + 12 + 3) |
+| **N** | **605** |
+
+Misurato: `cargo test --workspace --exclude galleria-e2e --no-fail-fast -- --skip a_saved_profile_is_not_readable_by_other_users
+--skip a_link_is_not_imported` sotto wine = **603 passate, 0 fallite, 0 `ignored`, 2 filtrate** (le due saltate a mano) =
+605 − 2. `scripts/check-gates.py --job win-check --cargo-log … --no-ignored` sul log di wine: tutte le prove di `WP1` e `WP2` `ok`
+tranne le due che wine non esegue, che il gate dice **MISSING** (è la prova che il controllo guarda).
+Prova a secco del passo finale: `scripts/check-gates.py --job check --cargo-log target/gates/check-cargo.log --no-ignored`
+con il log di Linux esce **1** (103 `ignored`).
+
+**U6 e U7 non verificati in CI.** Il job non si può provare senza push.
 
 ### Cosa guardare al primo run di `win-check`
 
-Da scrivere nel T4b.
+Job `win-check` (`windows-latest`, `shell: bash`). Passi, nell'ordine, e cosa può rompersi (nulla di questo è stato visto):
+
+1. **Prima del checkout**: `git config --global core.autocrlf false` (`tests/config.rs` legge `ci.yml` e i `.tsv` riga per riga).
+2. **Toolchain**: `python -c 'import tomllib…'` (serve Python ≥ 3.11 nel `PATH` di Git Bash: se `python` non c'è o è vecchio, rotto qui).
+   `rustup toolchain install 1.96.0` con `rustfmt,clippy,llvm-tools-preview`: la toolchain `msvc` è quella dell'host del runner.
+3. **`npm install --global "pnpm@$(scripts/gui.sh pnpm-version)"`**: `gui.sh` è bash puro per `pnpm-version`, ma non è mai girato su Git Bash.
+   Poi `pnpm install --frozen-lockfile && pnpm --dir ui build`.
+4. **`cargo build --workspace --all-targets` e `clippy -D warnings` per `msvc`**: finora solo `gnu` (xcheck). Le differenze possibili
+   sono lint che solo `msvc` fa scattare e il link statico di `WebView2Loader` (serve l'SDK di Windows, che il runner ha).
+5. **`cargo test --workspace --exclude galleria-e2e`**, log in `target/gates/win-check-cargo.log`: cosa non è stato visto sotto
+   wine e che qui gira per la prima volta: `a_saved_profile_is_not_readable_by_other_users` (legge la DACL con `icacls /save`: se `icacls`
+   scrive in un'altra codifica o se la cartella temporanea del runner ha una voce per `Users` ereditata, è rossa — **leggere l'SDDL
+   nel messaggio**), `a_link_is_not_imported` (serve il diritto di creare collegamenti: l'utente del runner è amministratore **[S]**; se non lo
+   è, la prova **fallisce** invece di saltarsi), e tutta la finestra sul runtime WebView2 vero invece che su wine.
+6. **Ultimo passo**: `python scripts/check-gates.py --job win-check --cargo-log target/gates/win-check-cargo.log --no-ignored --min-passed 605`.
+   Deve stampare **`check-gates: win-check: 605 passed; 0 ignored`** (o più di 605 passate) e una riga `ok` per ognuna delle dieci
+   prove di `WP1`/`WP2`: `the_client_says_unsupported_without_a_transport`; `profiles_live_under_appdata`,
+   `an_empty_or_relative_folder_is_refused`, `a_saved_profile_is_not_readable_by_other_users`,
+   `the_temporary_file_is_made_next_to_the_final_one`, `a_link_is_not_imported`, `the_state_file_lives_in_localappdata`,
+   `a_saved_profile_reads_back_and_replaces_the_old_one`, `the_service_folder_is_under_programdata`,
+   `the_state_is_written_and_read_back_on_windows`. Se `passed` è sotto 605, un binario di prova non è partito: confrontare con il conto
+   qui sopra.
+7. **La durata del job**: oggi nessuno la conosce. Annotarla.
 
 ## Per chi viene dopo
 
-Da scrivere.
+- **Aitano fa il primo push** e guarda «Cosa guardare al primo run di `win-check`»: finché non c'è un run verde, U6 e U7 sono
+  «non verificati in CI», e il resto di P1 (A1, A2) non è in questa sezione.
+- Rimettere in gioco con `cfg` sulle singole prove i file oggi esclusi a intero (`galleria-profile/tests/*`, `rubrica`, `ui_state`):
+  ora che i corpi Windows ci sono e che le prove della finestra girano sotto wine (`WINEPATH` con `WebView2Loader.dll`), si
+  provano in locale; ogni prova rimessa in gioco alza `N` (e il conto qui sopra).

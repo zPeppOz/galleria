@@ -3,9 +3,10 @@ use galleria_ipc::{
     client::{Client, ClientError},
     *,
 };
+#[cfg(target_os = "linux")]
+use galleria_profile::KeyringSecretStore;
 use galleria_profile::{
-    FileSecretStore, KeyringSecretStore, LayeredSecretStore, ProfileStore, SecretStore, StoreError,
-    Writes,
+    FileSecretStore, LayeredSecretStore, ProfileStore, SecretStore, StoreError, Writes,
 };
 use std::io::Write;
 use zeroize::Zeroizing;
@@ -68,7 +69,11 @@ async fn daemon(socket: &std::path::Path) -> Result<Client, CliError> {
 /// writes only to the file (`import` is unchanged), so a keyring is only ever read here. Without a session bus there is
 /// no keyring and nothing changes: no wait, nothing printed.
 fn layered_secrets(dir: &std::path::Path) -> Result<LayeredSecretStore, StoreError> {
+    #[cfg(target_os = "linux")]
     let keyring = KeyringSecretStore::open().map(|k| Box::new(k) as Box<dyn SecretStore>);
+    // The keyring is the Secret Service of Linux: elsewhere there is none, and the file is the only archive.
+    #[cfg(not(target_os = "linux"))]
+    let keyring: Option<Box<dyn SecretStore>> = None;
     Ok(LayeredSecretStore::new(
         keyring,
         Box::new(FileSecretStore::open(dir)?),

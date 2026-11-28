@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! The log of the session and «Export log…» (plan B5, T7): the whole buffer of the daemon is read in pages, written where the window
 //! «Save» says and nowhere else, and neither a path nor a known secret reaches the page. The window «Save» is a `SavePicker` that
 //! the tests replace.

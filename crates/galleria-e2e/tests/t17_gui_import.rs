@@ -1,3 +1,4 @@
+#![cfg(target_os = "linux")]
 //! G3 in the laboratory (plan B4, T6, Q37 (a)): the profiles the window of the GUI imported are read and connected by the
 //! real CLI and the real daemon on the client. The window itself runs in the `galleria-gui-dev` image (`scripts/gui.sh
 //! lab-import`), which writes its folder of profiles to `target/gui-lab/config/galleria`; the client sees the repository

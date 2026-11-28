@@ -10,10 +10,11 @@ use crate::ui_state::UiStateFile;
 use galleria_ipc::Protocol;
 use galleria_profile::openvpn_text::Item;
 use galleria_profile::{
-    ConfigIssue, ConfigIssueKind, FileSecretStore, KeyringSecretStore, LayeredSecretStore, Profile,
-    ProfileStore, SecretStore, Settings, Skipped, StoreError, StoreKind, WireGuardProfile, Writes,
-    check_openvpn_config, keyring_present, render_wireguard,
+    ConfigIssue, ConfigIssueKind, FileSecretStore, Profile, ProfileStore, SecretStore, Settings,
+    Skipped, StoreError, StoreKind, WireGuardProfile, check_openvpn_config, render_wireguard,
 };
+#[cfg(target_os = "linux")]
+use galleria_profile::{KeyringSecretStore, LayeredSecretStore, Writes, keyring_present};
 use serde::Serialize;
 use std::{
     path::{Path, PathBuf},
@@ -192,6 +193,7 @@ pub type StoreProbe = Arc<dyn Fn() -> StoreKind + Send + Sync>;
 
 /// The archive of the window (spec §9, D25): the keyring when the session has one, the file when it has not, reading from
 /// both. It is the only place of the crate that builds a `FileSecretStore`.
+#[cfg(target_os = "linux")]
 fn layered_secrets(dir: &Path, profile_name: &str) -> Result<Box<dyn SecretStore>, StoreError> {
     let keyring = KeyringSecretStore::open()
         .map(|keyring| Box::new(keyring.labelled(profile_name)) as Box<dyn SecretStore>);
@@ -202,10 +204,22 @@ fn layered_secrets(dir: &Path, profile_name: &str) -> Result<Box<dyn SecretStore
     )))
 }
 
+/// There is no keyring but the Secret Service of Linux: elsewhere the file is the only archive.
+#[cfg(not(target_os = "linux"))]
+fn layered_secrets(dir: &Path, profile_name: &str) -> Result<Box<dyn SecretStore>, StoreError> {
+    file_secrets(dir, profile_name)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn keyring_or_file() -> StoreKind {
+    StoreKind::File
+}
+
 fn file_secrets(dir: &Path, _profile_name: &str) -> Result<Box<dyn SecretStore>, StoreError> {
     Ok(Box::new(FileSecretStore::open(dir)?))
 }
 
+#[cfg(target_os = "linux")]
 fn keyring_or_file() -> StoreKind {
     if keyring_present() {
         StoreKind::Keyring

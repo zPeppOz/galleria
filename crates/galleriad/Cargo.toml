@@ -17,10 +17,12 @@ uuid.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 clap.workspace = true
+tokio-util.workspace = true
+
+[target.'cfg(unix)'.dependencies]
 libc.workspace = true
 rustix.workspace = true
 nix.workspace = true
-tokio-util.workspace = true
 
 [dev-dependencies]
 galleria-ipc = { workspace = true, features = ["client"] }

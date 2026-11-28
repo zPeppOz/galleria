@@ -14,8 +14,10 @@ galleria-profile = { path = "../galleria-profile" }
 clap.workspace = true
 tokio.workspace = true
 serde_json.workspace = true
-nix = { workspace = true, features = ["term"] }
 zeroize.workspace = true
+[target.'cfg(unix)'.dependencies]
+nix = { workspace = true, features = ["term"] }
+
 [dev-dependencies]
 rstest.workspace = true
 tempfile.workspace = true

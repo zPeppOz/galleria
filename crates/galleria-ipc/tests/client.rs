@@ -1,4 +1,4 @@
-#![cfg(feature = "client")]
+#![cfg(all(feature = "client", unix))]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 use galleria_ipc::{client::*, *};
 use serde_json::{Value, json};

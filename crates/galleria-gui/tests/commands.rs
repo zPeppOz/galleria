@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! Level-2 tests of the Tauri commands and events, on the mock runtime of `tauri::test` (S4) and against a real
 //! daemon with a fake backend. The webview is simulated: commands are invoked through the same entry point the
 //! webview uses, events are heard with a Rust listener.

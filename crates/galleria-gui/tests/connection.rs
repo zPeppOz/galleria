@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! Connecting from the window (plan B5, T4): `connect_profile` and `disconnect` against a real daemon with a fake backend, the
 //! replacement of a session, the last use of a profile, the announcements of the state, and that no command, no event and no
 //! line of `stderr` carries a secret. The commands are invoked as the webview does; the events are heard with a Rust listener.

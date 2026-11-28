@@ -1,20 +1,33 @@
 #![deny(unsafe_code)]
+/// Windows: the daemon is not there yet (the service is P2); it says so and leaves with 2.
+#[cfg(windows)]
+fn main() {
+    eprintln!("galleriad: Windows is not supported yet");
+    std::process::exit(2);
+}
+#[cfg(unix)]
 use clap::{Parser, Subcommand};
+#[cfg(unix)]
 use galleria_net::{NetManager, SystemRunner};
+#[cfg(unix)]
 use galleriad::{
     config::DaemonConfig,
     machine::RetryPolicy,
     manager::spawn_manager,
     server::{DaemonInfo, serve},
 };
+#[cfg(unix)]
 use std::{path::PathBuf, sync::Arc};
+#[cfg(unix)]
 use tokio_util::sync::CancellationToken;
+#[cfg(unix)]
 #[derive(Parser)]
 #[command(version, about = "Galleria system daemon")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
 }
+#[cfg(unix)]
 #[derive(Subcommand)]
 enum Command {
     OvpnHook {
@@ -31,6 +44,7 @@ enum Command {
         runtime_dir: Option<PathBuf>,
     },
 }
+#[cfg(unix)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();

@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! Import from a file or from pasted text (plan B4, T1). The files are the fixtures of the GUI (`galleria-gui/tests/support`),
 //! so that what is tried here is what the window, the smoke test and the screen reader check try.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

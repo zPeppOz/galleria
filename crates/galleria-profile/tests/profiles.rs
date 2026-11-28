@@ -1,3 +1,4 @@
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 use galleria_ipc::{BackendParams, Secret};
 use galleria_profile::*;

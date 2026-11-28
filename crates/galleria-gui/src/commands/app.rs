@@ -13,14 +13,25 @@ pub struct AppInfo {
     pub group: String,
 }
 
+/// The name of the account of the process: from the system, not from `$USER` (Unix).
+#[cfg(unix)]
+fn account_name() -> String {
+    let uid = nix::unistd::getuid();
+    match nix::unistd::User::from_uid(uid) {
+        Ok(Some(user)) => user.name,
+        _ => uid.to_string(),
+    }
+}
+/// Windows: the name of the account is in `USERNAME`.
+#[cfg(windows)]
+fn account_name() -> String {
+    std::env::var("USERNAME").unwrap_or_default()
+}
+
 impl AppInfo {
     /// `user` comes from the system account of the running process, not from `$USER`.
     pub fn new(socket: &Path) -> Self {
-        let uid = nix::unistd::getuid();
-        let user = match nix::unistd::User::from_uid(uid) {
-            Ok(Some(user)) => user.name,
-            _ => uid.to_string(),
-        };
+        let user = account_name();
         Self {
             version: env!("CARGO_PKG_VERSION").to_owned(),
             socket_path: socket.display().to_string(),

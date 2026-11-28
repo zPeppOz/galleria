@@ -3,9 +3,10 @@
 //! own, and the file never passes through the webview.
 
 use galleria_ipc::Protocol;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     io::Write,
-    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
 
@@ -89,6 +90,8 @@ pub fn write_export(path: &Path, text: &str) -> Result<(), ExportError> {
         _ => Path::new("."),
     };
     let mut file = tempfile::NamedTempFile::new_in(folder).map_err(fail)?;
+    // Windows: the file is written without `chmod`; a file made in a folder of the user is the user's.
+    #[cfg(unix)]
     file.as_file()
         .set_permissions(std::fs::Permissions::from_mode(0o600))
         .map_err(fail)?;

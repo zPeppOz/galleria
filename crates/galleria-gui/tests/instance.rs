@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! One window and the files that are handed to it (plan B4, T5, Q36 (b)): the arguments, the lock that dies with the process,
 //! the private socket, and a channel that closes whatever is not one line of paths from the same user. No window, no
 //! WebKit: the first process is a thread with its own runtime, and the second is `claim` in the test.

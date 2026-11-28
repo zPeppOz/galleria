@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! The tray (plan B6, T1, T2): the menu out of the model, with the tables of the plan; the tray that keeps it and writes it again
 //! only when it changed; the texts of the page; and, on the mock runtime, the click on an entry.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

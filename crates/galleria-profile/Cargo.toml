@@ -15,13 +15,15 @@ time.workspace = true
 uuid.workspace = true
 thiserror.workspace = true
 zeroize.workspace = true
-rustix.workspace = true
-nix.workspace = true
 tempfile.workspace = true
 [dev-dependencies]
 rstest.workspace = true
 [lints]
 workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix.workspace = true
+nix.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus-secret-service = { version = "4.2.0", features = ["vendored"] }

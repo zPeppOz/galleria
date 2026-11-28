@@ -1,3 +1,4 @@
+#![cfg(target_os = "linux")]
 //! G4, G7 and G9 in the laboratory, the half seen from the client (plan B5, T9 and T10, Q42 (b)): what the client saw and kept
 //! while the window of the GUI, in the `galleria-gui-dev` image, drove its real daemon through the bridge of
 //! `lab/tests/gui-daemon-relay.py` (`scripts/gui.sh lab-connect <26|27|79>`).

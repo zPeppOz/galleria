@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! The text «Export» writes (plan B3, T8, Q31): the native file of a profile with its keys put back in, which the import
 //! reads back into the same profile and the same secrets.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

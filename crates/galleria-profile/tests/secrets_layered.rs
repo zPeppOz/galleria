@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! The layered archive of the secrets (plan B5, T1): the keyring first, then the file. The keyring here is an archive in
 //! memory with a «locked» switch, so these tests run without a bus; the real one is tried by `tests/keyring.rs`.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

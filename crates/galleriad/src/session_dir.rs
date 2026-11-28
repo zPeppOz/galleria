@@ -1,16 +1,24 @@
+#[cfg(unix)]
+use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::{
     fs::{self, DirBuilder},
     io,
-    os::unix::fs::{DirBuilderExt, PermissionsExt},
     path::{Path, PathBuf},
 };
+#[cfg(unix)]
 fn private_dir(path: &Path) -> io::Result<()> {
     DirBuilder::new().mode(0o700).create(path)
+}
+/// Windows: the folder under `%PROGRAMDATA%` takes its protection from the descriptor that the service sets (P2-T3).
+#[cfg(windows)]
+fn private_dir(path: &Path) -> io::Result<()> {
+    DirBuilder::new().create(path)
 }
 fn session_root(runtime_dir: &Path) -> io::Result<PathBuf> {
     let root = runtime_dir.join("s");
     match fs::symlink_metadata(&root) {
         Ok(meta) if meta.is_dir() && !meta.file_type().is_symlink() => {
+            #[cfg(unix)]
             fs::set_permissions(&root, fs::Permissions::from_mode(0o700))?;
         }
         Ok(_) => return Err(io::Error::other("Invalid session root")),

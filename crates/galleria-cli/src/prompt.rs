@@ -1,10 +1,14 @@
 use crate::commands::{CliError, failure};
 use galleria_ipc::*;
+#[cfg(unix)]
 use nix::sys::termios::{self, LocalFlags, SetArg, Termios};
+#[cfg(unix)]
+use std::io::BufReader;
+#[cfg(unix)]
+use std::os::fd::AsFd;
 use std::{
     fs::File,
-    io::{self, BufRead, BufReader, Write},
-    os::fd::AsFd,
+    io::{self, BufRead, Write},
 };
 use zeroize::Zeroizing;
 fn line(reader: &mut impl BufRead) -> Result<Secret, CliError> {
@@ -35,10 +39,12 @@ pub fn stdin_secrets(
         ..Default::default()
     })
 }
+#[cfg(unix)]
 struct Restore<'a, F: AsFd> {
     fd: &'a F,
     attributes: Termios,
 }
+#[cfg(unix)]
 impl<F: AsFd> Drop for Restore<'_, F> {
     fn drop(&mut self) {
         let _ = termios::tcsetattr(self.fd, SetArg::TCSANOW, &self.attributes);
@@ -47,6 +53,18 @@ impl<F: AsFd> Drop for Restore<'_, F> {
 pub fn read_hidden_from(tty: &File) -> Result<Secret, CliError> {
     hidden_from(tty, || Ok(()))
 }
+/// Windows: the console without echo is not written yet, so a hidden request fails with a text instead of echoing.
+#[cfg(windows)]
+fn hidden_from(
+    _tty: &File,
+    _before_read: impl FnOnce() -> Result<(), CliError>,
+) -> Result<Secret, CliError> {
+    Err(CliError {
+        code: 1,
+        message: "A password without echo is not supported on Windows yet".into(),
+    })
+}
+#[cfg(unix)]
 fn hidden_from(
     tty: &File,
     before_read: impl FnOnce() -> Result<(), CliError>,

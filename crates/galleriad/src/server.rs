@@ -1,3 +1,4 @@
+pub use crate::daemon_info::DaemonInfo;
 use crate::{
     auth::*, config::DaemonConfig, dispatch::dispatch, manager::ManagerHandle,
     session_dir::purge_session_dirs,
@@ -18,12 +19,6 @@ use tokio::{
     task::JoinSet,
 };
 use tokio_util::sync::CancellationToken;
-#[derive(Clone)]
-pub struct DaemonInfo {
-    pub version: String,
-    pub backends: Vec<BackendInfo>,
-    pub backend_probe: Option<std::sync::Arc<dyn Fn() -> Vec<BackendInfo> + Send + Sync>>,
-}
 struct SocketGuard {
     path: PathBuf,
     dev: u64,

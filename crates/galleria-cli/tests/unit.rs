@@ -123,6 +123,7 @@ fn stdin_secrets_are_read_in_order() {
     assert_eq!(values.otp.unwrap().expose(), "123456");
 }
 #[test]
+#[cfg(unix)]
 fn prompt_never_echoes() {
     use nix::{
         pty::openpty,
@@ -163,6 +164,7 @@ fn status_json_is_the_ipc_status() {
 }
 
 #[test]
+#[cfg(unix)]
 fn echo_is_disabled_before_the_prompt_becomes_observable() {
     use nix::{
         pty::openpty,

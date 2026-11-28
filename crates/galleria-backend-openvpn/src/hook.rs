@@ -1,6 +1,10 @@
 use crate::hookenv::HOOK_ENV_PREFIXES;
-use std::{collections::BTreeMap, path::Path};
-use tokio::sync::{mpsc, oneshot};
+use std::collections::BTreeMap;
+#[cfg(unix)]
+use std::path::Path;
+#[cfg(unix)]
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 pub struct HookCall {
     pub env: BTreeMap<String, String>,
     pub reply: oneshot::Sender<bool>,
@@ -25,6 +29,7 @@ pub fn exit_code(kind: &str, verdict: Option<bool>) -> i32 {
         1
     }
 }
+#[cfg(unix)]
 pub fn hook_main(socket: &Path) -> i32 {
     use std::{
         io::{Read, Write},
@@ -53,6 +58,7 @@ pub fn hook_main(socket: &Path) -> i32 {
     })();
     exit_code(kind, result)
 }
+#[cfg(unix)]
 pub(crate) async fn serve_hook(listener: tokio::net::UnixListener, calls: mpsc::Sender<HookCall>) {
     use tokio::io::{AsyncWriteExt, BufReader};
     let mut workers = tokio::task::JoinSet::new();

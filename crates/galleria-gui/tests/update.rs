@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! The version check (plan B6, T4, G11): when it asks, what it takes from the answer, and what it sends. The server of these tests is a
 //! `TcpListener` in a thread that counts the connections and keeps every request as it came; the request itself is made by libsoup
 //! (`update_soup`), with the main loop of GLib running in a thread of the test, as the one of the app runs in its main thread.

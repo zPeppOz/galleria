@@ -9,13 +9,17 @@
 //! refer to, and the malicious profile of the laboratory) into that folder and nothing else; it does not touch the
 //! rubrica and prints the paths, one per line, as `name=path`.
 
+#[cfg(unix)]
 #[path = "../tests/support/fixtures.rs"]
 mod fixtures;
+#[cfg(unix)]
 #[path = "../tests/support/seed.rs"]
 mod seed;
 
+#[cfg(unix)]
 use std::{path::PathBuf, process::ExitCode};
 
+#[cfg(unix)]
 fn write_fixtures(folder: &str) -> ExitCode {
     let files = fixtures::write_fixtures(&PathBuf::from(folder));
     for (name, path) in [
@@ -32,6 +36,7 @@ fn write_fixtures(folder: &str) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+#[cfg(unix)]
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if let Some(at) = args.iter().position(|a| a == "--fixtures") {
@@ -54,4 +59,11 @@ fn main() -> ExitCode {
         dir.display()
     );
     ExitCode::SUCCESS
+}
+
+/// Windows: the rubrica of the smoke test is the Linux one; there is nothing to write.
+#[cfg(not(unix))]
+fn main() {
+    eprintln!("seed-rubrica: Unix only");
+    std::process::exit(2);
 }

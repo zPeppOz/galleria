@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! The rubrica in reading (plan B3, T3): the views, the two commands on the mock runtime, the errors, and that no
 //! command returns a secret (R3). Everything runs without a daemon: the socket given to the app does not exist.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

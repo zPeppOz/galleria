@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! Duplicate, export and delete (plan B3, T8): what is written, what is not, and that no secret and no path crosses the
 //! command. The window «Save» is a `SavePicker` that the tests replace.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

@@ -8,12 +8,10 @@
 
 use crate::{ImportError, Imported, import_openvpn_bytes, import_wireguard};
 use galleria_ipc::Protocol;
-use rustix::fs::OFlags;
 use std::{
     cell::Cell,
     fs::File,
     io::Read,
-    os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
 };
 use zeroize::Zeroizing;
@@ -67,13 +65,7 @@ pub fn import_text(text: &str, name: &str) -> Result<Imported, ImportError> {
 
 /// Opens `path` without blocking and reads at most the ceiling of a regular file.
 fn read_regular(path: &Path) -> Result<Zeroizing<Vec<u8>>, ImportFileError> {
-    // `O_NONBLOCK`: opening a FIFO that nobody writes to would wait for ever otherwise.
-    let flags = i32::try_from(OFlags::NONBLOCK.bits()).unwrap_or(0);
-    let file = std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(flags)
-        .open(path)
-        .map_err(ImportFileError::Unreadable)?;
+    let file = crate::sys::open_for_import(path).map_err(ImportFileError::Unreadable)?;
     let meta = file.metadata().map_err(ImportFileError::Unreadable)?;
     if !meta.is_file() {
         return Err(ImportFileError::NotAFile);

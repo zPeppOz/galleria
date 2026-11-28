@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! The session of someone else (plan B5, T8, D21): a session whose profile the rubrica does not have is foreign, and the window is told
 //! so by Rust, which looks at the rubrica when the daemon answers. Nothing here sends the replacement on its own.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

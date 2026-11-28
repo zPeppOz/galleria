@@ -11,6 +11,7 @@ mod secrets_keyring;
 mod secrets_layered;
 mod settings;
 mod store;
+mod sys;
 pub use export::*;
 use galleria_ipc::{
     BackendParams, ConnectOptions, ConnectParams, OpenVpnParams, ProfileRef, Protocol,

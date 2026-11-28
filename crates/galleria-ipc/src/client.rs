@@ -2,10 +2,12 @@ use crate::*;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use std::{collections::VecDeque, io, path::Path};
-use tokio::{
-    io::{AsyncWriteExt, BufReader},
-    net::UnixStream,
-};
+use tokio::io::{AsyncWriteExt, BufReader};
+#[cfg(unix)]
+type Transport = tokio::net::UnixStream;
+/// Windows has no transport yet (the named pipe is P2): the type only has to exist, `connect` never makes one.
+#[cfg(windows)]
+type Transport = tokio::io::DuplexStream;
 #[derive(Debug, thiserror::Error)]
 pub enum ClientError {
     #[error("IPC I/O failed")]
@@ -18,13 +20,21 @@ pub enum ClientError {
     PermissionDenied,
 }
 pub struct Client {
-    stream: BufReader<UnixStream>,
+    stream: BufReader<Transport>,
     next_id: u64,
     events: VecDeque<Event>,
 }
 impl Client {
+    #[cfg(windows)]
+    pub async fn connect(_path: &Path) -> Result<Self, ClientError> {
+        Err(ClientError::Io(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "galleria: the Windows transport is not there yet",
+        )))
+    }
+    #[cfg(unix)]
     pub async fn connect(path: &Path) -> Result<Self, ClientError> {
-        let stream = UnixStream::connect(path).await.map_err(|e| {
+        let stream = Transport::connect(path).await.map_err(|e| {
             if e.kind() == io::ErrorKind::PermissionDenied {
                 ClientError::PermissionDenied
             } else {

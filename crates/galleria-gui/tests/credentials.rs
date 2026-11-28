@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! Asking for credentials from the window and remembering them (plan B5, T6): `provide_input` and `forget_credentials` against a real
 //! daemon with a fake backend, «Ricorda» only after `connected`, never for a code or a passphrase, and that no command, no event
 //! and no line of `stderr` carries what was typed (the rule of «Il viaggio di una credenziale»).

@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! Level-2 tests of the daemon link against a real daemon with a fake backend and against scripted servers.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 mod support;

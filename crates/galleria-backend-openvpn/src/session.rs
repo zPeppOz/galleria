@@ -33,6 +33,8 @@ impl Credentials {
         self
     }
 }
+// The fields are read by the Unix session; on Windows OpenVPN does not run yet (P4).
+#[cfg_attr(windows, allow(dead_code))]
 pub struct OpenVpnBackend {
     pub(crate) cfg: ValidOpenVpn,
     pub(crate) bin: crate::plat::OpenVpnBinary,

@@ -252,6 +252,7 @@ fn manual_client_and_link_options_are_supported(#[case] name: &str) {
 }
 #[test]
 #[ignore = "requires lab/gen-pki.sh generated profiles"]
+#[cfg(target_os = "linux")]
 fn lab_profiles_use_known_directives() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lab/out");
     let mut count = 0;

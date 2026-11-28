@@ -7,12 +7,15 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
-    ffi::OsString,
     fs,
-    io::Write,
-    os::unix::fs::{DirBuilderExt, PermissionsExt},
     path::{Path, PathBuf},
     sync::Mutex,
+};
+#[cfg(unix)]
+use std::{
+    ffi::OsString,
+    io::Write,
+    os::unix::fs::{DirBuilderExt, PermissionsExt},
 };
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use uuid::Uuid;
@@ -211,6 +214,7 @@ pub struct UiStateFile {
 
 /// `$XDG_STATE_HOME/galleria/state.toml`, or `$HOME/.local/state/galleria/state.toml`. Pure, so it can be tried
 /// without touching the environment of the test process.
+#[cfg(unix)]
 pub fn state_path(xdg_state_home: Option<OsString>, home: Option<OsString>) -> PathBuf {
     let base = match xdg_state_home.filter(|s| !s.is_empty()) {
         Some(dir) => PathBuf::from(dir),
@@ -227,8 +231,15 @@ impl UiStateFile {
         }
     }
 
+    #[cfg(unix)]
     pub fn default_path() -> PathBuf {
         state_path(std::env::var_os("XDG_STATE_HOME"), std::env::var_os("HOME"))
+    }
+
+    /// Windows: for now the minimum that compiles; `%LOCALAPPDATA%\galleria\state.toml` is written in T5, with its proofs.
+    #[cfg(windows)]
+    pub fn default_path() -> PathBuf {
+        PathBuf::new()
     }
 
     pub fn path(&self) -> &Path {
@@ -290,6 +301,16 @@ impl UiStateFile {
         Ok(state)
     }
 
+    /// Windows: the same, for now the minimum that compiles; the real write is T5.
+    #[cfg(windows)]
+    fn write(&self, _text: &str) -> std::io::Result<()> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "galleria: the state file is not there yet on Windows",
+        ))
+    }
+
+    #[cfg(unix)]
     fn write(&self, text: &str) -> std::io::Result<()> {
         let dir = self
             .path

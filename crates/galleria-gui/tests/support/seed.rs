@@ -9,7 +9,9 @@
 use galleria_profile::{
     FileSecretStore, ProfileStore, SecretStore, import_openvpn, import_wireguard,
 };
-use std::{fs, os::unix::fs::PermissionsExt, path::Path};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::{fs, path::Path};
 use uuid::Uuid;
 
 pub const SECRET_MARK: &str = "SEED-SECRET-";
@@ -141,6 +143,7 @@ pub fn seed(dir: &Path, empty: bool) -> Seeded {
         format!("schema_version = 1\ngroups = [{groups}]\n"),
     )
     .unwrap();
+    #[cfg(unix)]
     fs::set_permissions(&settings, fs::Permissions::from_mode(0o600)).unwrap();
     seeded
 }

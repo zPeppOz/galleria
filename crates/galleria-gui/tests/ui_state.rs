@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! `state.toml` (D32, Q25, Q34): the pure module and, on the mock runtime, the two commands that expose it.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

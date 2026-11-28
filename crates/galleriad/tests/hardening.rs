@@ -1,3 +1,4 @@
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 #[test]
 fn harden_process_makes_it_not_dumpable() {

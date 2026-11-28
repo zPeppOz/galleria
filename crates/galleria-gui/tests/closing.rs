@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! What closing the window and quitting do (plan B6, T3): the decision with its table, the unsaved bit that stops both, the commands that
 //! answer `{ done }`, and the question «is there a tray to come back from» on a bus. The event of the close itself (the «X») cannot be sent on
 //! the mock runtime: the smoke test of the window sends the request a window manager would (`G10c`, `G10e`, `G10f`).

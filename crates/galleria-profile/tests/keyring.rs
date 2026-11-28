@@ -1,3 +1,4 @@
+#![cfg(target_os = "linux")]
 //! The keyring store against a real Secret Service (plan B5, T2). Every test here is `#[ignore]`: `cargo test --workspace`
 //! does not run them, and `scripts/gui.sh keyring` (lab/tests/gui-keyring.sh) runs them three times, each under a session
 //! bus of its own with GNOME Keyring unlocked, locked or absent, and says which with `GALLERIA_KEYRING_CASE`.

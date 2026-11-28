@@ -20,6 +20,8 @@ pub struct ManagerHandle {
     events: broadcast::Sender<Event>,
 }
 enum Command {
+    // Only the Unix server asks for it; the Windows one is P2.
+    #[cfg_attr(windows, allow(dead_code))]
     Recover(oneshot::Sender<Result<(), SessionError>>),
     Logs(LogsParams, oneshot::Sender<LogsResult>),
     Audit(u32, &'static str),
@@ -72,6 +74,7 @@ impl ManagerHandle {
             .map_err(|_| closed())?;
         rx.await.map_err(|_| closed())?
     }
+    #[cfg_attr(windows, allow(dead_code))]
     pub(crate) async fn recover(&self) -> Result<(), SessionError> {
         let (tx, rx) = oneshot::channel();
         self.commands

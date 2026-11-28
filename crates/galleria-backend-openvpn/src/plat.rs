@@ -1,16 +1,20 @@
+#[cfg(unix)]
 use crate::{
     config::*,
     hookenv::ProfileFacts,
-    session::{Credentials, OpenVpnBackend, drive_with_output},
-    version::*,
+    session::{Credentials, drive_with_output},
 };
+use crate::{session::OpenVpnBackend, version::*};
 use galleria_backend::*;
+#[cfg(unix)]
 use galleria_ipc::*;
-use std::{path::PathBuf, process::Stdio, time::Duration};
-use tokio::{
-    io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader},
-    sync::mpsc,
-};
+use std::path::PathBuf;
+#[cfg(unix)]
+use std::{process::Stdio, time::Duration};
+#[cfg(unix)]
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader};
+use tokio::sync::mpsc;
+#[cfg(unix)]
 use zeroize::Zeroizing;
 #[derive(Debug, Clone)]
 pub struct OpenVpnBinary {
@@ -22,6 +26,12 @@ pub enum Unavailable {
     NotFound,
     TooOld(OpenVpnVersion),
 }
+/// Windows: nothing is looked for yet (the search in the registry is P4), so OpenVPN is never found.
+#[cfg(windows)]
+pub fn probe() -> Result<OpenVpnBinary, Unavailable> {
+    Err(Unavailable::NotFound)
+}
+#[cfg(unix)]
 pub fn probe() -> Result<OpenVpnBinary, Unavailable> {
     for path in ["/usr/sbin/openvpn", "/usr/bin/openvpn"] {
         let Ok(out) = std::process::Command::new(path)
@@ -48,12 +58,15 @@ pub fn probe() -> Result<OpenVpnBinary, Unavailable> {
     }
     Err(Unavailable::NotFound)
 }
+#[cfg(unix)]
 struct Abort(tokio::task::JoinHandle<()>);
+#[cfg(unix)]
 impl Drop for Abort {
     fn drop(&mut self) {
         self.0.abort();
     }
 }
+#[cfg(unix)]
 async fn logs<R: AsyncRead + Unpin>(input: R, events: mpsc::Sender<BackendEvent>) {
     let mut lines = BufReader::new(input).lines();
     while let Ok(Some(line)) = lines.next_line().await {
@@ -69,6 +82,15 @@ async fn logs<R: AsyncRead + Unpin>(input: R, events: mpsc::Sender<BackendEvent>
         }
     }
 }
+#[cfg(windows)]
+pub(crate) async fn run(
+    _backend: OpenVpnBackend,
+    _ctx: &SessionContext,
+    _commands: mpsc::Receiver<BackendCommand>,
+) -> ExitReason {
+    ExitReason::Transport("OpenVPN is not supported on Windows yet".into())
+}
+#[cfg(unix)]
 pub(crate) async fn run(
     mut backend: OpenVpnBackend,
     ctx: &SessionContext,

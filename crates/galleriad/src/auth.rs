@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use std::{io, os::fd::AsFd};
 pub struct PeerCreds {
     pub uid: u32,
@@ -14,6 +15,7 @@ pub fn authorize(creds: &PeerCreds, policy: &AccessPolicy) -> bool {
             .allowed_gid
             .is_some_and(|gid| creds.gid == gid || creds.groups.contains(&gid))
 }
+#[cfg(unix)]
 pub fn peer_creds(stream: &tokio::net::UnixStream) -> io::Result<PeerCreds> {
     let creds = stream.peer_cred()?;
     Ok(PeerCreds {

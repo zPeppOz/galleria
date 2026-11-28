@@ -1,5 +1,7 @@
 use crate::manager::BackendFactory;
-use galleria_backend_wireguard::{KernelDevice, WireGuardBackend, validate};
+#[cfg(target_os = "linux")]
+use galleria_backend_wireguard::KernelDevice;
+use galleria_backend_wireguard::{WgDevice, WireGuardBackend, validate};
 use galleria_ipc::*;
 use std::{path::PathBuf, sync::Arc};
 pub fn real_factory(daemon_exe: PathBuf) -> BackendFactory {
@@ -17,13 +19,8 @@ fn factory_with_probe(
                     ErrorCode::BackendUnavailable.to_rpc("WireGuard kernel module is unavailable")
                 );
             }
-            let device = KernelDevice::new()
-                .map_err(|_| ErrorCode::BackendUnavailable.to_rpc("WireGuard is unavailable"))?;
-            Ok(Box::new(WireGuardBackend::new(
-                cfg,
-                options,
-                Box::new(device),
-            )))
+            let device = new_wireguard_device()?;
+            Ok(Box::new(WireGuardBackend::new(cfg, options, device)))
         }
         BackendParams::Openvpn(p) => {
             let cfg = galleria_backend_openvpn::config::validate(p)?;
@@ -38,6 +35,17 @@ fn factory_with_probe(
             )))
         }
     })
+}
+/// The WireGuard of the kernel is the only device there is, and only on Linux: elsewhere WireGuard is unavailable.
+#[cfg(target_os = "linux")]
+fn new_wireguard_device() -> Result<Box<dyn WgDevice>, RpcError> {
+    KernelDevice::new()
+        .map(|device| Box::new(device) as Box<dyn WgDevice>)
+        .map_err(|_| ErrorCode::BackendUnavailable.to_rpc("WireGuard is unavailable"))
+}
+#[cfg(not(target_os = "linux"))]
+fn new_wireguard_device() -> Result<Box<dyn WgDevice>, RpcError> {
+    Err(ErrorCode::BackendUnavailable.to_rpc("WireGuard is not supported on this system yet"))
 }
 pub fn wireguard_available() -> bool {
     if std::path::Path::new("/sys/module/wireguard").exists() {

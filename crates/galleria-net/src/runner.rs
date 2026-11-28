@@ -1,8 +1,9 @@
 use crate::{Cmd, NetError, Program};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     collections::HashMap,
     io::Read,
-    os::unix::fs::PermissionsExt,
     path::PathBuf,
     process::{Command, Stdio},
     time::{Duration, Instant},
@@ -14,6 +15,12 @@ pub struct SystemRunner {
     paths: HashMap<&'static str, PathBuf>,
 }
 impl SystemRunner {
+    /// Windows: the plan of today (`ip`, `resolvectl`, `sysctl`) makes no sense there, and `netsh` is P3.
+    #[cfg(windows)]
+    pub fn locate() -> Result<Self, NetError> {
+        Err(NetError::ToolMissing("ip"))
+    }
+    #[cfg(unix)]
     pub fn locate() -> Result<Self, NetError> {
         let mut paths = HashMap::new();
         for name in ["ip", "resolvectl", "sysctl"] {
@@ -171,7 +178,7 @@ impl CommandRunner for SystemRunner {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;

@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! `galleria.toml` (the groups of the rubrica) and the lenient listing of the profiles (plan B3, T3, Q29, Q30).
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 use galleria_profile::*;

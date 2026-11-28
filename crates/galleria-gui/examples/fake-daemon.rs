@@ -5,12 +5,15 @@
 //!
 //! Usage: `fake-daemon <dir> [--scenario <name>]`. A scenario is a list of scripts of the fake backend, one for each
 //! `connect` (plan B5, P16; the names are in `tests/support/scenarios.rs`). Without one the backend says nothing.
+#[cfg(unix)]
 #[path = "../tests/support/mod.rs"]
 mod support;
 
+#[cfg(unix)]
 use support::{FakeDaemon, Harness, info, scenarios};
+#[cfg(unix)]
 use tokio::signal::unix::{SignalKind, signal};
-
+#[cfg(unix)]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let mut args = std::env::args_os().skip(1);
@@ -35,4 +38,11 @@ async fn main() -> anyhow::Result<()> {
     tokio::select! { _ = terminate.recv() => {}, _ = interrupt.recv() => {} }
     daemon.stop().await;
     Ok(())
+}
+
+/// Windows: the daemon of the smoke test is the Unix one; there is nothing to start.
+#[cfg(not(unix))]
+fn main() {
+    eprintln!("fake-daemon: Unix only");
+    std::process::exit(2);
 }

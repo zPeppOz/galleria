@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! The groups of the rubrica (plan B3, T6): created, renamed, deleted and ordered in `galleria.toml`, with the profiles
 //! that belong to them. A group is a name (Q30): who is in it is `Profile.group`, the file holds the order and the empty
 //! groups. No test here touches a secret, and none talks to a daemon.

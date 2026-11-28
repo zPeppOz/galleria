@@ -1,3 +1,4 @@
+#![cfg(target_os = "linux")]
 //! The CLI reads the secrets from the keyring and from the file (plan B5, T2; D25, G6). A fake daemon takes the `connect`
 //! call and hands its parameters to the test: that is where the key material shows up.
 //!

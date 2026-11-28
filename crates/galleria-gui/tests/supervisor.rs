@@ -1,3 +1,4 @@
+#![cfg(unix)]
 //! Level-2 tests of the event supervisor: a real daemon with a fake backend, plus scripted servers.
 //! Every wait is "until X shows up, at most N seconds"; the only fixed sleep is the slow sink of one test.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

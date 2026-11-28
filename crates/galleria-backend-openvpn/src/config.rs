@@ -6,6 +6,8 @@ use std::{collections::BTreeMap, path::Path};
 use zeroize::Zeroize;
 pub struct ValidOpenVpn {
     pub(crate) items: Vec<Item>,
+    // Read by the Unix session; on Windows OpenVPN does not run yet (P4).
+    #[cfg_attr(windows, allow(dead_code))]
     pub(crate) credentials: InputValues,
     pub(crate) secrets: BTreeMap<String, Secret>,
 }

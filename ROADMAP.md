@@ -141,7 +141,9 @@ Demone come servizio Windows con WireGuardNT e OpenVPN installato come prerequis
 - [ ] Spec e piano della fase 3 <!-- branch: galleria/t_efe58c01-galleria-spec-e-piano-della-fase-3-porti · task: t_efe58c01 · by: nello -->
   - [x] spec `docs/superpowers/specs/2026-11-26-fase3-windows-design.md`: criteri W1–W13, con i due rinviati dalla fase 1 (Q2) e i punti aperti di `docs/05-esito-spike-windows.md` §8; solo documenti, niente eseguito su Windows
   - [x] piano a blocchi `docs/superpowers/plans/2026-11-26-fase3-windows.md`: essenziale P1–P6 181 h (forchetta 160–240), rifinitura P7–P8 56 h
-  - [ ] decisione di Peppe: se farla e fin dove (Q60), ambiente di prova e ISO (Q58, Q59), firma (Q61); Q58–Q73 nella spec §18
+  - [x] decisione di Peppe del 2026-11-27: **solo P1** (Q60 = a), runner e VM di valutazione (Q58 = a), ISO e `swtpm` messi da Peppe (Q59); Q68 = (a) adottata da Aitano. Firma (Q61) e il resto di Q61–Q73 aspettano la decisione su P2
+  - [x] piano di dettaglio di P1 `docs/superpowers/plans/2026-11-27-fase3-p1.md`: 32 h in tre card (B 13 h, A1 13 h, A2 6 h); esito in `docs/09-esito-fase3.md` <!-- task: t_89e28ae2 · by: nello -->
+  - [ ] da Peppe prima di P1-A1: la ISO in `/mnt/b/vm` e `sudo apt install swtpm swtpm-tools`; risposte a Q74 (server di R-A) e Q75 (se la VM non regge), nel piano di P1
 - [ ] Servizio e named pipe
   - [ ] servizio LocalSystem e pipe con ACL a SYSTEM, Administrators e INTERACTIVE (D18); un utente non autorizzato è rifiutato
 - [ ] Backend WireGuardNT

@@ -12,6 +12,8 @@ mod secrets_layered;
 mod settings;
 mod store;
 mod sys;
+#[cfg(windows)]
+pub mod windows_paths;
 pub use export::*;
 use galleria_ipc::{
     BackendParams, ConnectOptions, ConnectParams, OpenVpnParams, ProfileRef, Protocol,

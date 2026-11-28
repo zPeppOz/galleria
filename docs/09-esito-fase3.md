@@ -36,8 +36,8 @@ Card `t_5d2dccab`. Da scrivere.
 
 ## P1-B · Il workspace compila su Windows (T4a, T5, T4b)
 
-Card `t_4faef896`. **Stato: T4a fatto (commit «gate the unix code of every crate…»); T5 e T4b NON fatti** (finito il
-budget della card). Quindi il job `win-check` non esiste ancora, e U6 e U7 sono «non verificati in CI».
+Card `t_4faef896` (T4a) e `t_227bc768` (T5, T4b). **Stato: T4a, T5 e T4b fatti in locale, niente push.** Il job `win-check`
+è scritto ma **mai eseguito**: U6 e U7 sono «non verificati in CI».
 
 ### T4a · cosa è stato fatto e come è stato provato
 
@@ -114,6 +114,48 @@ sono state eseguite** (wine non le avvia). Le escluse della finestra e di `galle
 scritto il corpo Windows, e provarla sotto wine. **Non fatto.**
 
 **Solo Windows:** `galleria-ipc/tests/client_windows.rs::the_client_says_unsupported_without_a_transport` (1, passa sotto wine).
+
+### T5 · percorsi e protezione dei file su Windows
+
+Commit «put profiles and state under the windows user folders and keep them private». Funzioni **pure** (il valore della
+variabile entra come argomento; assente, vuoto o non assoluto — `profili`, `.\x`, `C:x`, `\x` — dà `None`).
+
+| Cosa | Linux | Windows | Dove |
+|---|---|---|---|
+| profili | `$XDG_CONFIG_HOME/galleria` o `$HOME/.config/galleria` | `%APPDATA%\galleria` | `galleria_profile::windows_paths::profiles_dir`, usata da `sys/windows.rs::default_dir` |
+| stato della finestra | `$XDG_STATE_HOME/galleria/state.toml` | `%LOCALAPPDATA%\galleria\state.toml` | `galleria_gui::ui_state::state_path` (Windows) |
+| cartella del servizio | `/run/galleria` | `%PROGRAMDATA%\Galleria` (solo il percorso; il descrittore è P2-T3) | `galleriad::config::service_dir` |
+| protezione di cartelle e file | `0700`, `0600`, proprietario | nessun permesso scritto da noi: si eredita da `%APPDATA%`/`%LOCALAPPDATA%` (spec §8). Il temporaneo nasce accanto al file finale (`tempfile::NamedTempFile::new_in` + `persist`); un collegamento simbolico o una giunzione nella cartella dei profili è rifiutato come su Unix | `galleria-profile/src/sys/windows.rs`, `ui_state.rs` |
+| file da importare | `O_NONBLOCK`, file regolare, ≤ 1 MiB | aperto con `FILE_FLAG_OPEN_REPARSE_POINT` (senza `unsafe`): un collegamento si apre come tale, non è un file regolare e dà `NotAFile`, l'errore che Linux dà per lo stesso caso (un collegamento a un dispositivo) | `sys/windows.rs::open_for_import` |
+
+Quando la variabile non è usabile (assente, vuota, relativa) `default_dir()` e `default_path()` tornano un percorso vuoto
+(la firma non cambia, Linux invariato): `ProfileStore::open` risponde `Invalid` con «%APPDATA% is missing, empty or not an
+absolute path…», la scrittura dello stato risponde con lo stesso testo per `%LOCALAPPDATA%`, e la lettura dello stato dà i
+valori di default. `DaemonConfig::default()` ricade su `C:\ProgramData\Galleria` se `%PROGRAMDATA%` non è usabile (il
+demone non gira ancora su Windows).
+
+Prove scritte (tutte `cfg(windows)`):
+
+| Prova | File | Dove è stata eseguita |
+|---|---|---|
+| `profiles_live_under_appdata`, `an_empty_or_relative_folder_is_refused` (6 casi), `a_saved_profile_reads_back_and_replaces_the_old_one` | `galleria-profile/tests/windows_paths.rs` | wine: passano |
+| `the_temporary_file_is_made_next_to_the_final_one` | `galleria-profile/src/sys/windows.rs` (prova unitaria: ha bisogno di vedere il temporaneo prima del rinomina, quindi di una cucitura privata `atomic_with`; il piano la voleva in `tests/`) | wine: passa |
+| `the_service_folder_is_under_programdata` | `galleriad/tests/windows_paths.rs` (nel piano stava in `galleria-profile`: `galleriad` non dipende da `galleria-profile` e un'altra dipendenza avrebbe cambiato `Cargo.lock`) | wine: passa |
+| `a_saved_profile_is_not_readable_by_other_users` | `galleria-profile/tests/windows_paths.rs`: legge la DACL con `icacls /save` (SDDL, indipendente dalla lingua) e cerca `WD`/`BU`/`AU` e i SID `S-1-1-0`/`S-1-5-32-545`/`S-1-5-11` | **mai eseguita**: sotto wine non direbbe niente (come da piano) |
+| `a_link_is_not_imported` | stesso file; se non può creare il collegamento **fallisce** | **mai eseguita**: wine crea il collegamento ma poi non lo vede (`symlink_metadata` dà «File not found»), quindi non prova niente; il primo run è `win-check` |
+| `the_state_file_lives_in_localappdata`, `the_state_is_written_and_read_back_on_windows`, `an_unusable_variable_is_named_by_the_error_of_the_write` | `galleria-gui/tests/ui_state_windows.rs` | **compilate** (xcheck), **mai eseguite**: i binari della finestra sotto wine non partono (`WebView2Loader.dll`) |
+
+Sotto wine: `cargo test --workspace --exclude galleria-e2e --exclude galleria-gui -- --skip a_saved_profile_is_not_readable_by_other_users --skip a_link_is_not_imported`
+= **478 passate, 0 fallite, 0 `ignored`, 2 filtrate** (le due saltate a mano: sono le due che qui sopra non provano niente).
+478 = 468 di T4a + 10 prove nuove eseguite. «xcheck» (`cargo clippy --workspace --all-targets -- -D warnings`,
+`x86_64-pc-windows-gnu`) verde.
+
+**Due limiti da portare nella guida di P6:** (1) chi sposta `%APPDATA%` su una condivisione di rete ne eredita i
+permessi: noi non scriviamo ACL, quindi proteggiamo quanto la cartella già protegge; (2) il valore delle variabili lo
+decide chi lancia il programma, come `XDG_CONFIG_HOME` su Linux.
+
+**Non fatto in T5:** rimettere in gioco con `cfg` sulle singole prove i file oggi esclusi a intero (`galleria-profile/tests/*`,
+`rubrica`, `ui_state`): sono ancora le 131 + 362 della tabella qui sopra, e N di `win-check` le conta come escluse.
 
 ### Note per chi scrive `win-check` (T4b, non fatto)
 

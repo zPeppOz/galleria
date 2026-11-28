@@ -5,18 +5,16 @@
 //! newer file gives the defaults) and an unknown key is tolerated and dropped at the next write.
 
 use serde::{Deserialize, Serialize};
+#[cfg(unix)]
+use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     sync::Mutex,
 };
-#[cfg(unix)]
-use std::{
-    ffi::OsString,
-    io::Write,
-    os::unix::fs::{DirBuilderExt, PermissionsExt},
-};
+#[cfg(any(unix, windows))]
+use std::{ffi::OsString, io::Write};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use uuid::Uuid;
 
@@ -223,6 +221,14 @@ pub fn state_path(xdg_state_home: Option<OsString>, home: Option<OsString>) -> P
     base.join("galleria/state.toml")
 }
 
+/// `%LOCALAPPDATA%\galleria\state.toml`: the state is of this machine, not of the roaming profile. Pure, like the Unix
+/// one. A variable that is missing, empty or not absolute gives `None`.
+#[cfg(windows)]
+pub fn state_path(local_appdata: Option<OsString>) -> Option<PathBuf> {
+    galleria_profile::windows_paths::absolute_folder(local_appdata)
+        .map(|dir| dir.join("galleria").join("state.toml"))
+}
+
 impl UiStateFile {
     pub fn new(path: PathBuf) -> Self {
         Self {
@@ -236,10 +242,11 @@ impl UiStateFile {
         state_path(std::env::var_os("XDG_STATE_HOME"), std::env::var_os("HOME"))
     }
 
-    /// Windows: for now the minimum that compiles; `%LOCALAPPDATA%\galleria\state.toml` is written in T5, with its proofs.
+    /// Windows: `%LOCALAPPDATA%\galleria\state.toml`. When the variable cannot be used the path is empty: the file is read
+    /// as missing (the defaults) and a write says which variable is wrong.
     #[cfg(windows)]
     pub fn default_path() -> PathBuf {
-        PathBuf::new()
+        state_path(std::env::var_os("LOCALAPPDATA")).unwrap_or_default()
     }
 
     pub fn path(&self) -> &Path {
@@ -301,13 +308,26 @@ impl UiStateFile {
         Ok(state)
     }
 
-    /// Windows: the same, for now the minimum that compiles; the real write is T5.
+    /// Windows: no permission is written, `%LOCALAPPDATA%` is of the user alone (spec §8). The temporary file is born
+    /// next to the final one, and the rename replaces it.
     #[cfg(windows)]
-    fn write(&self, _text: &str) -> std::io::Result<()> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "galleria: the state file is not there yet on Windows",
-        ))
+    fn write(&self, text: &str) -> std::io::Result<()> {
+        let dir = self
+            .path
+            .parent()
+            .filter(|dir| !dir.as_os_str().is_empty())
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    galleria_profile::windows_paths::unusable("LOCALAPPDATA"),
+                )
+            })?;
+        fs::create_dir_all(dir)?;
+        let mut file = tempfile::NamedTempFile::new_in(dir)?;
+        file.write_all(text.as_bytes())?;
+        file.as_file().sync_all()?;
+        file.persist(&self.path).map_err(|e| e.error)?;
+        Ok(())
     }
 
     #[cfg(unix)]
